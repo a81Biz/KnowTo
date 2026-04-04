@@ -3,22 +3,31 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import type { Env } from '../types/env';
 
 export class SupabaseService {
-  private client: SupabaseClient;
+  private client: SupabaseClient | null;
+  private isDev: boolean;
 
   constructor(env: Env) {
-    this.client = createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, {
-      auth: { autoRefreshToken: false, persistSession: false },
-    });
+    this.isDev = env.ENVIRONMENT !== 'production';
+    // En dev no se necesita conexión real; evitar crash si las vars no están definidas.
+    this.client = this.isDev
+      ? null
+      : createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, {
+          auth: { autoRefreshToken: false, persistSession: false },
+        });
   }
 
   async createProject(params: {
     userId: string;
     name: string;
     clientName: string;
-    industry?: string;
-    email?: string;
+    industry?: string | undefined;
+    email?: string | undefined;
   }): Promise<{ projectId: string }> {
-    const { data, error } = await this.client.rpc('sp_create_project', {
+    if (this.isDev) {
+      return { projectId: crypto.randomUUID() };
+    }
+
+    const { data, error } = await this.client!.rpc('sp_create_project', {
       p_user_id: params.userId,
       p_name: params.name,
       p_client_name: params.clientName,
@@ -36,7 +45,11 @@ export class SupabaseService {
     stepNumber: number;
     inputData: Record<string, unknown>;
   }): Promise<{ stepId: string }> {
-    const { data, error } = await this.client.rpc('sp_save_step', {
+    if (this.isDev) {
+      return { stepId: crypto.randomUUID() };
+    }
+
+    const { data, error } = await this.client!.rpc('sp_save_step', {
       p_project_id: params.projectId,
       p_step_number: params.stepNumber,
       p_input_data: params.inputData,
@@ -54,7 +67,11 @@ export class SupabaseService {
     title: string;
     content: string;
   }): Promise<{ documentId: string }> {
-    const { data, error } = await this.client.rpc('sp_save_document', {
+    if (this.isDev) {
+      return { documentId: crypto.randomUUID() };
+    }
+
+    const { data, error } = await this.client!.rpc('sp_save_document', {
       p_project_id: params.projectId,
       p_step_id: params.stepId,
       p_phase_id: params.phaseId,
@@ -68,7 +85,11 @@ export class SupabaseService {
   }
 
   async getProjectContext(projectId: string): Promise<Record<string, unknown>> {
-    const { data, error } = await this.client.rpc('sp_get_project_context', {
+    if (this.isDev) {
+      return { project: null };
+    }
+
+    const { data, error } = await this.client!.rpc('sp_get_project_context', {
       p_project_id: projectId,
     });
 
@@ -77,14 +98,18 @@ export class SupabaseService {
   }
 
   async markStepError(stepId: string, errorMsg: string): Promise<void> {
-    await this.client.rpc('sp_mark_step_error', {
+    if (this.isDev) return;
+
+    await this.client!.rpc('sp_mark_step_error', {
       p_step_id: stepId,
       p_error_msg: errorMsg,
     });
   }
 
   async getUserProjects(userId: string) {
-    const { data, error } = await this.client
+    if (this.isDev) return [];
+
+    const { data, error } = await this.client!
       .from('vw_project_progress')
       .select('*')
       .eq('user_id', userId)

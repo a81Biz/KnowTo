@@ -36,15 +36,17 @@ services:
   # BACKEND (Cloudflare Worker en modo desarrollo con wrangler)
   # ---------------------------------------------------------------------------
   backend:
-    image: node:20-alpine
+    image: node:20
     container_name: knowto-backend
     working_dir: /app
     # wrangler dev necesita --ip 0.0.0.0 para ser accesible desde fuera del contenedor
     command: >
       sh -c "npm install &&
-             npx wrangler dev src/index.ts --port 8787 --ip 0.0.0.0 --local"
+             npx wrangler dev src/index.ts --port 8787 --ip 0.0.0.0 --local
+             --inspector-port 9229"
     ports:
       - "8787:8787"
+      - "9229:9229"
     volumes:
       - ./backend:/app
       # Volumen nombrado para node_modules — evita conflicto con el bind mount del host

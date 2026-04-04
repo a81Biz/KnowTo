@@ -50,7 +50,8 @@ class PromptRegistry {
         content: raw,
       };
     }
-    const [, frontmatter, content] = frontmatterMatch;
+    const frontmatter = frontmatterMatch[1] ?? '';
+    const content = frontmatterMatch[2] ?? '';
     const metadata: PromptMetadata = { id: 'unknown', name: '', version: '1.0.0', tags: [] };
 
     for (const line of frontmatter.split('\n')) {
@@ -68,6 +69,7 @@ class PromptRegistry {
     }
 
     return { metadata, content: content.trim() };
+
   }
 
   get(id: PromptId): PromptEntry {

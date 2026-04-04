@@ -1,0 +1,53 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    // -------------------------------------------------------------------------
+    // Backend: Cloudflare Worker corriendo en Docker (wrangler dev --local)
+    // Requisito: docker compose up -d  (puerto 9229 debe estar expuesto)
+    // -------------------------------------------------------------------------
+    {
+      "name": "Backend: Attach (Docker)",
+      "type": "node",
+      "request": "attach",
+      "port": 9229,
+      "address": "127.0.0.1",
+      "localRoot": "${workspaceFolder}/backend",
+      "remoteRoot": "/app",
+      "sourceMaps": true,
+      "resolveSourceMapLocations": ["**", "!**/node_modules/**"],
+      "restart": true,
+      "timeout": 30000
+    },
+    // -------------------------------------------------------------------------
+    // Backend: Cloudflare Worker corriendo directamente en el host
+    // Requisito: cd backend && npx wrangler dev --inspector-port 9229
+    // -------------------------------------------------------------------------
+    {
+      "name": "Backend: Attach (Host)",
+      "type": "node",
+      "request": "attach",
+      "port": 9229,
+      "address": "127.0.0.1",
+      "localRoot": "${workspaceFolder}/backend",
+      "remoteRoot": "${workspaceFolder}/backend",
+      "sourceMaps": true,
+      "resolveSourceMapLocations": ["**", "!**/node_modules/**"],
+      "restart": true,
+      "timeout": 30000
+    },
+    // -------------------------------------------------------------------------
+    // Frontend: Chrome/Edge — lanza o adjunta al navegador con DevTools
+    // Requisito: npm run dev en /frontend (Vite en :5173)
+    // -------------------------------------------------------------------------
+    {
+      "name": "Frontend: Chrome",
+      "type": "chrome",
+      "request": "launch",
+      "url": "http://localhost:5173",
+      "webRoot": "${workspaceFolder}/frontend/src",
+      "sourceMapPathOverrides": {
+        "/@fs/*": "${workspaceFolder}/*"
+      }
+    }
+  ]
+}

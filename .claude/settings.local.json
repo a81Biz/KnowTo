@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ls /c/DevOps/Desarrollos/KnowTo/frontend/.env*)",
+      "Bash(docker-compose -f /c/DevOps/Desarrollos/KnowTo/docker-compose.yml down -v)",
+      "Bash(docker-compose up:*)",
+      "Bash(docker exec:*)",
+      "Bash(docker run:*)",
+      "Bash(npm install:*)",
+      "Bash(node -e \"const p = require\\('./node_modules/@hono/zod-openapi/package.json'\\); console.log\\(p.version\\)\")",
+      "Bash(npx tsc:*)",
+      "Bash(npm test:*)"
+    ]
+  }
+}

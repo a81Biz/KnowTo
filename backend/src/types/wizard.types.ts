@@ -6,9 +6,9 @@ export type PromptId = 'F0' | 'F1' | 'F2' | 'F3' | 'F4' | 'F5' | 'F5_2' | 'F6' |
 export interface ProjectContext {
   projectName: string;
   clientName: string;
-  industry?: string;
-  email?: string;
-  previousData?: Record<string, unknown>;
+  industry?: string | undefined;
+  email?: string | undefined;
+  previousData?: Record<string, unknown> | undefined;
 }
 
 export interface GenerateDocumentRequest {

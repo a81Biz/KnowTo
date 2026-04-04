@@ -12,17 +12,26 @@ import type { PhaseId, PromptId } from '../types/wizard.types';
 // ============================================================================
 // 1. TIPOS
 // ============================================================================
+export interface StepUiConfig {
+  loadingText?: string;
+  submitText?: string;
+  submittingText?: string;
+}
+
 export interface StepConfig {
   stepNumber: number;
   templateId: string;
   phaseId: PhaseId;
   promptId: PromptId;
+  uiConfig?: StepUiConfig;
+  /** Step 0 only: crear el proyecto antes de generar el documento */
+  createProjectFirst?: boolean;
 }
 
 // ============================================================================
 // CLASE BASE
 // ============================================================================
-export abstract class BaseStep {
+export class BaseStep {
   // 2. ESTADO PRIVADO
   protected _container!: HTMLElement;
   protected _config: StepConfig;
@@ -44,6 +53,7 @@ export abstract class BaseStep {
 
   constructor(config: StepConfig) {
     this._config = config;
+    if (config.uiConfig) Object.assign(this._uiConfig, config.uiConfig);
   }
 
   // 3. CACHÉ DEL DOM
@@ -80,13 +90,45 @@ export abstract class BaseStep {
   }
 
   protected async _generateDocument(extraData?: Record<string, unknown>): Promise<void> {
-    const state = wizardStore.getState();
+    const formData = { ...this._collectFormData(), ...extraData };
+    let state = wizardStore.getState();
+
+    // Step 0: crear el proyecto con los datos del formulario antes de generar
+    if (this._config.createProjectFirst && !state.projectId) {
+      try {
+        showLoading('Creando proyecto...');
+        const emailVal = (formData['email'] as string) || undefined;
+        const res = await postData<{ projectId: string }>(
+          ENDPOINTS.wizard.createProject,
+          {
+            name: formData['projectName'] as string,
+            clientName: formData['clientName'] as string,
+            industry: (formData['industry'] as string) || undefined,
+            email: emailVal,
+          }
+        );
+        if (res.data?.projectId) {
+          wizardStore.setProjectId(res.data.projectId);
+          wizardStore.setClientData({
+            projectName: formData['projectName'] as string,
+            clientName: formData['clientName'] as string,
+            industry: formData['industry'] as string ?? '',
+            email: formData['email'] as string ?? '',
+          });
+          state = wizardStore.getState();
+        }
+      } catch (err) {
+        hideLoading();
+        showError(err instanceof Error ? err.message : 'Error al crear el proyecto');
+        return;
+      }
+    }
+
     if (!state.projectId) {
       showError('No hay proyecto activo. Regresa al inicio.');
       return;
     }
 
-    const formData = { ...this._collectFormData(), ...extraData };
     const step = state.steps[this._config.stepNumber];
 
     // Registrar step si no tiene ID

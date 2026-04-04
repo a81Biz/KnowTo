@@ -1,16 +1,41 @@
 // src/routes/health.route.ts
-import { Hono } from 'hono';
+import { OpenAPIHono, createRoute, z } from '@hono/zod-openapi';
 import type { Env } from '../types/env';
 
-const health = new Hono<{ Bindings: Env }>();
-
-health.get('/', (c) => {
-  return c.json({
-    success: true,
-    service: 'knowto-backend',
-    environment: c.env.ENVIRONMENT,
-    timestamp: new Date().toISOString(),
-  });
+const routeHealth = createRoute({
+  method: 'get',
+  path: '/',
+  tags: ['Sistema'],
+  summary: 'Health check',
+  description: 'Verifica que el worker está activo. No requiere autenticación.',
+  responses: {
+    200: {
+      description: 'Servicio activo',
+      content: {
+        'application/json': {
+          schema: z
+            .object({
+              success: z.literal(true),
+              service: z.string(),
+              environment: z.string(),
+              timestamp: z.string(),
+            })
+            .openapi('HealthResponse'),
+        },
+      },
+    },
+  },
 });
+
+const health = new OpenAPIHono<{ Bindings: Env }>();
+
+health.openapi(routeHealth, (c) =>
+  c.json({
+    success: true as const,
+    service: 'knowto-backend',
+    environment: c.env.ENVIRONMENT ?? 'unknown',
+    timestamp: new Date().toISOString(),
+  })
+);
 
 export { health };

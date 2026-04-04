@@ -11,7 +11,9 @@
     "test:prompts": "vitest run --reporter verbose src/__tests__/prompts"
   },
   "dependencies": {
+    "@hono/zod-openapi": "^0.16.4",
     "@hono/zod-validator": "^0.2.1",
+    "@scalar/hono-api-reference": "^0.5.184",
     "@supabase/supabase-js": "^2.39.0",
     "hono": "^4.1.0",
     "zod": "^3.22.4"

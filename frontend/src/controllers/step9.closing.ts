@@ -1,39 +1,11 @@
-// src/controllers/step9closing.ts
-// Paso 9: controlador que sigue las 7 secciones del FRONTEND ARCHITECTURE DOCUMENT
-// HTML en: /templates/tpl-step9-closing.html (NO HTML embebido aquí)
+// src/controllers/step9.closing.ts
+// HTML en: /templates/tpl-step9-closing.html
+import { createStep } from '../shared/step.factory';
 
-// ============================================================================
-// 1. DEPENDENCIAS
-// ============================================================================
-import { BaseStep } from '../shared/step.base';
-import type { PhaseId, PromptId } from '../types/wizard.types';
-
-// ============================================================================
-// 2. ESTADO PRIVADO Y CONFIGURACIÓN
-// ============================================================================
-const _config = {
+export const Step9Closing = createStep({
   stepNumber: 9,
   templateId: 'tpl-step9-closing',
-  phaseId: 'CLOSE' as PhaseId,
-  promptId: 'F6_2' as PromptId,
-};
-
-// ============================================================================
-// 3-6. Implementadas en BaseStep (cache DOM, vista, negocio, eventos)
-// ============================================================================
-class Step9Closing extends BaseStep {
-  constructor() {
-    super(_config);
-    this._uiConfig.loadingText = 'Generando documento para CLOSE...';
-  }
-}
-
-// ============================================================================
-// 7. API PÚBLICA (export const — patrón del FRONTEND ARCHITECTURE DOCUMENT)
-// ============================================================================
-const _instance = new Step9Closing();
-
-export const Step9Closing = {
-  mount: (container: HTMLElement) => _instance.mount(container),
-  getData: () => _instance.getData(),
-};
+  phaseId: 'CLOSE',
+  promptId: 'F6_2',
+  uiConfig: { loadingText: 'Generando documento de Finalización...' },
+});
