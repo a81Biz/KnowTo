@@ -1,0 +1,58 @@
+<template id="tpl-step4-production">
+  <div id="step-4-container" class="step-container space-y-6">
+    <div>
+      <h2 class="text-2xl font-bold text-gray-900">Producción de Contenidos (8 Productos EC0366)</h2>
+      <p class="text-gray-500 mt-1">La IA generará los 8 productos obligatorios de los Elementos E1219 y E1220.</p>
+    </div>
+    <div class="bg-blue-50 border border-blue-200 rounded-xl p-4">
+      <p class="text-blue-800 font-medium text-sm mb-2">📋 Productos que se generarán:</p>
+      <div class="grid md:grid-cols-2 gap-1 text-blue-700 text-sm">
+        <div>P0: Cronograma de desarrollo (E1219)</div>
+        <div>P1: Documento de Información General (E1219)</div>
+        <div>P2: Guías de actividades por módulo (E1220)</div>
+        <div>P3: Calendario general de actividades (E1220)</div>
+        <div>P4: Documentos de texto (E1220, mín. 5 págs)</div>
+        <div>P5: Presentación electrónica (E1220)</div>
+        <div>P6: Material multimedia - guión de video (E1220)</div>
+        <div>P7: Instrumentos de evaluación (E1220)</div>
+      </div>
+    </div>
+    <form id="form-step4" class="space-y-5" novalidate>
+      <div class="group">
+        <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">
+          Detalles adicionales para la producción
+        </label>
+        <textarea id="textarea-production-notes" name="productionNotes" rows="3"
+          placeholder="Ej: El curso tendrá 4 módulos de 2 semanas cada uno. Los videos serán screencasts..."
+          class="input-field w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500"></textarea>
+      </div>
+      <div class="grid md:grid-cols-2 gap-4">
+        <div class="group">
+          <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Fecha de inicio estimada</label>
+          <input id="input-start-date" name="startDate" type="date"
+            class="input-field w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500" />
+        </div>
+        <div class="group">
+          <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Materiales existentes</label>
+          <input id="input-existing-materials" name="existingMaterials" type="text"
+            placeholder="Ej: 5 videos, un libro, ninguno"
+            class="input-field w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500" />
+        </div>
+      </div>
+      <div class="bg-amber-50 border border-amber-200 rounded-xl p-3">
+        <p class="text-amber-800 text-sm">⚠️ Este es el paso más largo. La IA generará ~8,000 palabras. Puede tardar hasta 2 minutos.</p>
+      </div>
+      <button id="btn-submit" type="submit"
+        class="btn-primary w-full bg-blue-900 text-white py-4 px-8 rounded-xl font-bold text-lg hover:bg-blue-800 transition-all disabled:opacity-50">
+        ✨ Generar 8 Productos de Producción
+      </button>
+    </form>
+    <div id="preview-panel" class="hidden">
+      <div id="document-preview" class="document-preview bg-gray-50 border border-gray-200 rounded-xl p-6 max-h-96 overflow-y-auto text-sm"></div>
+      <div class="mt-3 flex gap-2">
+        <button id="btn-copy-doc" class="px-4 py-2 border border-gray-300 rounded-lg text-sm">📋 Copiar</button>
+        <button id="btn-regenerate" class="px-4 py-2 border border-blue-300 text-blue-700 rounded-lg text-sm">🔄 Regenerar</button>
+      </div>
+    </div>
+  </div>
+</template>

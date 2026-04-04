@@ -1,0 +1,87 @@
+<template id="tpl-step2-analysis">
+  <div id="step-2-container" class="step-container space-y-6">
+    <div>
+      <h2 class="text-2xl font-bold text-gray-900">Especificaciones de Análisis y Diseño</h2>
+      <p class="text-gray-500 mt-1">Define la modalidad, interactividad, estructura temática y Perfil de Ingreso (obligatorio EC0366).</p>
+    </div>
+    <form id="form-step2" class="space-y-5" novalidate>
+      <div class="grid md:grid-cols-2 gap-4">
+        <div class="group">
+          <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Modalidad *</label>
+          <select id="select-modality" name="modality" class="input-field w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500">
+            <option value="asynchronous">Asincrónico</option>
+            <option value="synchronous">Sincrónico</option>
+            <option value="blended">Mixto (Blended)</option>
+            <option value="self-paced">Autodirigido</option>
+          </select>
+        </div>
+        <div class="group">
+          <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Nivel de interactividad *</label>
+          <select id="select-interactivity" name="interactivity" class="input-field w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500">
+            <option value="low">Nivel 1 - Pasivo (solo lectura/video)</option>
+            <option value="medium" selected>Nivel 2-3 - Moderado (quizzes, actividades)</option>
+            <option value="high">Nivel 4 - Robusto (simulaciones, gamificación)</option>
+          </select>
+        </div>
+      </div>
+      <div class="group">
+        <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">
+          Temas principales del curso (uno por línea) *
+        </label>
+        <textarea id="textarea-main-topics" name="mainTopics" rows="5" required
+          placeholder="Módulo 1: Introducción&#10;Módulo 2: Conceptos fundamentales&#10;Módulo 3: Práctica aplicada&#10;Módulo 4: Evaluación final"
+          class="input-field w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 font-mono text-sm"></textarea>
+      </div>
+      <div class="grid md:grid-cols-2 gap-4">
+        <div class="group">
+          <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Duración estimada (horas)</label>
+          <input id="input-estimated-hours" name="estimatedHours" type="number" min="1" max="500"
+            placeholder="40"
+            class="input-field w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500" />
+        </div>
+        <div class="group">
+          <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Disponibilidad semanal del alumno (hrs)</label>
+          <input id="input-weekly-hours" name="weeklyAvailability" type="number" min="1" max="40"
+            placeholder="5"
+            class="input-field w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500" />
+        </div>
+      </div>
+      <div class="group">
+        <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">
+          Escolaridad mínima requerida (Perfil de Ingreso) *
+        </label>
+        <input id="input-min-education" name="minEducation" type="text" required
+          placeholder="Ej: Bachillerato terminado, Técnico Superior Universitario, Licenciatura"
+          class="input-field w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500" />
+      </div>
+      <div class="group">
+        <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">
+          Conocimientos previos requeridos (Perfil de Ingreso) *
+        </label>
+        <input id="input-prior-knowledge" name="priorKnowledge" type="text" required
+          placeholder="Ej: Conocimiento básico de computación, manejo de correo electrónico"
+          class="input-field w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500" />
+      </div>
+      <div class="group">
+        <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">
+          Habilidades digitales requeridas (Perfil de Ingreso)
+        </label>
+        <input id="input-digital-skills" name="digitalSkills" type="text"
+          placeholder="Ej: Manejo básico de navegador web, descargar archivos"
+          class="input-field w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500" />
+      </div>
+      <button id="btn-submit" type="submit"
+        class="btn-primary w-full bg-blue-900 text-white py-4 px-8 rounded-xl font-bold text-lg hover:bg-blue-800 transition-all disabled:opacity-50">
+        ✨ Generar Especificaciones de Análisis
+      </button>
+    </form>
+    <div id="preview-panel" class="hidden">
+      <h3 class="font-semibold text-gray-700 mb-3">📄 Documento generado:</h3>
+      <div id="document-preview" class="document-preview bg-gray-50 border border-gray-200 rounded-xl p-6 max-h-96 overflow-y-auto text-sm"></div>
+      <div class="mt-3 flex gap-2">
+        <button id="btn-copy-doc" class="px-4 py-2 border border-gray-300 rounded-lg text-sm">📋 Copiar</button>
+        <button id="btn-regenerate" class="px-4 py-2 border border-blue-300 text-blue-700 rounded-lg text-sm">🔄 Regenerar</button>
+      </div>
+    </div>
+  </div>
+</template>

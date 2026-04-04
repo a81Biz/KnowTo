@@ -1,0 +1,38 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "KnowTo Prompt File Schema",
+  "description": "Esquema para validar archivos de prompt del sistema EC0366",
+  "type": "object",
+  "required": ["id", "name", "version", "tags"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "enum": ["F0", "F1", "F2", "F3", "F4", "F5", "F5_2", "F6", "F6_2"],
+      "description": "Identificador único del prompt"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 5,
+      "description": "Nombre descriptivo del prompt"
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "description": "Versión semántica del prompt"
+    },
+    "author": {
+      "type": "string",
+      "description": "Autor del prompt"
+    },
+    "last_updated": {
+      "type": "string",
+      "description": "Fecha de última actualización"
+    },
+    "tags": {
+      "type": "array",
+      "items": { "type": "string" },
+      "minItems": 1,
+      "description": "Etiquetas para clasificar el prompt"
+    }
+  }
+}

@@ -1,32 +1,31 @@
 // src/main.ts
-// Orquestador principal: maneja auth, navegación entre vistas y pasos del wizard
-
+// Orquestador principal — FRONTEND ARCHITECTURE DOCUMENT
 import { getCurrentUser, signInWithGoogle, signOut, onAuthStateChange } from './shared/auth';
 import { wizardStore } from './stores/wizard.store';
-import { showError, showLoading, hideLoading } from './shared/ui';
-import { postData, getData } from './shared/http.client';
-import { ENDPOINTS } from './shared/endpoints';
-import type { WizardState } from './types/wizard.types';
+import { showError, showLoading, hideLoading, renderMarkdown } from './shared/ui';
+import { getData, postData } from './shared/http.client';
+import { buildEndpoint, ENDPOINTS } from './shared/endpoints';
 
-// Controllers (importación lazy por paso)
-import { initStep0 } from './controllers/step0.clientdata';
-import { initStep1 } from './controllers/step1.needs';
-import { initStep2 } from './controllers/step2.analysis';
-import { initStep3 } from './controllers/step3.specs';
-import { initStep4 } from './controllers/step4.production';
-import { initStep5 } from './controllers/step5.checklist';
-import { initStep6 } from './controllers/step6.evidence';
-import { initStep7 } from './controllers/step7.adjustments';
-import { initStep8 } from './controllers/step8.signatures';
-import { initStep9 } from './controllers/step9.closing';
+// Importar controladores con la API correcta: { mount, getData }
+import { Step0ClientData } from './controllers/step0.clientdata';
+import { Step1Needs } from './controllers/step1.needs';
+import { Step2Analysis } from './controllers/step2.analysis';
+import { Step3Specs } from './controllers/step3.specs';
+import { Step4Production } from './controllers/step4.production';
+import { Step5Checklist } from './controllers/step5.checklist';
+import { Step6Evidence } from './controllers/step6.evidence';
+import { Step7Adjustments } from './controllers/step7.adjustments';
+import { Step8Payment } from './controllers/step8.payment';
+import { Step9Closing } from './controllers/step9.closing';
 
-const STEP_INIT_FNS = [
-  initStep0, initStep1, initStep2, initStep3, initStep4,
-  initStep5, initStep6, initStep7, initStep8, initStep9,
-];
+// Registro de controladores — SSOT para navegación
+const STEP_CONTROLLERS = [
+  Step0ClientData, Step1Needs, Step2Analysis, Step3Specs, Step4Production,
+  Step5Checklist, Step6Evidence, Step7Adjustments, Step8Payment, Step9Closing,
+] as const;
 
 // ============================================================================
-// DOM references
+// DOM REFERENCES
 // ============================================================================
 const viewAuth = document.getElementById('view-auth')!;
 const viewApp  = document.getElementById('view-app')!;
@@ -43,8 +42,8 @@ const btnNext = document.getElementById('btn-next-step') as HTMLButtonElement;
 // ============================================================================
 // AUTH
 // ============================================================================
-btnGoogleLogin.addEventListener('click', () => signInWithGoogle().catch(showError));
-btnLogout.addEventListener('click', () => signOut());
+btnGoogleLogin.addEventListener('click', () => { void signInWithGoogle().catch(showError); });
+btnLogout.addEventListener('click', () => { void signOut(); });
 
 onAuthStateChange(async (user) => {
   if (user) {
@@ -66,64 +65,56 @@ async function initDashboard(): Promise<void> {
   wizardContainer.classList.add('hidden');
 
   try {
-    const res = await getData<unknown[]>(ENDPOINTS.wizard.listProjects);
-    const projects = res.data ?? [];
-    renderDashboard(projects);
+    const res = await getData<unknown[]>(buildEndpoint(ENDPOINTS.wizard.listProjects));
+    renderDashboard(res.data ?? []);
   } catch {
     renderDashboard([]);
   }
 }
 
 function renderDashboard(projects: unknown[]): void {
+  const rows = (projects as Record<string, unknown>[]).map((p) => `
+    <div class="bg-white rounded-xl border border-gray-100 shadow-sm p-6 hover:shadow-md transition-shadow cursor-pointer project-card"
+      data-project-id="${p['project_id']}">
+      <div class="font-semibold text-gray-900 text-lg mb-1">${p['name']}</div>
+      <div class="text-gray-500 text-sm mb-4">${p['client_name']}</div>
+      <div class="flex items-center gap-2">
+        <div class="flex-1 bg-gray-100 rounded-full h-2">
+          <div class="bg-blue-900 rounded-full h-2 transition-all" style="width:${p['progress_pct'] ?? 0}%"></div>
+        </div>
+        <span class="text-xs text-gray-500">${p['progress_pct'] ?? 0}%</span>
+      </div>
+    </div>
+  `).join('');
+
   dashboardContainer.innerHTML = `
     <div class="mb-8 flex items-center justify-between">
       <div>
         <h1 class="text-3xl font-bold text-gray-900">Mis proyectos</h1>
-        <p class="text-gray-500 mt-1">Gestiona tus procesos de certificación EC0366</p>
+        <p class="text-gray-500 mt-1">Procesos de certificación EC0366</p>
       </div>
       <button id="btn-new-project"
-        class="bg-blue-900 text-white px-6 py-3 rounded-xl font-semibold hover:bg-blue-800 transition-colors flex items-center gap-2">
-        <span class="material-symbols-outlined text-sm">add</span>
-        Nuevo proyecto
+        class="bg-blue-900 text-white px-6 py-3 rounded-xl font-semibold hover:bg-blue-800 transition-colors">
+        + Nuevo proyecto
       </button>
     </div>
     ${projects.length === 0
-      ? `<div class="text-center py-20 text-gray-400">
-          <span class="material-symbols-outlined text-6xl mb-4 block">folder_open</span>
-          <p class="text-lg">No tienes proyectos aún.</p>
-          <p class="text-sm mt-2">Crea tu primer proyecto para comenzar.</p>
-        </div>`
-      : `<div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          ${(projects as Record<string, unknown>[]).map((p) => `
-            <div class="bg-white rounded-xl border border-gray-100 shadow-sm p-6 hover:shadow-md transition-shadow cursor-pointer project-card"
-              data-project-id="${p['project_id']}">
-              <div class="font-semibold text-gray-900 text-lg mb-1">${p['name']}</div>
-              <div class="text-gray-500 text-sm mb-4">${p['client_name']}</div>
-              <div class="flex items-center gap-2">
-                <div class="flex-1 bg-gray-100 rounded-full h-2">
-                  <div class="bg-blue-900 rounded-full h-2" style="width:${p['progress_pct']}%"></div>
-                </div>
-                <span class="text-xs text-gray-500">${p['progress_pct']}%</span>
-              </div>
-              <div class="mt-3 text-xs text-gray-400">Paso ${p['current_step']} / 9</div>
-            </div>
-          `).join('')}
-        </div>`
+      ? '<div class="text-center py-20 text-gray-400"><p class="text-6xl mb-4">📂</p><p class="text-lg">No tienes proyectos aún.</p></div>'
+      : `<div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">${rows}</div>`
     }
   `;
 
-  document.getElementById('btn-new-project')?.addEventListener('click', () => startNewProject());
-
+  document.getElementById('btn-new-project')?.addEventListener('click', () => { void startNewProject(); });
   document.querySelectorAll('.project-card').forEach((card) => {
     card.addEventListener('click', () => {
-      const projectId = (card as HTMLElement).dataset['projectId'];
-      if (projectId) resumeProject(projectId);
+      const id = (card as HTMLElement).dataset['projectId'];
+      if (id) void resumeProject(id);
     });
   });
 }
 
 // ============================================================================
-// WIZARD NAVIGATION
+// WIZARD
 // ============================================================================
 async function startNewProject(): Promise<void> {
   wizardStore.reset();
@@ -136,12 +127,13 @@ async function startNewProject(): Promise<void> {
 async function resumeProject(projectId: string): Promise<void> {
   try {
     showLoading('Cargando proyecto...');
-    const res = await getData<Record<string, unknown>>(ENDPOINTS.wizard.getProject(projectId));
+    const res = await getData<Record<string, unknown>>(
+      buildEndpoint(ENDPOINTS.wizard.getProject(projectId))
+    );
     const project = res.data?.['project'] as Record<string, unknown> | undefined;
-
     if (project) {
-      wizardStore.setProjectInfo({
-        projectId,
+      wizardStore.setProjectId(projectId);
+      wizardStore.setClientData({
         projectName: String(project['name'] ?? ''),
         clientName: String(project['client_name'] ?? ''),
         industry: String(project['industry'] ?? ''),
@@ -149,11 +141,10 @@ async function resumeProject(projectId: string): Promise<void> {
       });
       wizardStore.goToStep(Number(project['current_step'] ?? 0));
     }
-
     dashboardContainer.classList.add('hidden');
     wizardContainer.classList.remove('hidden');
     renderProgress();
-    await loadStep(wizardStore.getState().currentStep);
+    await loadStep(wizardStore.getCurrentStep());
   } catch (e) {
     showError(e instanceof Error ? e.message : 'Error al cargar el proyecto');
   } finally {
@@ -162,27 +153,21 @@ async function resumeProject(projectId: string): Promise<void> {
 }
 
 function renderProgress(): void {
-  const state = wizardStore.getState();
+  const { steps, currentStep } = wizardStore.getState();
   wizardProgress.innerHTML = `
-    <div class="flex items-center gap-1 overflow-x-auto pb-2">
-      ${state.steps.map((step, i) => `
+    <div class="flex items-center gap-1 overflow-x-auto pb-2 mb-6">
+      ${steps.map((step, i) => `
         <div class="flex items-center gap-1 flex-shrink-0">
           <div class="flex flex-col items-center">
             <div class="wizard-step-indicator ${
               step.status === 'completed' ? 'completed' :
-              i === state.currentStep ? 'active' : 'pending'
+              i === currentStep ? 'active' : 'pending'
             }" title="${step.label}">
-              ${step.status === 'completed'
-                ? '<span class="material-symbols-outlined text-sm">check</span>'
-                : String(i + 1)
-              }
+              ${step.status === 'completed' ? '✓' : String(i + 1)}
             </div>
-            <span class="text-xs mt-1 text-gray-500 hidden md:block">${step.label}</span>
+            <span class="text-xs mt-1 text-gray-500 hidden lg:block max-w-16 text-center leading-tight">${step.label}</span>
           </div>
-          ${i < state.steps.length - 1
-            ? `<div class="w-8 h-px bg-gray-200 flex-shrink-0 mb-4"></div>`
-            : ''
-          }
+          ${i < steps.length - 1 ? '<div class="w-6 h-px bg-gray-200 flex-shrink-0 mb-4"></div>' : ''}
         </div>
       `).join('')}
     </div>
@@ -190,39 +175,27 @@ function renderProgress(): void {
 }
 
 async function loadStep(n: number): Promise<void> {
-  const initFn = STEP_INIT_FNS[n];
-  if (!initFn) return;
+  const controller = STEP_CONTROLLERS[n];
+  if (!controller) return;
 
   wizardStepContent.innerHTML = '';
-
-  const state = wizardStore.getState();
   btnPrev.disabled = n === 0;
   btnPrev.classList.toggle('opacity-50', n === 0);
-  btnNext.textContent = n === state.steps.length - 1 ? '🎉 Finalizar' : 'Siguiente →';
+  btnNext.textContent = n === 9 ? '🎉 Finalizar' : 'Siguiente →';
 
-  await initFn(wizardStepContent, wizardStore);
+  // Usar mount() — API pública correcta del controlador
+  await controller.mount(wizardStepContent);
   renderProgress();
 }
 
 btnPrev.addEventListener('click', () => {
-  const { currentStep } = wizardStore.getState();
-  if (currentStep > 0) {
-    wizardStore.goToStep(currentStep - 1);
-    loadStep(currentStep - 1);
-  }
+  wizardStore.prevStep();
+  void loadStep(wizardStore.getCurrentStep());
 });
 
-btnNext.addEventListener('click', async () => {
-  const { currentStep, steps } = wizardStore.getState();
-  if (currentStep < steps.length - 1) {
-    wizardStore.goToStep(currentStep + 1);
-    await loadStep(currentStep + 1);
-  } else {
-    // Cierre del wizard
-    alert('¡Proceso completado! Descarga tu expediente desde el panel de proyectos.');
-    wizardStore.reset();
-    await initDashboard();
-  }
+btnNext.addEventListener('click', () => {
+  wizardStore.nextStep();
+  void loadStep(wizardStore.getCurrentStep());
 });
 
 // ============================================================================

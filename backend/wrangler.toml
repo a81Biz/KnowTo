@@ -9,11 +9,11 @@ binding = "AI"
 [vars]
 ENVIRONMENT = "development"
 
-[[d1_databases]]
-# Descomenta si usas D1 en lugar de Supabase
-# binding = "DB"
-# database_name = "knowto-db"
-# database_id = "your-database-id"
+# Reglas para que wrangler empaquete los .md como módulos de texto
+[[rules]]
+type = "Text"
+globs = ["**/*.md"]
+fallthrough = true
 
 [env.production]
 name = "knowto-backend-production"

@@ -1,21 +1,49 @@
 // src/shared/endpoints.ts
 // SSOT: Única fuente de verdad para todas las URLs de la API
-// NO escribas URLs directamente en los controladores. Usa siempre este archivo.
-
-const BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8787';
+// FRONTEND ARCHITECTURE DOCUMENT sección 8
 
 export const ENDPOINTS = {
-  health: `${BASE_URL}/api/health`,
+  // Base del backend
+  backend: import.meta.env.VITE_API_URL ?? 'http://localhost:8787',
 
-  wizard: {
-    createProject: `${BASE_URL}/api/wizard/project`,
-    getProject: (id: string) => `${BASE_URL}/api/wizard/project/${id}`,
-    listProjects: `${BASE_URL}/api/wizard/projects`,
-    saveStep: `${BASE_URL}/api/wizard/step`,
-    generate: `${BASE_URL}/api/wizard/generate`,
-  },
-
+  // Auth
   auth: {
-    me: `${BASE_URL}/api/auth/me`,
+    me: '/api/auth/me',
+    login: '/api/auth/login',
+    logout: '/api/auth/logout',
   },
+
+  // Wizard
+  wizard: {
+    createProject: '/api/wizard/project',
+    saveStep: '/api/wizard/step',
+    generate: '/api/wizard/generate',
+    getProject: (projectId: string) => `/api/wizard/project/${projectId}`,
+    listProjects: '/api/wizard/projects',
+    getProgress: '/api/wizard/progress',
+  },
+
+  // Documents
+  documents: {
+    generate: '/api/documents/generate',
+    get: (documentId: string) => `/api/documents/${documentId}`,
+    list: (projectId: string) => `/api/documents/project/${projectId}`,
+  },
+
+  // Health
+  health: '/api/health',
 } as const;
+
+// Helper para construir URLs completas (FRONTEND ARCHITECTURE DOCUMENT)
+export function buildEndpoint(
+  path: string,
+  params?: Record<string, string | number>
+): string {
+  let url = path;
+  if (params) {
+    Object.entries(params).forEach(([k, v]) => {
+      url = url.replace(`:${k}`, String(v));
+    });
+  }
+  return `${ENDPOINTS.backend}${url}`;
+}

@@ -1,11 +1,17 @@
 // src/stores/wizard.store.ts
-// Singleton que mantiene el estado global del wizard con persistencia en localStorage
+// Singleton — FRONTEND ARCHITECTURE DOCUMENT sección 9
+import type {
+  WizardState, WizardStep, StepStatus,
+  ClientData, NeedsData, AnalysisData, SpecsData,
+  ProductionData, ChecklistData, EvidenceData,
+  AdjustmentsData, PaymentData, ClosingData,
+  PhaseId, PromptId,
+} from '../types/wizard.types';
 
-import type { WizardState, WizardStep, StepStatus } from '../types/wizard.types';
-
+type Listener = (state: WizardState) => void;
 const STORAGE_KEY = 'knowto_wizard_state';
 
-const STEP_DEFINITIONS: Omit<WizardStep, 'status' | 'inputData' | 'documentContent' | 'documentId' | 'stepId'>[] = [
+const STEP_DEFINITIONS: Omit<WizardStep, 'status' | 'inputData'>[] = [
   { stepNumber: 0, phaseId: 'F0',    promptId: 'F0',   label: 'Marco de Referencia', icon: 'search' },
   { stepNumber: 1, phaseId: 'F1',    promptId: 'F1',   label: 'Necesidades',         icon: 'analytics' },
   { stepNumber: 2, phaseId: 'F2',    promptId: 'F2',   label: 'Análisis',            icon: 'architecture' },
@@ -18,148 +24,140 @@ const STEP_DEFINITIONS: Omit<WizardStep, 'status' | 'inputData' | 'documentConte
   { stepNumber: 9, phaseId: 'CLOSE', promptId: 'F6_2', label: 'Finalización',        icon: 'celebration' },
 ];
 
-function createInitialState(): WizardState {
-  return {
-    projectId: null,
-    projectName: '',
-    clientName: '',
-    industry: '',
-    email: '',
-    currentStep: 0,
-    isGenerating: false,
-    steps: STEP_DEFINITIONS.map((def) => ({
-      ...def,
-      status: 'pending' as StepStatus,
-      inputData: {},
-    })),
-  };
-}
+const initialState: WizardState = {
+  currentStep: 0,
+  projectId: null,
+  clientData: { clientName: '', projectName: '', industry: '', email: '' },
+  needsData: null,
+  analysisData: null,
+  specsData: null,
+  productionData: null,
+  checklistData: null,
+  evidenceData: null,
+  adjustmentsData: null,
+  paymentData: null,
+  closingData: null,
+  steps: STEP_DEFINITIONS.map((d) => ({ ...d, status: 'pending' as StepStatus, inputData: {} })),
+};
 
-class WizardStore {
-  private state: WizardState;
-  private listeners: Array<(state: WizardState) => void> = [];
+class WizardStoreClass {
+  private state: WizardState = { ...initialState };
+  private listeners: Listener[] = [];
 
-  constructor() {
-    this.state = this.loadFromStorage() ?? createInitialState();
+  constructor() { this.loadFromLocalStorage(); }
+
+  // Suscripción
+  subscribe(listener: Listener): () => void {
+    this.listeners.push(listener);
+    return () => { this.listeners = this.listeners.filter((l) => l !== listener); };
   }
 
-  private loadFromStorage(): WizardState | null {
+  private notify(): void { this.listeners.forEach((l) => l(this.state)); }
+
+  // Persistencia
+  private saveToLocalStorage(): void {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(this.state)); } catch { /* silent */ }
+  }
+
+  private loadFromLocalStorage(): void {
     try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      return raw ? (JSON.parse(raw) as WizardState) : null;
-    } catch {
-      return null;
-    }
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) this.state = { ...initialState, ...JSON.parse(saved) as WizardState };
+    } catch { /* silent */ }
   }
 
-  private persist(): void {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(this.state));
-    } catch {
-      console.warn('[WizardStore] Could not persist state to localStorage');
-    }
-  }
+  // Getters
+  getState(): WizardState { return { ...this.state }; }
+  getCurrentStep(): number { return this.state.currentStep; }
+  getProjectId(): string | null { return this.state.projectId; }
+  getClientData(): ClientData { return { ...this.state.clientData }; }
 
-  private notify(): void {
-    this.listeners.forEach((fn) => fn(this.state));
-  }
-
-  subscribe(fn: (state: WizardState) => void): () => void {
-    this.listeners.push(fn);
-    return () => { this.listeners = this.listeners.filter((l) => l !== fn); };
-  }
-
-  getState(): Readonly<WizardState> { return this.state; }
-
-  getStep(n: number): WizardStep | undefined { return this.state.steps[n]; }
-
-  getCurrentStep(): WizardStep | undefined { return this.state.steps[this.state.currentStep]; }
-
-  setProjectInfo(info: { projectId: string; projectName: string; clientName: string; industry?: string; email?: string }): void {
-    this.state = {
-      ...this.state,
-      projectId: info.projectId,
-      projectName: info.projectName,
-      clientName: info.clientName,
-      industry: info.industry ?? '',
-      email: info.email ?? '',
+  getStepData<T>(stepId: number): T | null {
+    const keys: Record<number, keyof WizardState> = {
+      0: 'clientData', 1: 'needsData', 2: 'analysisData', 3: 'specsData',
+      4: 'productionData', 5: 'checklistData', 6: 'evidenceData',
+      7: 'adjustmentsData', 8: 'paymentData', 9: 'closingData',
     };
-    this.persist();
-    this.notify();
+    const key = keys[stepId];
+    return key ? (this.state[key] as T) ?? null : null;
   }
 
-  setStepInputData(stepNumber: number, data: Record<string, unknown>): void {
-    const steps = [...this.state.steps];
-    const step = steps[stepNumber];
-    if (!step) return;
-    steps[stepNumber] = { ...step, inputData: data };
-    this.state = { ...this.state, steps };
-    this.persist();
-    this.notify();
+  // Setters del FRONTEND ARCHITECTURE DOCUMENT
+  setCurrentStep(step: number): void { this.state.currentStep = step; this.saveToLocalStorage(); this.notify(); }
+  setProjectId(id: string): void { this.state.projectId = id; this.saveToLocalStorage(); this.notify(); }
+  setClientData(data: Partial<ClientData>): void {
+    this.state.clientData = { ...this.state.clientData, ...data };
+    this.saveToLocalStorage(); this.notify();
   }
 
+  setStepData(stepId: number, data: unknown): void {
+    const keys: Record<number, keyof WizardState> = {
+      0: 'clientData', 1: 'needsData', 2: 'analysisData', 3: 'specsData',
+      4: 'productionData', 5: 'checklistData', 6: 'evidenceData',
+      7: 'adjustmentsData', 8: 'paymentData', 9: 'closingData',
+    };
+    const key = keys[stepId];
+    if (key) { (this.state as Record<string, unknown>)[key] = data; this.saveToLocalStorage(); this.notify(); }
+  }
+
+  // Métodos de Steps (metadata del wizard)
   setStepStatus(stepNumber: number, status: StepStatus): void {
     const steps = [...this.state.steps];
-    const step = steps[stepNumber];
-    if (!step) return;
-    steps[stepNumber] = { ...step, status };
+    const s = steps[stepNumber]; if (!s) return;
+    steps[stepNumber] = { ...s, status };
     this.state = { ...this.state, steps };
-    this.persist();
-    this.notify();
+    this.saveToLocalStorage(); this.notify();
   }
 
   setStepDocument(stepNumber: number, content: string, documentId: string): void {
     const steps = [...this.state.steps];
-    const step = steps[stepNumber];
-    if (!step) return;
-    steps[stepNumber] = { ...step, documentContent: content, documentId, status: 'completed' };
+    const s = steps[stepNumber]; if (!s) return;
+    steps[stepNumber] = { ...s, documentContent: content, documentId, status: 'completed' };
     this.state = { ...this.state, steps };
-    this.persist();
-    this.notify();
+    this.saveToLocalStorage(); this.notify();
   }
 
   setStepId(stepNumber: number, stepId: string): void {
     const steps = [...this.state.steps];
-    const step = steps[stepNumber];
-    if (!step) return;
-    steps[stepNumber] = { ...step, stepId };
+    const s = steps[stepNumber]; if (!s) return;
+    steps[stepNumber] = { ...s, stepId };
     this.state = { ...this.state, steps };
-    this.persist();
+    this.saveToLocalStorage();
   }
 
-  goToStep(n: number): void {
-    if (n < 0 || n >= this.state.steps.length) return;
-    this.state = { ...this.state, currentStep: n };
-    this.persist();
-    this.notify();
+  setStepInputData(stepNumber: number, data: Record<string, unknown>): void {
+    const steps = [...this.state.steps];
+    const s = steps[stepNumber]; if (!s) return;
+    steps[stepNumber] = { ...s, inputData: data };
+    this.state = { ...this.state, steps };
+    this.saveToLocalStorage();
   }
 
-  setGenerating(val: boolean): void {
-    this.state = { ...this.state, isGenerating: val };
-    this.notify();
-  }
+  // Navegación
+  nextStep(): void { if (this.state.currentStep < 9) this.setCurrentStep(this.state.currentStep + 1); }
+  prevStep(): void { if (this.state.currentStep > 0) this.setCurrentStep(this.state.currentStep - 1); }
+  goToStep(n: number): void { if (n >= 0 && n <= 9) this.setCurrentStep(n); }
 
   reset(): void {
+    this.state = { ...initialState, steps: STEP_DEFINITIONS.map((d) => ({ ...d, status: 'pending' as StepStatus, inputData: {} })) };
     localStorage.removeItem(STORAGE_KEY);
-    this.state = createInitialState();
     this.notify();
   }
 
+  // Construir contexto acumulado para el prompt
   buildContext(): Record<string, unknown> {
-    const completedSteps = this.state.steps
-      .filter((s) => s.status === 'completed')
-      .map((s) => ({ phaseId: s.phaseId, inputData: s.inputData, content: s.documentContent }));
-
+    const prev: Record<string, unknown> = {};
+    this.state.steps.filter((s) => s.status === 'completed').forEach((s) => {
+      prev[s.phaseId] = { inputData: s.inputData, content: s.documentContent };
+    });
     return {
-      projectName: this.state.projectName,
-      clientName: this.state.clientName,
-      industry: this.state.industry,
-      email: this.state.email,
-      previousData: Object.fromEntries(
-        completedSteps.map((s) => [s.phaseId, { inputData: s.inputData, content: s.content }])
-      ),
+      projectName: this.state.clientData.projectName,
+      clientName: this.state.clientData.clientName,
+      industry: this.state.clientData.industry,
+      email: this.state.clientData.email,
+      previousData: prev,
     };
   }
 }
 
-export const wizardStore = new WizardStore();
+export const wizardStore = new WizardStoreClass();

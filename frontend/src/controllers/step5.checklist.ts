@@ -1,210 +1,39 @@
-// src/controllers/step5.checklist.ts
-// Controlador del paso 5: Verificación del Curso (E1221)
-// Estructura de 7 secciones (ver FRONTEND ARCHITECTURE DOCUMENT.md)
+// src/controllers/step5checklist.ts
+// Paso 5: controlador que sigue las 7 secciones del FRONTEND ARCHITECTURE DOCUMENT
+// HTML en: /templates/tpl-step5-checklist.html (NO HTML embebido aquí)
 
 // ============================================================================
 // 1. DEPENDENCIAS
 // ============================================================================
-import { postData } from '../shared/http.client';
-import { ENDPOINTS } from '../shared/endpoints';
-import { showLoading, hideLoading, showError, renderMarkdown } from '../shared/ui';
-import type { WizardStore } from '../stores/wizard.store';
+import { BaseStep } from '../shared/step.base';
+import type { PhaseId, PromptId } from '../types/wizard.types';
 
 // ============================================================================
 // 2. ESTADO PRIVADO Y CONFIGURACIÓN
 // ============================================================================
-let _container: HTMLElement;
-let _store: typeof import('../stores/wizard.store').wizardStore;
-
-const _dom: {
-  form?: HTMLFormElement;
-  btnGenerate?: HTMLButtonElement;
-  previewPanel?: HTMLDivElement;
-} = {};
-
-// ============================================================================
-// 3. CACHÉ DEL DOM
-// ============================================================================
-const _cacheDOM = (): void => {
-  _dom.form = _container.querySelector('#step-5-form') ?? undefined;
-  _dom.btnGenerate = _container.querySelector('#btn-generate-5') ?? undefined;
-  _dom.previewPanel = _container.querySelector('#preview-5') ?? undefined;
+const _config = {
+  stepNumber: 5,
+  templateId: 'tpl-step5-checklist',
+  phaseId: 'F5.1' as PhaseId,
+  promptId: 'F5' as PromptId,
 };
 
 // ============================================================================
-// 4. LÓGICA DE VISTA
+// 3-6. Implementadas en BaseStep (cache DOM, vista, negocio, eventos)
 // ============================================================================
-const _renderPreview = (content: string): void => {
-  if (!_dom.previewPanel) return;
-  _dom.previewPanel.innerHTML = `
-    <div class="document-preview p-6 bg-gray-50 rounded-xl border border-gray-200 max-h-96 overflow-y-auto">
-      ${renderMarkdown(content)}
-    </div>
-    <div class="mt-4 flex gap-3">
-      <button class="btn-copy-doc px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50">
-        📋 Copiar documento
-      </button>
-    </div>
-  `;
-
-  _container.querySelector('.btn-copy-doc')?.addEventListener('click', () => {
-    navigator.clipboard.writeText(content).then(() => alert('Documento copiado'));
-  });
-};
-
-const _setLoading = (loading: boolean): void => {
-  if (_dom.btnGenerate) {
-    _dom.btnGenerate.disabled = loading;
-    _dom.btnGenerate.textContent = loading ? '⏳ Generando con IA...' : '✨ Generar documento';
+class Step5Checklist extends BaseStep {
+  constructor() {
+    super(_config);
+    this._uiConfig.loadingText = 'Generando documento para F5.1...';
   }
-};
-
-// ============================================================================
-// 5. LÓGICA DE NEGOCIO
-// ============================================================================
-const _collectFormData = (): Record<string, unknown> => {
-  const data: Record<string, unknown> = {};
-  if (!_dom.form) return data;
-  const formData = new FormData(_dom.form);
-  for (const [key, value] of formData.entries()) {
-    data[key] = value;
-  }
-  return data;
-};
-
-const _generateDocument = async (): Promise<void> => {
-  const state = _store.getState();
-  if (!state.projectId) {
-    showError('No hay proyecto activo. Regresa al inicio.');
-    return;
-  }
-
-  const inputData = _collectFormData();
-  const currentStep = state.steps[5];
-  if (!currentStep?.stepId) {
-    showError('Error: step ID no encontrado.');
-    return;
-  }
-
-  _setLoading(true);
-  showLoading('Generando documento de Verificación del Curso (E1221)...');
-
-  try {
-    _store.setStepInputData(5, inputData);
-
-    const context = _store.buildContext() as {
-      projectName: string;
-      clientName: string;
-      industry?: string;
-      email?: string;
-      previousData?: Record<string, unknown>;
-    };
-
-    const res = await postData<{ documentId: string; content: string }>(
-      ENDPOINTS.wizard.generate,
-      {
-        projectId: state.projectId,
-        stepId: currentStep.stepId,
-        phaseId: 'F5.1',
-        promptId: 'F5',
-        context,
-        userInputs: inputData,
-      }
-    );
-
-    if (res.data) {
-      _store.setStepDocument(5, res.data.content, res.data.documentId);
-      _renderPreview(res.data.content);
-    }
-  } catch (err) {
-    showError(err instanceof Error ? err.message : 'Error al generar el documento');
-    _store.setStepStatus(5, 'error');
-  } finally {
-    _setLoading(false);
-    hideLoading();
-  }
-};
-
-// ============================================================================
-// 6. REGISTRO DE EVENTOS
-// ============================================================================
-const _bindEvents = (): void => {
-  _dom.btnGenerate?.addEventListener('click', (e) => {
-    e.preventDefault();
-    void _generateDocument();
-  });
-};
-
-// ============================================================================
-// 7. API PÚBLICA
-// ============================================================================
-export async function initStep5(
-  container: HTMLElement,
-  store: typeof import('../stores/wizard.store').wizardStore
-): Promise<void> {
-  _container = container;
-  _store = store;
-
-  const state = store.getState();
-  const step = state.steps[5];
-
-  // Si hay documento previo, mostrarlo directamente
-  const previewHtml = step?.documentContent
-    ? `<div class="document-preview p-6 bg-gray-50 rounded-xl border border-gray-200 max-h-96 overflow-y-auto">
-        ${renderMarkdown(step.documentContent)}
-       </div>`
-    : '';
-
-  container.innerHTML = `
-    <div class="space-y-6">
-      <div>
-        <h2 class="text-2xl font-bold text-gray-900">Verificación del Curso (E1221)</h2>
-        <p class="text-gray-500 mt-1">Genera el checklist de verificación técnica y pedagógica, y la plantilla del reporte de pruebas.</p>
-      </div>
-
-      <form id="step-5-form" class="space-y-4">
-        <div class="space-y-4">
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">Resultados de las pruebas de usuario realizadas</label>
-          <textarea name="testResults" rows="4" placeholder="Describe los resultados: número de participantes, calificaciones obtenidas, problemas encontrados..."
-            class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500"></textarea>
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">Número de participantes en la prueba piloto</label>
-          <input name="pilotParticipants" type="number" min="1" placeholder="5"
-            class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500" />
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">Problemas técnicos encontrados</label>
-          <textarea name="technicalIssues" rows="2" placeholder="Ej: Los videos tardaban en cargar, el quiz del módulo 2 no guardaba..."
-            class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500"></textarea>
-        </div>
-      </div>
-      </form>
-
-      <button id="btn-generate-5"
-        class="w-full bg-blue-900 text-white py-4 rounded-xl font-semibold text-lg hover:bg-blue-800 transition-colors">
-        ✨ Generar documento con IA
-      </button>
-
-      <div id="preview-5">
-        ${previewHtml}
-      </div>
-    </div>
-  `;
-
-  // Guardar stepId si el proyecto ya existe
-  if (state.projectId && !step?.stepId) {
-    try {
-      const res = await postData<{ stepId: string }>(ENDPOINTS.wizard.saveStep, {
-        projectId: state.projectId,
-        stepNumber: 5,
-        inputData: step?.inputData ?? {},
-      });
-      if (res.data) store.setStepId(5, res.data.stepId);
-    } catch { /* silent */ }
-  }
-
-  _cacheDOM();
-  _bindEvents();
 }
+
+// ============================================================================
+// 7. API PÚBLICA (export const — patrón del FRONTEND ARCHITECTURE DOCUMENT)
+// ============================================================================
+const _instance = new Step5Checklist();
+
+export const Step5Checklist = {
+  mount: (container: HTMLElement) => _instance.mount(container),
+  getData: () => _instance.getData(),
+};
