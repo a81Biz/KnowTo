@@ -8,4 +8,5 @@ export interface Env {
   SUPABASE_JWT_SECRET: string;
   ENVIRONMENT: string;
   OLLAMA_URL?: string;
+  OLLAMA_MODEL?: string;
 }

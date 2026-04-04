@@ -23,7 +23,8 @@ services:
       - postgres_data:/var/lib/postgresql/data
       - ./supabase/migrations:/docker-entrypoint-initdb.d:ro
     networks:
-      - knowto-network
+      knowto-network:
+        ipv4_address: 172.20.0.10
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U knowto -d knowto_dev"]
@@ -40,10 +41,10 @@ services:
     container_name: knowto-backend
     working_dir: /app
     # wrangler dev necesita --ip 0.0.0.0 para ser accesible desde fuera del contenedor
-    command: >
-      sh -c "npm install &&
-             npx wrangler dev src/index.ts --port 8787 --ip 0.0.0.0 --local
-             --inspector-port 9229"
+    # dev:debug = Node.js puro vía tsx, sin sandbox de workerd.
+    # --loader ./src/md-loader.mjs: resuelve imports .md igual que wrangler [[rules]] type=Text
+    # --inspect=0.0.0.0:9229: habilita el debugger de Node.js para VS Code
+    command: sh -c "npm install && npm run dev:debug"
     ports:
       - "8787:8787"
       - "9229:9229"
@@ -53,17 +54,21 @@ services:
       - backend_node_modules:/app/node_modules
     environment:
       NODE_ENV: development
-      # Variables de entorno del Worker (sustituyen a .dev.vars en Docker)
+      PORT: "8787"
+      ENVIRONMENT: development
+      OLLAMA_URL: "http://ollama:11434"
+      OLLAMA_MODEL: "llama3.2:3b"
       SUPABASE_URL: ${SUPABASE_URL:-http://postgres:5432}
       SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY:-dummy-key}
       SUPABASE_JWT_SECRET: ${SUPABASE_JWT_SECRET:-dummy-secret}
-      OLLAMA_URL: http://ollama:11434
-      ENVIRONMENT: development
     depends_on:
       postgres:
         condition: service_healthy
+      ollama:
+        condition: service_started
     networks:
-      - knowto-network
+      knowto-network:
+        ipv4_address: 172.20.0.30
     restart: unless-stopped
 
   # ---------------------------------------------------------------------------
@@ -78,32 +83,32 @@ services:
       - "5173:5173"
     volumes:
       - ./frontend:/app
-      # Volumen nombrado para node_modules — evita conflicto con el bind mount del host
       - frontend_node_modules:/app/node_modules
     environment:
       NODE_ENV: development
-      # IMPORTANTE: dentro de Docker, usar el nombre del servicio, no localhost
       VITE_API_URL: http://localhost:8787
       VITE_SUPABASE_URL: ${VITE_SUPABASE_URL:-http://localhost:54321}
       VITE_SUPABASE_ANON_KEY: ${VITE_SUPABASE_ANON_KEY:-dummy-key}
     depends_on:
       - backend
     networks:
-      - knowto-network
+      knowto-network:
+        ipv4_address: 172.20.0.40
     restart: unless-stopped
 
   # ---------------------------------------------------------------------------
-  # OLLAMA (IA local — opcional, comentar si no tienes GPU o quieres Workers AI)
+  # OLLAMA (IA local)
+  # IP fija 172.20.0.20 — referenciada en extra_hosts del backend para que
+  # workerd (runtime de wrangler) pueda resolver el hostname "ollama".
   # Para deshabilitar: docker compose up -d --scale ollama=0
   # ---------------------------------------------------------------------------
   ollama:
     image: ollama/ollama:latest
     container_name: knowto-ollama
     ports:
-      - "11434:11434"
+      - "11435:11434"   # Puerto 11435 en host para no colisionar con Ollama local
     volumes:
       - ollama_data:/root/.ollama
-    # Arranca el servidor y descarga el modelo (solo la primera vez)
     entrypoint: ["/bin/sh", "-c"]
     command:
       - |
@@ -112,24 +117,27 @@ services:
         ollama pull llama3.2:3b
         wait
     networks:
-      - knowto-network
+      knowto-network:
+        ipv4_address: 172.20.0.20
     restart: unless-stopped
     # Descomenta si tienes GPU NVIDIA:
-    # deploy:
-    #   resources:
-    #     reservations:
-    #       devices:
-    #         - driver: nvidia
-    #           count: all
-    #           capabilities: [gpu]
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
 
 networks:
   knowto-network:
     driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/24
 
 volumes:
   postgres_data:
   ollama_data:
-  # Volúmenes nombrados para node_modules (fix al conflicto de bind mount)
   backend_node_modules:
   frontend_node_modules:

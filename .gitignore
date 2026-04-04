@@ -3,5 +3,6 @@ dist/
 .wrangler/
 .env
 .env.local
+.dev.vars
 *.log
 .DS_Store

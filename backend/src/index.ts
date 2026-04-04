@@ -11,6 +11,45 @@ import type { Env } from './types/env';
 
 const app = new OpenAPIHono<{ Bindings: Env }>();
 
+// ── Helpers de dominio ────────────────────────────────────────────────────────
+//
+// El backend está en  api.{dominio}  y el frontend en  {dominio}.
+// Ambos se derivan de la URL de la propia petición al Worker; no hay
+// ningún dominio hardcodeado ni variable de entorno para esto.
+//
+// Ejemplos:
+//   Worker en api.knowto.dev   → permite knowto.dev y www.knowto.dev
+//   Worker en api.knowto.mx    → permite knowto.mx  y www.knowto.mx
+//   Worker en localhost:8787   → permite cualquier localhost (cualquier puerto)
+
+function apexFromRequest(requestUrl: string): string | null {
+  try {
+    const host = new URL(requestUrl).hostname; // "api.knowto.dev"
+    // Quita el primer segmento (el subdominio "api")
+    const parts = host.split('.');
+    return parts.length >= 2 ? parts.slice(1).join('.') : null;
+  } catch {
+    return null;
+  }
+}
+
+function isAllowedOrigin(origin: string, requestUrl: string, isProd: boolean): boolean {
+  try {
+    const { hostname } = new URL(origin);
+
+    if (!isProd) {
+      // Desarrollo: acepta cualquier localhost independientemente del puerto
+      return hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1';
+    }
+
+    // Producción: el frontend está en el dominio apex del propio Worker
+    const apex = apexFromRequest(requestUrl);
+    return apex !== null && (hostname === apex || hostname === `www.${apex}`);
+  } catch {
+    return false;
+  }
+}
+
 // ============================================================================
 // MIDDLEWARE GLOBAL
 // ============================================================================
@@ -18,7 +57,10 @@ app.use('*', logger());
 app.use(
   '*',
   cors({
-    origin: ['http://localhost:5173', 'https://knowto.dev'],
+    origin: (origin, c) => {
+      const isProd = (c.env as Env).ENVIRONMENT === 'production';
+      return isAllowedOrigin(origin, c.req.url, isProd) ? origin : '';
+    },
     allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowHeaders: ['Content-Type', 'Authorization'],
     maxAge: 86400,
@@ -45,10 +87,13 @@ app.doc('/api/openapi.json', (c) => ({
       'Todos los endpoints de /api/wizard requieren autenticación Bearer (Google OAuth via Supabase). ' +
       'En desarrollo local usar el token literal `dev-local-bypass`.',
   },
-  servers: [
-    { url: 'http://localhost:8787', description: 'Desarrollo local (wrangler dev)' },
-    { url: 'https://knowto-backend.workers.dev', description: `Producción (${c.env.ENVIRONMENT ?? 'cloudflare'})` },
-  ],
+  servers: (() => {
+    // URL del propio Worker en esta petición — siempre correcta sin config manual
+    const workerOrigin = new URL(c.req.url).origin;
+    return [
+      { url: workerOrigin, description: 'Este servidor' },
+    ];
+  })(),
   components: {
     securitySchemes: {
       bearerAuth: {

@@ -99,7 +99,7 @@ export class BaseStep {
         showLoading('Creando proyecto...');
         const emailVal = (formData['email'] as string) || undefined;
         const res = await postData<{ projectId: string }>(
-          ENDPOINTS.wizard.createProject,
+          buildEndpoint(ENDPOINTS.wizard.createProject),
           {
             name: formData['projectName'] as string,
             clientName: formData['clientName'] as string,
@@ -136,7 +136,7 @@ export class BaseStep {
     if (!stepId) {
       try {
         const res = await postData<{ stepId: string }>(
-          ENDPOINTS.wizard.saveStep,
+          buildEndpoint(ENDPOINTS.wizard.saveStep),
           { projectId: state.projectId, stepNumber: this._config.stepNumber, inputData: formData }
         );
         if (res.data?.stepId) {
@@ -165,7 +165,7 @@ export class BaseStep {
       };
 
       const res = await postData<{ documentId: string; content: string }>(
-        ENDPOINTS.wizard.generate,
+        buildEndpoint(ENDPOINTS.wizard.generate),
         {
           projectId: state.projectId,
           stepId,

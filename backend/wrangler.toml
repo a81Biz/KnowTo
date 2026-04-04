@@ -8,6 +8,10 @@ binding = "AI"
 
 [vars]
 ENVIRONMENT = "development"
+# Ollama: "ollama" se resuelve via extra_hosts del docker-compose → 172.20.0.20
+# En dev nativo sobreescribir con OLLAMA_URL=http://localhost:11434 en .dev.vars
+OLLAMA_URL   = "http://ollama:11434"
+OLLAMA_MODEL = "llama3.2:3b"
 
 # Reglas para que wrangler empaquete los .md como módulos de texto
 [[rules]]

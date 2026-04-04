@@ -1,97 +1,160 @@
 // src/__tests__/services/ai.service.test.ts
-// Tests unitarios del AIService.
-// Se mockea env.AI.run para no hacer llamadas reales a Workers AI.
+//
+// Cubre los dos backends de IA:
+//   development → Ollama  (se mockea globalThis.fetch)
+//   production  → Workers AI  (se mockea env.AI.run)
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { AIService } from '../../services/ai.service';
 import type { Env } from '../../types/env';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
-const AI_RESPONSE = '# Marco de Referencia\nContenido generado por IA.';
+const AI_CONTENT = '# Marco de Referencia\nContenido generado por IA.';
 
-function makeEnv(runResult: unknown = { response: AI_RESPONSE }): Env {
+const BASE_OPTS = {
+  promptId: 'F0' as const,
+  context: { projectName: 'Test Project', clientName: 'Juan Pérez', industry: 'Manufactura' },
+  userInputs: { courseTopic: 'Seguridad industrial' },
+};
+
+function makeDevEnv(ollamaUrl = 'http://ollama:11434'): Env {
   return {
     ENVIRONMENT: 'development',
+    OLLAMA_URL: ollamaUrl,
+    AI: { run: vi.fn() } as unknown as Ai, // no debe llamarse en dev
+  } as Env;
+}
+
+function makeProdEnv(runResult: unknown = { response: AI_CONTENT }): Env {
+  return {
+    ENVIRONMENT: 'production',
     AI: { run: vi.fn().mockResolvedValue(runResult) } as unknown as Ai,
   } as Env;
 }
 
-describe('AIService', () => {
-  beforeEach(() => vi.clearAllMocks());
+function mockFetch(body: unknown, ok = true, status = 200) {
+  return vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+    new Response(JSON.stringify(body), {
+      status,
+      headers: { 'Content-Type': 'application/json' },
+    })
+  );
+}
 
-  it('genera contenido a partir de un promptId válido', async () => {
-    const env = makeEnv();
-    const svc = new AIService(env);
-    const content = await svc.generate({
-      promptId: 'F0',
-      context: { projectName: 'Test Project', clientName: 'Juan Pérez', industry: 'Manufactura' },
-      userInputs: { courseTopic: 'Seguridad industrial' },
-    });
-    expect(content).toBe(AI_RESPONSE);
-    expect((env.AI.run as ReturnType<typeof vi.fn>)).toHaveBeenCalledOnce();
+// ─────────────────────────────────────────────────────────────────────────────
+describe('AIService — modo desarrollo (Ollama)', () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it('llama a Ollama y devuelve el contenido generado', async () => {
+    const fetchSpy = mockFetch({ response: AI_CONTENT });
+    const svc = new AIService(makeDevEnv());
+    const content = await svc.generate(BASE_OPTS);
+
+    expect(content).toBe(AI_CONTENT);
+    expect(fetchSpy).toHaveBeenCalledOnce();
+    const [url] = fetchSpy.mock.calls[0] as [string, ...unknown[]];
+    expect(url).toContain('/api/generate');
+    expect(url).toContain('ollama');
   });
 
-  it('llama a AI con el modelo correcto', async () => {
-    const env = makeEnv();
-    const svc = new AIService(env);
-    await svc.generate({
-      promptId: 'F1',
-      context: { projectName: 'P', clientName: 'C' },
-      userInputs: {},
-    });
-    const [model] = (env.AI.run as ReturnType<typeof vi.fn>).mock.calls[0] as [string, ...unknown[]];
-    expect(model).toBe('@cf/meta/llama-3.2-3b-instruct');
+  it('usa http://localhost:11434 cuando OLLAMA_URL no está definida', async () => {
+    const fetchSpy = mockFetch({ response: AI_CONTENT });
+    const env = makeDevEnv();
+    delete (env as Partial<Env>).OLLAMA_URL;
+    await new AIService(env).generate(BASE_OPTS);
+    const [url] = fetchSpy.mock.calls[0] as [string, ...unknown[]];
+    expect(url).toContain('localhost:11434');
   });
 
-  it('acepta respuesta como string plano (alternativa al objeto {response})', async () => {
-    const env = makeEnv('# Respuesta directa');
-    const svc = new AIService(env);
-    const content = await svc.generate({
-      promptId: 'F0',
-      context: { projectName: 'P', clientName: 'C' },
-      userInputs: {},
-    });
-    expect(content).toBe('# Respuesta directa');
+  it('envía model, prompt y system en el body', async () => {
+    const fetchSpy = mockFetch({ response: AI_CONTENT });
+    await new AIService(makeDevEnv()).generate(BASE_OPTS);
+    const [, init] = fetchSpy.mock.calls[0] as [string, RequestInit];
+    const body = JSON.parse(init.body as string) as Record<string, unknown>;
+    expect(body['model']).toBe('llama3.2:3b');
+    expect(typeof body['prompt']).toBe('string');
+    expect(typeof body['system']).toBe('string');
+    expect(body['stream']).toBe(false);
   });
 
-  it('lanza error cuando la respuesta de IA está vacía', async () => {
-    const env = makeEnv({ response: '' });
-    const svc = new AIService(env);
-    await expect(
-      svc.generate({ promptId: 'F0', context: { projectName: 'P', clientName: 'C' }, userInputs: {} })
-    ).rejects.toThrow('AI generation failed');
+  it('el prompt contiene el contexto del proyecto', async () => {
+    const fetchSpy = mockFetch({ response: AI_CONTENT });
+    await new AIService(makeDevEnv()).generate(BASE_OPTS);
+    const [, init] = fetchSpy.mock.calls[0] as [string, RequestInit];
+    const body = JSON.parse(init.body as string) as { prompt: string };
+    expect(body.prompt).toContain('Test Project');
+    expect(body.prompt).toContain('Juan Pérez');
   });
 
-  it('lanza error cuando AI.run lanza una excepción', async () => {
-    const env = makeEnv();
-    (env.AI.run as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new Error('Workers AI unavailable'));
-    const svc = new AIService(env);
-    await expect(
-      svc.generate({ promptId: 'F0', context: { projectName: 'P', clientName: 'C' }, userInputs: {} })
-    ).rejects.toThrow('AI generation failed: Workers AI unavailable');
+  it('NO llama a env.AI.run en desarrollo', async () => {
+    mockFetch({ response: AI_CONTENT });
+    const env = makeDevEnv();
+    await new AIService(env).generate(BASE_OPTS);
+    expect(env.AI.run).not.toHaveBeenCalled();
   });
 
-  it('interpola el contexto en el prompt renderizado', async () => {
-    const env = makeEnv();
-    const svc = new AIService(env);
-    await svc.generate({
-      promptId: 'F0',
-      context: { projectName: 'MiProyecto', clientName: 'Ana López' },
-      userInputs: { courseTopic: 'Node.js avanzado' },
-    });
-    const callArgs = (env.AI.run as ReturnType<typeof vi.fn>).mock.calls[0] as [string, { prompt: string }];
-    expect(callArgs[1].prompt).toContain('MiProyecto');
-    expect(callArgs[1].prompt).toContain('Ana López');
+  it('lanza error si Ollama responde con HTTP error', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response('Service Unavailable', { status: 503 })
+    );
+    await expect(new AIService(makeDevEnv()).generate(BASE_OPTS))
+      .rejects.toThrow('AI generation failed');
+  });
+
+  it('lanza error si Ollama devuelve response vacío', async () => {
+    mockFetch({ response: '' });
+    await expect(new AIService(makeDevEnv()).generate(BASE_OPTS))
+      .rejects.toThrow('AI generation failed');
   });
 
   it('todos los promptIds válidos se renderizan sin error', async () => {
     const ids = ['F0', 'F1', 'F2', 'F3', 'F4', 'F5', 'F5_2', 'F6', 'F6_2'] as const;
     for (const id of ids) {
-      const env = makeEnv();
-      const svc = new AIService(env);
+      mockFetch({ response: AI_CONTENT });
       await expect(
-        svc.generate({ promptId: id, context: { projectName: 'P', clientName: 'C' }, userInputs: {} })
-      ).resolves.toBeDefined();
+        new AIService(makeDevEnv()).generate({ ...BASE_OPTS, promptId: id })
+      ).resolves.toBe(AI_CONTENT);
     }
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+describe('AIService — modo producción (Workers AI)', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('llama a Workers AI con el modelo correcto', async () => {
+    const env = makeProdEnv();
+    await new AIService(env).generate(BASE_OPTS);
+    const [model] = (env.AI.run as ReturnType<typeof vi.fn>).mock.calls[0] as [string, ...unknown[]];
+    expect(model).toBe('@cf/meta/llama-3.2-3b-instruct');
+  });
+
+  it('devuelve el contenido del objeto {response}', async () => {
+    const content = await new AIService(makeProdEnv({ response: AI_CONTENT })).generate(BASE_OPTS);
+    expect(content).toBe(AI_CONTENT);
+  });
+
+  it('acepta respuesta como string plano', async () => {
+    const content = await new AIService(makeProdEnv(AI_CONTENT)).generate(BASE_OPTS);
+    expect(content).toBe(AI_CONTENT);
+  });
+
+  it('lanza error si Workers AI devuelve response vacío', async () => {
+    await expect(new AIService(makeProdEnv({ response: '' })).generate(BASE_OPTS))
+      .rejects.toThrow('AI generation failed');
+  });
+
+  it('lanza error si env.AI.run lanza una excepción', async () => {
+    const env = makeProdEnv();
+    (env.AI.run as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new Error('Workers AI unavailable'));
+    await expect(new AIService(env).generate(BASE_OPTS))
+      .rejects.toThrow('AI generation failed: Workers AI unavailable');
+  });
+
+  it('NO llama a fetch en producción', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch');
+    await new AIService(makeProdEnv()).generate(BASE_OPTS);
+    expect(fetchSpy).not.toHaveBeenCalled();
+    fetchSpy.mockRestore();
   });
 });

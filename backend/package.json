@@ -3,8 +3,9 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "dev": "wrangler dev src/index.ts --port 8787",
-    "build": "tsc",
+    "dev": "node --require ./src/register-md.cjs --env-file=.dev.vars -r tsx/cjs src/server.dev.ts",
+    "dev:debug": "node --require ./src/register-md.cjs --env-file=.dev.vars --inspect=0.0.0.0:9229 -r tsx/cjs src/server.dev.ts",
+    "dev:wrangler": "wrangler dev src/index.ts --port 8787",
     "deploy": "wrangler deploy",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -20,7 +21,9 @@
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20240222.0",
+    "@hono/node-server": "^1.19.12",
     "@types/node": "^20.11.0",
+    "tsx": "^4.21.0",
     "typescript": "^5.3.3",
     "vitest": "^1.2.0",
     "wrangler": "^3.28.4"
