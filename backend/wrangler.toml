@@ -1,0 +1,22 @@
+name = "knowto-backend"
+main = "src/index.ts"
+compatibility_date = "2024-03-15"
+compatibility_flags = ["nodejs_compat"]
+
+[ai]
+binding = "AI"
+
+[vars]
+ENVIRONMENT = "development"
+
+[[d1_databases]]
+# Descomenta si usas D1 en lugar de Supabase
+# binding = "DB"
+# database_name = "knowto-db"
+# database_id = "your-database-id"
+
+[env.production]
+name = "knowto-backend-production"
+
+[env.production.vars]
+ENVIRONMENT = "production"

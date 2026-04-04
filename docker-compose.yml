@@ -1,0 +1,81 @@
+services:
+  postgres:
+    image: postgres:15
+    container_name: knowto-postgres
+    environment:
+      POSTGRES_USER: knowto
+      POSTGRES_PASSWORD: knowto123
+      POSTGRES_DB: knowto_dev
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./supabase/migrations:/docker-entrypoint-initdb.d
+    networks:
+      - knowto-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U knowto -d knowto_dev"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    image: node:20-alpine
+    container_name: knowto-backend
+    working_dir: /app
+    command: sh -c "npm install && npm run dev"
+    ports:
+      - "8787:8787"
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+    environment:
+      NODE_ENV: development
+      SUPABASE_URL: ${SUPABASE_URL:-http://postgres:5432}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY:-dummy-key}
+      SUPABASE_JWT_SECRET: ${SUPABASE_JWT_SECRET:-dummy-secret}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - knowto-network
+
+  frontend:
+    image: node:20-alpine
+    container_name: knowto-frontend
+    working_dir: /app
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0"
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    environment:
+      NODE_ENV: development
+      VITE_API_URL: http://localhost:8787
+      VITE_SUPABASE_URL: ${VITE_SUPABASE_URL:-http://localhost:54321}
+      VITE_SUPABASE_ANON_KEY: ${VITE_SUPABASE_ANON_KEY:-dummy-key}
+    depends_on:
+      - backend
+    networks:
+      - knowto-network
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: knowto-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    command: >
+      sh -c "ollama serve & sleep 10 && ollama pull llama3.2:3b && tail -f /dev/null"
+    networks:
+      - knowto-network
+
+networks:
+  knowto-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  ollama_data:

@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+
+<html class="light" lang="es"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>KNOWTO - Certification Wizard EC0366</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-tertiary-fixed-variant": "#3c475a",
+                        "surface-bright": "#f7faf9",
+                        "on-surface-variant": "#44474c",
+                        "error-container": "#ffdad6",
+                        "on-secondary-container": "#556679",
+                        "tertiary-fixed-dim": "#bcc7dd",
+                        "on-background": "#181c1c",
+                        "tertiary-container": "#1f2a3b",
+                        "on-secondary": "#ffffff",
+                        "tertiary-fixed": "#d8e3fa",
+                        "secondary-container": "#d2e4fb",
+                        "on-secondary-fixed": "#0b1d2d",
+                        "on-tertiary-container": "#8691a6",
+                        "tertiary": "#0a1526",
+                        "surface-dim": "#d7dbda",
+                        "on-surface": "#181c1c",
+                        "on-tertiary-fixed": "#111c2c",
+                        "primary": "#000f43",
+                        "on-primary-container": "#6a89ff",
+                        "inverse-surface": "#2d3131",
+                        "surface-container-high": "#e6e9e8",
+                        "surface-container": "#ebeeed",
+                        "surface-container-lowest": "#ffffff",
+                        "primary-container": "#002073",
+                        "secondary-fixed-dim": "#b7c8de",
+                        "outline-variant": "#c4c6cd",
+                        "on-error-container": "#93000a",
+                        "surface-container-low": "#f1f4f3",
+                        "surface": "#f7faf9",
+                        "surface-container-highest": "#e0e3e2",
+                        "on-tertiary": "#ffffff",
+                        "inverse-primary": "#b7c4ff",
+                        "surface-tint": "#004ced",
+                        "on-primary": "#ffffff",
+                        "on-error": "#ffffff",
+                        "background": "#f7faf9",
+                        "primary-fixed-dim": "#b7c4ff",
+                        "outline": "#74777d",
+                        "inverse-on-surface": "#eef1f0",
+                        "on-primary-fixed": "#001452",
+                        "on-secondary-fixed-variant": "#38485a",
+                        "surface-variant": "#e0e3e2",
+                        "secondary": "#4f6073",
+                        "primary-fixed": "#dde1ff",
+                        "on-primary-fixed-variant": "#0038b6",
+                        "error": "#ba1a1a",
+                        "secondary-fixed": "#d2e4fb"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "fontFamily": {
+                        "headline": ["Inter"],
+                        "body": ["Inter"],
+                        "label": ["Inter"]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        body { font-family: 'Inter', sans-serif; }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            vertical-align: middle;
+        }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        
+        .preview-glass {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+    </style>
+</head>
+<body class="bg-surface text-on-surface min-h-screen flex flex-col">
+<!-- TopAppBar -->
+<header class="flex justify-between items-center px-8 py-4 w-full bg-white/80 backdrop-blur-xl sticky top-0 docked full-width z-50">
+<div class="flex items-center gap-8">
+<span class="text-2xl font-black text-[#000f43] dark:text-white tracking-tighter">KNOWTO</span>
+<div class="hidden md:flex items-center gap-4">
+<div class="w-48 h-1.5 bg-surface-container-high rounded-full overflow-hidden">
+<div class="h-full bg-primary transition-all duration-500" id="progress-bar" style="width: 10%"></div>
+</div>
+<span class="text-xs font-bold text-secondary uppercase tracking-widest" id="progress-text">Progreso: 10%</span>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<button class="p-2 rounded-full hover:bg-[#f1f4f3] transition-colors">
+<span class="material-symbols-outlined text-[#000f43]">help_outline</span>
+</button>
+<button class="p-2 rounded-full hover:bg-[#f1f4f3] transition-colors">
+<span class="material-symbols-outlined text-[#000f43]">account_circle</span>
+</button>
+</div>
+</header>
+<div class="flex flex-1 overflow-hidden">
+<!-- SideNavBar -->
+<aside class="fixed left-0 top-0 h-full flex flex-col pt-24 border-r border-transparent bg-[#f1f4f3] dark:bg-slate-900 h-screen w-72 left-0 top-0 border-r-0 z-40 overflow-y-auto no-scrollbar">
+<div class="px-8 mb-8">
+<h3 class="font-['Inter'] text-sm uppercase tracking-widest font-semibold text-[#000f43]">Fases de Certificaci\u00f3n</h3>
+<p class="text-xs text-secondary mt-1">Estándar EC0366</p>
+</div>
+<nav class="flex flex-col gap-1 pb-32">
+<!-- Navigation Items are dynamically updated via script, but keeping placeholders for layout -->
+<a class="nav-item bg-white shadow-[0_12px_40px_rgba(24,28,28,0.06)] rounded-lg mr-4 ml-2 text-[#000f43] font-bold px-6 py-3 flex items-center gap-3 transition-all" data-step="0" href="#">
+<span class="material-symbols-outlined">start</span>
+<span class="font-['Inter'] text-sm uppercase tracking-widest">Inicio</span>
+</a>
+<a class="nav-item text-[#4f6073] px-6 py-3 flex items-center gap-3 hover:text-[#000f43] transition-all translate-x-1" data-step="1" href="#">
+<span class="material-symbols-outlined">person</span>
+<span class="font-['Inter'] text-sm uppercase tracking-widest">Datos Personales</span>
+</a>
+<a class="nav-item text-[#4f6073] px-6 py-3 flex items-center gap-3 hover:text-[#000f43] transition-all" data-step="2" href="#">
+<span class="material-symbols-outlined">work</span>
+<span class="font-['Inter'] text-sm uppercase tracking-widest">Experiencia</span>
+</a>
+<a class="nav-item text-[#4f6073] px-6 py-3 flex items-center gap-3 hover:text-[#000f43] transition-all" data-step="3" href="#">
+<span class="material-symbols-outlined">school</span>
+<span class="font-['Inter'] text-sm uppercase tracking-widest">Formaci\u00f3n</span>
+</a>
+<a class="nav-item text-[#4f6073] px-6 py-3 flex items-center gap-3 hover:text-[#000f43] transition-all" data-step="4" href="#">
+<span class="material-symbols-outlined">psychology</span>
+<span class="font-['Inter'] text-sm uppercase tracking-widest">Competencias</span>
+</a>
+<a class="nav-item text-[#4f6073] px-6 py-3 flex items-center gap-3 hover:text-[#000f43] transition-all" data-step="5" href="#">
+<span class="material-symbols-outlined">description</span>
+<span class="font-['Inter'] text-sm uppercase tracking-widest">Documentaci\u00f3n</span>
+</a>
+<a class="nav-item text-[#4f6073] px-6 py-3 flex items-center gap-3 hover:text-[#000f43] transition-all" data-step="6" href="#">
+<span class="material-symbols-outlined">verified</span>
+<span class="font-['Inter'] text-sm uppercase tracking-widest">Validaci\u00f3n</span>
+</a>
+<a class="nav-item text-[#4f6073] px-6 py-3 flex items-center gap-3 hover:text-[#000f43] transition-all" data-step="7" href="#">
+<span class="material-symbols-outlined">fact_check</span>
+<span class="font-['Inter'] text-sm uppercase tracking-widest">Revisi\u00f3n Final</span>
+</a>
+<a class="nav-item text-[#4f6073] px-6 py-3 flex items-center gap-3 hover:text-[#000f43] transition-all" data-step="8" href="#">
+<span class="material-symbols-outlined">payments</span>
+<span class="font-['Inter'] text-sm uppercase tracking-widest">Pago</span>
+</a>
+<a class="nav-item text-[#4f6073] px-6 py-3 flex items-center gap-3 hover:text-[#000f43] transition-all" data-step="9" href="#">
+<span class="material-symbols-outlined">celebration</span>
+<span class="font-['Inter'] text-sm uppercase tracking-widest">Finalizar</span>
+</a>
+</nav>
+</aside>
+<!-- Main Content Canvas -->
+<main class="ml-72 flex-1 flex flex-col md:flex-row overflow-hidden bg-surface">
+<!-- Left 40%: Form Section -->
+<section class="w-full md:w-[40%] h-full p-12 overflow-y-auto no-scrollbar border-r border-transparent">
+<div class="max-w-md mx-auto space-y-8">
+<header>
+<span class="text-xs font-bold text-tertiary uppercase tracking-[0.2em]">Paso actual</span>
+<h1 class="text-4xl font-black text-primary mt-2 tracking-tight" id="step-title">Datos del Cliente</h1>
+<p class="text-on-surface-variant mt-4 leading-relaxed" id="step-description">
+                            Complete los campos básicos para inicializar el marco de referencia de la certificación EC0366.
+                        </p>
+</header>
+<form class="space-y-6 mt-10" id="wizard-form">
+<div class="space-y-6" id="form-fields-container">
+<!-- Dynamic form fields inject here -->
+<div class="group">
+<label class="block text-xs font-bold text-secondary uppercase tracking-widest mb-2">Nombre del Cliente</label>
+<input class="w-full bg-surface-container-low border-0 border-l-2 border-transparent focus:border-primary focus:ring-0 transition-all p-4 text-primary font-medium" id="client_name" name="client_name" placeholder="Ingrese nombre completo" type="text" value="Alberto Martínez"/>
+</div>
+<div class="group">
+<label class="block text-xs font-bold text-secondary uppercase tracking-widest mb-2">Curso / Proyecto</label>
+<input class="w-full bg-surface-container-low border-0 border-l-2 border-transparent focus:border-primary focus:ring-0 transition-all p-4 text-primary font-medium" id="course_name" name="course_name" placeholder="Nombre del programa" type="text" value="De Cero a Cloud"/>
+</div>
+<div class="group">
+<label class="block text-xs font-bold text-secondary uppercase tracking-widest mb-2">Institución</label>
+<input class="w-full bg-surface-container-low border-0 border-l-2 border-transparent focus:border-primary focus:ring-0 transition-all p-4 text-primary font-medium" id="institution" name="institution" placeholder="Nombre de la entidad" type="text"/>
+</div>
+<div class="group">
+<label class="block text-xs font-bold text-secondary uppercase tracking-widest mb-2">Fecha de Inicio</label>
+<input class="w-full bg-surface-container-low border-0 border-l-2 border-transparent focus:border-primary focus:ring-0 transition-all p-4 text-primary font-medium" id="start_date" name="start_date" type="date"/>
+</div>
+</div>
+<div class="pt-4">
+<button class="w-full bg-gradient-to-r from-primary to-primary-container text-white py-4 px-8 rounded-lg font-bold uppercase tracking-widest hover:opacity-90 active:scale-95 transition-all flex justify-center items-center gap-2" id="btn-generate" type="button">
+<span>Generar / Confirmar</span>
+<span class="material-symbols-outlined">bolt</span>
+</button>
+</div>
+</form>
+</div>
+</section>
+<!-- Right 60%: Document Preview Section -->
+<section class="hidden md:flex flex-col w-[60%] bg-surface-dim p-12 overflow-hidden relative">
+<div class="absolute inset-0 opacity-10 pointer-events-none">
+<img class="w-full h-full object-cover" data-alt="abstract architectural blueprint background with subtle geometric lines and blueprint textures in navy blue" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBlixBRx-4sx_KSZGQaM-ZsCBfsJ94CWHXUSqLqvlnJRfI5ozaQDMwouvdSnyPnmNMb7Fs8BtJQ6Q0TiZH7ZnsAUsbEvzxWGwfnO1GHpt9O5eOFT6nnDhMsybLPSJONwIkdqV9aNy5X31cij9IZe9LMRntrtNGdsk3Q3LtOHP1JmbrVJorjXqSZixMPrjYlOu7LCXt_wh82wISVBoGsjwVD9e1FAjTT5MS9dAMOyX4XH8uykXdFQLYI0vl_qGCLwdwyibPDRqluKsmF"/>
+</div>
+<div class="flex-1 flex flex-col z-10">
+<div class="flex justify-between items-center mb-8">
+<h2 class="text-xs font-bold text-primary uppercase tracking-[0.3em]">Vista Previa del Documento</h2>
+<div class="flex gap-2">
+<span class="w-3 h-3 rounded-full bg-white/40"></span>
+<span class="w-3 h-3 rounded-full bg-white/40"></span>
+<span class="w-3 h-3 rounded-full bg-white/40"></span>
+</div>
+</div>
+<div class="flex-1 preview-glass rounded-2xl shadow-2xl p-12 overflow-y-auto no-scrollbar prose prose-slate" id="document-canvas">
+<div class="text-on-surface-variant font-['Inter'] leading-loose" id="preview-content">
+<div class="flex flex-col items-center justify-center h-full text-center space-y-4">
+<span class="material-symbols-outlined text-6xl text-primary/20" style="font-variation-settings: 'FILL' 1;">description</span>
+<p class="text-lg italic text-secondary/60">Complete los datos para generar el marco de referencia.</p>
+</div>
+</div>
+</div>
+</div>
+</section>
+</main>
+</div>
+<!-- BottomNavBar -->
+<footer class="fixed bottom-0 left-0 w-full flex justify-between items-center px-12 py-6 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md shadow-[0_-12px_40px_rgba(24,28,28,0.04)] z-40">
+<button class="opacity-50 cursor-not-allowed flex items-center gap-2 text-[#4f6073] dark:text-slate-300 border border-[#4f6073]/20 px-8 py-3 rounded-md font-['Inter'] text-xs font-bold uppercase tracking-widest transition-all" disabled="" id="btn-prev">
+<span class="material-symbols-outlined">arrow_back</span>
+            Anterior
+        </button>
+<button class="bg-gradient-to-r from-[#000f43] to-[#002073] text-white px-8 py-3 rounded-md font-['Inter'] text-xs font-bold uppercase tracking-widest hover:opacity-90 active:scale-[0.98] transition-all flex items-center gap-2" id="btn-next">
+            Siguiente
+            <span class="material-symbols-outlined">arrow_forward</span>
+</button>
+</footer>
+<script>
+        // Data and Content Simulation
+        const wizardData = {
+            currentStep: 0,
+            userData: {
+                client_name: "Alberto Martínez",
+                course_name: "De Cero a Cloud",
+                institution: "",
+                start_date: ""
+            },
+            steps: [
+                { title: "Inicio", icon: "start", description: "Marco de referencia para la certificación." },
+                { title: "Datos Personales", icon: "person", description: "F1: Informe de necesidades y perfil del candidato." },
+                { title: "Experiencia", icon: "work", description: "F2: Especificaciones de análisis de trayectoria profesional." },
+                { title: "Formación", icon: "school", description: "F3: Especificaciones técnicas de la capacitación recibida." },
+                { title: "Competencias", icon: "psychology", description: "F4: Producción de evidencias (8 productos clave)." },
+                { title: "Documentación", icon: "description", description: "F5.1: Checklist de documentos obligatorios." },
+                { title: "Validación", icon: "verified", description: "F5.2: Anexo de evidencias validadas." },
+                { title: "Revisión Final", icon: "fact_check", description: "F6.1: Ajustes técnicos y revisión de calidad." },
+                { title: "Pago", icon: "payments", description: "Gestión de aranceles de certificación." },
+                { title: "Finalizar", icon: "celebration", description: "F6.2: Firmas finales y envío a comité." }
+            ]
+        };
+
+        const documentTemplates = [
+            `# F0: Marco de Referencia\n\n**Proyecto:** {{course_name}}\n**Candidato:** {{client_name}}\n\nEste documento establece las bases para el Estándar de Competencia EC0366. Se definen los alcances y criterios de evaluación iniciales para asegurar el cumplimiento normativo.`,
+            `# F1: Informe de Necesidades\n\nSe ha detectado que el candidato {{client_name}} requiere certificación para validar competencias en el área de {{course_name}}. \n\n### Perfil del Candidato\n- Nivel educativo: Técnico Superior\n- Experiencia sectorial: 5 años`,
+            `# F2: Especificaciones de Análisis\n\nAnálisis detallado de la brecha de competencia. El curso {{course_name}} cubrirá los siguientes módulos técnicos:\n1. Arquitectura Cloud\n2. Seguridad de Datos\n3. Despliegue Continuo`,
+            `# F3: Especificaciones Técnicas\n\nEl plan de capacitación se ejecutará en la institución {{institution}}. \n\n**Fecha de Inicio:** {{start_date}}\n\nEspecificaciones de infraestructura: Laboratorios virtuales, acceso a consola AWS/Azure.`,
+            `# F4: Producción de Evidencias\n\nEl candidato deberá entregar los 8 productos fundamentales:\n1. Plan de curso\n2. Instrumentos de evaluación\n3. Lista de verificación\n4. Reporte de resultados...`,
+            `# F5.1: Checklist de Documentación\n\n| Documento | Estado |\n|---|---|\n| Identificación Oficial | Recibido |\n| CURP | Recibido |\n| Diploma Previo | Pendiente |`,
+            `# F5.2: Anexo de Evidencias\n\nEvidencias fotográficas y archivos de video que demuestran la ejecución de las competencias evaluadas durante el curso {{course_name}}.`,
+            `# F6.1: Ajustes de Calidad\n\nRevisión final de los productos entregados por {{client_name}}. Se han realizado ajustes menores en el formato del Plan de Sesión para cumplir al 100% con el estándar.`,
+            `# Gestión de Pago\n\n**Concepto:** Evaluación y Certificación EC0366\n**Monto:** $4,500.00 MXN\n**Estatus:** Esperando comprobante.`,
+            `# F6.2: Cierre y Firmas\n\nDocumento listo para envío al Comité de Evaluación.\n\n__________________________\n**Firma del Candidato**\n{{client_name}}\n\n__________________________\n**Firma del Evaluador**`
+        ];
+
+        // Functions
+        function init() {
+            loadFromStorage();
+            updateUI();
+            
+            document.getElementById('btn-next').addEventListener('click', () => navigate(1));
+            document.getElementById('btn-prev').addEventListener('click', () => navigate(-1));
+            document.getElementById('btn-generate').addEventListener('click', saveAndRefresh);
+            
+            document.querySelectorAll('.nav-item').forEach(item => {
+                item.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    wizardData.currentStep = parseInt(item.getAttribute('data-step'));
+                    updateUI();
+                });
+            });
+        }
+
+        function loadFromStorage() {
+            const saved = localStorage.getItem('knowto_wizard_data');
+            if (saved) {
+                const parsed = JSON.parse(saved);
+                wizardData.userData = parsed.userData;
+                wizardData.currentStep = parsed.currentStep || 0;
+            }
+            
+            // Populate form
+            document.getElementById('client_name').value = wizardData.userData.client_name;
+            document.getElementById('course_name').value = wizardData.userData.course_name;
+            document.getElementById('institution').value = wizardData.userData.institution || "";
+            document.getElementById('start_date').value = wizardData.userData.start_date || "";
+        }
+
+        function saveAndRefresh() {
+            wizardData.userData.client_name = document.getElementById('client_name').value;
+            wizardData.userData.course_name = document.getElementById('course_name').value;
+            wizardData.userData.institution = document.getElementById('institution').value;
+            wizardData.userData.start_date = document.getElementById('start_date').value;
+            
+            localStorage.setItem('knowto_wizard_data', JSON.stringify(wizardData));
+            updateUI();
+            
+            // Visual feedback
+            const btn = document.getElementById('btn-generate');
+            const originalText = btn.innerHTML;
+            btn.innerHTML = '¡Datos Guardados!';
+            setTimeout(() => btn.innerHTML = originalText, 2000);
+        }
+
+        function navigate(direction) {
+            const nextStep = wizardData.currentStep + direction;
+            if (nextStep >= 0 && nextStep < wizardData.steps.length) {
+                wizardData.currentStep = nextStep;
+                updateUI();
+            }
+        }
+
+        function updateUI() {
+            const step = wizardData.steps[wizardData.currentStep];
+            
+            // Update Text
+            document.getElementById('step-title').innerText = step.title;
+            document.getElementById('step-description').innerText = step.description;
+            
+            // Update Progress
+            const progress = ((wizardData.currentStep + 1) / wizardData.steps.length) * 100;
+            document.getElementById('progress-bar').style.width = `${progress}%`;
+            document.getElementById('progress-text').innerText = `Progreso: ${Math.round(progress)}%`;
+            
+            // Update Navigation state
+            document.getElementById('btn-prev').disabled = wizardData.currentStep === 0;
+            document.getElementById('btn-prev').style.opacity = wizardData.currentStep === 0 ? '0.5' : '1';
+            
+            // Update SideNav Visuals
+            document.querySelectorAll('.nav-item').forEach((item, idx) => {
+                if (idx === wizardData.currentStep) {
+                    item.className = "nav-item bg-white shadow-[0_12px_40px_rgba(24,28,28,0.06)] rounded-lg mr-4 ml-2 text-[#000f43] font-bold px-6 py-3 flex items-center gap-3 transition-all";
+                } else {
+                    item.className = "nav-item text-[#4f6073] px-6 py-3 flex items-center gap-3 hover:text-[#000f43] transition-all";
+                }
+            });
+
+            // Update Preview Content
+            renderPreview();
+        }
+
+        function renderPreview() {
+            let template = documentTemplates[wizardData.currentStep] || "Contenido no disponible para esta fase.";
+            
+            // Simple replace simulation
+            template = template
+                .replace(/{{client_name}}/g, wizardData.userData.client_name || "[NOMBRE]")
+                .replace(/{{course_name}}/g, wizardData.userData.course_name || "[CURSO]")
+                .replace(/{{institution}}/g, wizardData.userData.institution || "[INSTITUCIÓN]")
+                .replace(/{{start_date}}/g, wizardData.userData.start_date || "[FECHA]");
+
+            // Format markdown-ish to HTML
+            const html = template
+                .split('\n').map(line => {
+                    if (line.startsWith('# ')) return `<h1 class="text-3xl font-black text-primary mb-6">${line.substring(2)}</h1>`;
+                    if (line.startsWith('## ')) return `<h2 class="text-xl font-bold text-secondary mt-8 mb-4">${line.substring(3)}</h2>`;
+                    if (line.startsWith('### ')) return `<h3 class="text-lg font-bold text-tertiary mt-6 mb-2">${line.substring(4)}</h3>`;
+                    if (line.startsWith('**')) return `<p class="mb-4"><strong>${line.replace(/\*\*/g, '')}</strong></p>`;
+                    if (line.startsWith('- ')) return `<li class="ml-4 mb-1 list-disc">${line.substring(2)}</li>`;
+                    if (line.trim() === "") return "<br/>";
+                    return `<p class="mb-4">${line}</p>`;
+                }).join('');
+
+            document.getElementById('preview-content').innerHTML = html;
+        }
+
+        // Initialize on load
+        window.onload = init;
+    </script>
+</body></html>
