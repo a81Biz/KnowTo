@@ -1,36 +1,50 @@
 # KnowTo
 
-Plataforma de certificación EC0366 (CONOCER) asistida por IA. Guía al evaluador a través de 12 pasos para generar los documentos oficiales del proceso de certificación.
+Plataforma de microsites de certificación asistidos por IA. Arquitectura multi-microsite con un API Gateway compartido y frontends aislados por subdominio.
 
 ## Stack
 
 | Capa | Tecnología |
 |---|---|
-| Frontend | TypeScript + Vite + Tailwind CSS (Vanilla) |
+| Frontend | TypeScript + Vite + Tailwind CSS (Vanilla TS, sin framework) |
 | Backend | Hono + `@hono/zod-openapi` — Node.js en dev, Cloudflare Workers en prod |
 | IA — producción | Workers AI — `@cf/meta/llama-3.2-3b-instruct` |
 | IA — desarrollo | Ollama local — `llama3.2:3b` (configurable) |
-| Base de datos | Supabase (PostgreSQL) vía stored procedures |
-| Dev local | Docker Compose + Postgres + Ollama |
-| Tests | Vitest (78 tests, 100 % pass) |
+| Base de datos | Supabase (PostgreSQL) vía stored procedures RPC |
+| Routing local | Nginx (reverse proxy, único puerto expuesto: 80) |
+| Dev local | Docker Compose — Nginx + Node.js + Postgres + Ollama |
+| Tests | Vitest (80 tests, 100 % pass) |
 
 ---
 
 ## Inicio rápido
 
-```bash
-# Levantar todos los servicios (no requiere cuenta de Cloudflare)
-docker compose up -d
+### Con Docker (recomendado)
 
-# Frontend  → http://localhost:5173
-# Backend   → http://localhost:8787
-# API Docs  → http://localhost:8787/api/docs
-# Ollama    → http://localhost:11435  (puerto del contenedor; descarga llama3.2:3b la primera vez)
+**Prerequisito único por máquina** — añadir al archivo `hosts`:
+
+```
+# Windows: C:\Windows\System32\drivers\etc\hosts  (abrir como Administrador)
+# Linux/Mac: /etc/hosts
+
+127.0.0.1  dcfl.localhost
+127.0.0.1  api.localhost
 ```
 
-El backend tarda ~20 s en estar listo (npm install + arranque de Node.js dentro del contenedor).
+```bash
+docker compose up -d
+```
 
-**Sin Docker** (desarrollo nativo):
+| URL | Servicio |
+|---|---|
+| `http://localhost` | Directorio de microsites |
+| `http://dcfl.localhost` | Microsite EC0366 |
+| `http://api.localhost/docs` | Swagger UI (Scalar) |
+| `http://api.localhost/health` | Health check del API |
+
+El backend tarda ~20 s en estar listo (npm install + arranque de Node.js).
+
+### Sin Docker (desarrollo nativo)
 
 ```bash
 # Terminal 1 — backend
@@ -40,11 +54,19 @@ npm run dev          # Node.js en :8787, lee backend/.dev.vars
 # o con debugger:
 npm run dev:debug    # igual + inspector Node.js en :9229
 
-# Terminal 2 — frontend
-cd frontend
+# Terminal 2 — microsite dcfl
+cd frontend/dcfl
 npm install
 npm run dev          # Vite en :5173
+
+# Terminal 3 — (opcional) directorio raíz
+cd frontend/root
+npm install
+npm run dev          # Vite en :5174
 ```
+
+> En desarrollo nativo el frontend llama directamente a `http://localhost:8787`.
+> No se necesitan entradas en el archivo `hosts`.
 
 > **No se necesita cuenta de Cloudflare ni `wrangler login`** para desarrollar.
 > El backend corre en Node.js puro (`server.dev.ts`). `wrangler` solo se usa para `deploy`.
@@ -59,11 +81,41 @@ dentro de Docker. La solución es correr el mismo código Hono en Node.js con
 `@hono/node-server`, que no tiene esa restricción.
 
 ```
-wrangler dev   →  workerd (sandbox)  →  bloquea 172.20.0.x  →  Ollama inalcanzable
-npm run dev    →  Node.js puro       →  acceso total         →  Ollama funciona
+wrangler dev  →  workerd (sandbox)  →  bloquea 172.20.0.x  →  Ollama inalcanzable
+npm run dev   →  Node.js puro       →  acceso total         →  Ollama funciona
 ```
 
-Para producción el deploy sigue siendo `wrangler deploy` → Cloudflare Workers.
+En producción el deploy sigue siendo `wrangler deploy` → Cloudflare Workers.
+
+---
+
+## Arquitectura de microsites
+
+```
+Browser
+  ├── localhost           → frontend-root   (directorio)
+  ├── dcfl.localhost      → frontend-dcfl   (microsite EC0366)
+  └── api.localhost       → backend         (API Gateway)
+         ↓
+       Nginx (puerto 80, único expuesto)
+         ↓
+   Docker network (knowto-network 172.20.0.0/24)
+   ├── frontend-root   :5174
+   ├── frontend-dcfl   :5173
+   ├── backend         :8787  (también :9229 para debugger)
+   ├── postgres        :5432
+   └── ollama          :11434
+```
+
+Cada microsite tiene su propio frontend Vite y su propio router en el backend.
+Un fallo en un microsite no afecta a los demás.
+
+**Convención de URLs:**
+
+| Entorno | Frontend | API |
+|---|---|---|
+| Desarrollo | `[slug].localhost` | `api.localhost/[slug]/...` |
+| Producción | `[slug].[dominio]` | `api.[dominio]/[slug]/...` |
 
 ---
 
@@ -72,72 +124,340 @@ Para producción el deploy sigue siendo `wrangler deploy` → Cloudflare Workers
 ```
 knowto/
 ├── backend/
-│   ├── src/
-│   │   ├── index.ts              # App Hono — CORS dinámico + OpenAPI + rutas
-│   │   ├── server.dev.ts         # Entry point de desarrollo (Node.js + @hono/node-server)
-│   │   ├── register-md.cjs       # Loader .md para Node.js (equivale a [[rules]] de wrangler)
-│   │   ├── middleware/
-│   │   │   ├── auth.middleware.ts      # Bearer JWT: dev bypass / Supabase prod
-│   │   │   └── error.middleware.ts
-│   │   ├── routes/
-│   │   │   ├── health.route.ts         # GET /api/health
-│   │   │   └── wizard.route.ts         # /api/wizard/*
-│   │   ├── services/
-│   │   │   ├── ai.service.ts               # Ollama (dev) / Workers AI (prod)
-│   │   │   ├── context-extractor.service.ts # Extrae secciones de docs anteriores
-│   │   │   └── supabase.service.ts          # Mocks UUID (dev) / RPC real (prod)
-│   │   ├── prompts/
-│   │   │   ├── index.ts                # PromptRegistry singleton
-│   │   │   ├── flow-map.json           # Mapa de flujo: fases, extractores, patrones
-│   │   │   └── templates/              # 20 plantillas Markdown (F0–F6_2b, F2_5, F4_P0–F4_P7, F6_FORM + EXTRACTOR)
-│   │   └── types/
-│   │       ├── env.ts                  # Bindings de Cloudflare Workers
-│   │       └── wizard.types.ts         # PhaseId, PromptId, ProjectContext…
-│   ├── src/__tests__/             # Vitest — 78 tests
-│   │   ├── middleware/auth.middleware.test.ts
-│   │   ├── routes/health.e2e.test.ts
-│   │   ├── routes/wizard.e2e.test.ts
-│   │   ├── services/ai.service.test.ts
-│   │   └── services/supabase.service.test.ts
-│   ├── .dev.vars                  # Variables locales para Node.js dev (no commitear)
-│   ├── wrangler.toml
-│   └── vitest.config.ts
-├── frontend/
 │   └── src/
-│       ├── main.ts               # Orquestador: auth + dashboard + wizard
-│       ├── controllers/          # Un controlador por paso (step0–step11); step4.production y step7.adjustments son clases personalizadas
-│       ├── stores/wizard.store.ts
-│       ├── shared/
-│       │   ├── endpoints.ts      # URL base resuelta en runtime desde window.location
-│       │   ├── http.client.ts    # fetch wrapper con auth header automático
-│       │   ├── step.base.ts      # Clase base de todos los controladores
-│       │   ├── pubsub.ts
-│       │   └── validationEngine.ts
-│       └── types/wizard.types.ts
-├── .vscode/launch.json           # Configuraciones de debug para VS Code
+│       ├── index.ts              # API Gateway — CORS + OpenAPI + monta routers de microsites
+│       ├── server.dev.ts         # Entry point de desarrollo (Node.js + @hono/node-server)
+│       ├── register-md.cjs       # Loader .md para Node.js (equivale a [[rules]] de wrangler)
+│       ├── core/
+│       │   ├── middleware/
+│       │   │   ├── auth.middleware.ts      # Bearer JWT: dev bypass / Supabase JWT prod
+│       │   │   └── error.middleware.ts
+│       │   └── types/
+│       │       ├── env.ts                  # Bindings de Cloudflare Workers
+│       │       └── modules.d.ts            # Declaración de módulos *.md
+│       └── dcfl/                           # Microsite EC0366
+│           ├── router.ts                   # Compone y exporta el router de dcfl
+│           ├── routes/
+│           │   ├── health.route.ts         # GET /dcfl/health
+│           │   └── wizard.route.ts         # /dcfl/wizard/*
+│           ├── services/
+│           │   ├── ai.service.ts           # Ollama (dev) / Workers AI (prod)
+│           │   ├── context-extractor.service.ts
+│           │   └── supabase.service.ts     # Mocks UUID (dev) / RPC real (prod)
+│           ├── prompts/
+│           │   ├── index.ts                # PromptRegistry singleton
+│           │   ├── flow-map.json           # Mapa de fases, extractores y patrones
+│           │   └── templates/              # Plantillas Markdown (F0–F6_2b, F4_P*, F6_FORM, EXTRACTOR)
+│           └── types/
+│               ├── wizard.types.ts         # PhaseId, PromptId, ProjectContext…
+│               └── document.types.ts
+├── backend/src/__tests__/        # Vitest — 80 tests
+│   ├── middleware/auth.middleware.test.ts
+│   ├── routes/health.e2e.test.ts
+│   ├── routes/wizard.e2e.test.ts
+│   ├── services/ai.service.test.ts
+│   ├── services/supabase.service.test.ts
+│   └── prompts/prompt-registry.test.ts
+├── frontend/
+│   ├── core/src/                 # Utilidades compartidas (importadas como @core/*)
+│   │   ├── auth.ts               # Google OAuth + dev bypass
+│   │   ├── supabase.client.ts
+│   │   ├── http.client.ts        # fetch wrapper con Bearer automático
+│   │   ├── ui.ts                 # showLoading, renderMarkdown, printDocument…
+│   │   ├── pubsub.ts
+│   │   ├── template.loader.ts
+│   │   └── validationEngine.ts
+│   ├── dcfl/                     # Microsite EC0366 — app Vite independiente
+│   │   ├── src/
+│   │   │   ├── main.ts           # Orquestador: auth + dashboard + wizard
+│   │   │   ├── controllers/      # step0–step11, step4.production, step7.adjustments
+│   │   │   ├── shared/
+│   │   │   │   ├── endpoints.ts  # URLs resueltas en runtime desde window.location
+│   │   │   │   ├── step.base.ts  # Clase base de todos los controladores
+│   │   │   │   └── step.factory.ts
+│   │   │   ├── stores/wizard.store.ts
+│   │   │   └── types/
+│   │   ├── templates/            # HTML de cada paso del wizard
+│   │   ├── microsite.json        # Metadatos del microsite (leídos por frontend-root)
+│   │   └── vite.config.ts
+│   └── root/                     # Directorio de microsites — app Vite independiente
+│       └── src/main.ts           # Descubre microsites leyendo microsite.json de cada uno
+├── nginx/
+│   ├── nginx.conf                # Config global + map WebSocket
+│   └── conf.d/local.conf         # Un server block por microsite
+├── docs/
+│   ├── ADDING-A-MICROSITE.md     # Guía paso a paso para añadir un microsite nuevo
+│   └── dcfl/
+│       └── PROCESO-EC0366.md     # Descripción del proceso de negocio de EC0366
+├── .env.example                  # Variables de entorno documentadas
 ├── docker-compose.yml
-└── DEBUG.md                      # Guía detallada de debugging
+└── wrangler.toml
 ```
+
+---
+
+## Routing local (Nginx)
+
+```nginx
+localhost        →  frontend-root:5174
+dcfl.localhost   →  frontend-dcfl:5173
+api.localhost    →  backend:8787
+```
+
+Todos los WebSockets de HMR (Vite) pasan por Nginx usando el header `Upgrade`.
+El `Connection` se establece con un `map` para no afectar peticiones HTTP normales.
+
+---
+
+## Resolución dinámica de URLs
+
+Sin dominios hardcodeados. El mismo bundle funciona en cualquier entorno.
+
+### Frontend — `endpoints.ts` (resuelve en runtime)
+
+```
+dcfl.localhost   →  http://api.localhost/dcfl
+dcfl.knowto.dev  →  https://api.knowto.dev/dcfl
+dcfl.elsitio.mx  →  https://api.elsitio.mx/dcfl
+```
+
+Lógica en `frontend/dcfl/src/shared/endpoints.ts`:
+- Si hay `VITE_API_BASE_URL` → úsala como override
+- Si el hostname es `*.localhost` → `api.localhost/[slug]`
+- Si no → `api.[apex-domain]/[slug]`
+
+### Backend — CORS (`index.ts`, derivado del host de la petición)
+
+```
+Worker en api.knowto.dev  →  acepta Origin: *.knowto.dev
+En desarrollo             →  acepta cualquier *.localhost
+```
+
+---
+
+## Motores de IA por entorno
+
+| Entorno | Motor | Mecanismo |
+|---|---|---|
+| `development` | Ollama local | `fetch(OLLAMA_URL/api/generate)` — sin auth |
+| `production` | Workers AI | `env.AI.run('@cf/meta/llama-3.2-3b-instruct')` — binding CF |
+
+El modelo de Ollama es configurable con `OLLAMA_MODEL` (default: `llama3.2:3b`).
+
+> **Tiempos esperados en dev (CPU sin GPU):** 60–180 s por documento.
+> En producción con Workers AI: 5–15 s.
+> Con GPU NVIDIA: descomenta `deploy.resources` en `docker-compose.yml`.
+
+---
+
+## Comportamiento por entorno
+
+| Servicio | Desarrollo | Producción |
+|---|---|---|
+| Runtime backend | Node.js (`server.dev.ts`) | Cloudflare Workers (workerd) |
+| IA | Ollama Docker (`llama3.2:3b`) | Workers AI (`llama-3.2-3b-instruct`) |
+| Base de datos | Mocks en memoria (UUIDs) | Supabase — stored procedures RPC |
+| Auth | Token literal `dev-local-bypass` | JWT Google OAuth via Supabase |
+| CORS | Acepta `*.localhost` | Solo `*.[apex-domain]` |
+| Login Cloudflare | No requerido | Requerido para `wrangler deploy` |
+
+---
+
+## API REST
+
+Documentación interactiva (Scalar): `http://api.localhost/docs`
+Spec OpenAPI 3.0: `http://api.localhost/openapi.json`
+
+### Autenticación
+
+```
+Authorization: Bearer <token>
+```
+
+| Entorno | Token válido |
+|---|---|
+| Desarrollo | `dev-local-bypass` (literal, sin firma) |
+| Producción | JWT de Google OAuth emitido por Supabase |
+
+### Endpoints
+
+| Método | Ruta | Auth | Descripción |
+|---|---|---|---|
+| `GET` | `/health` | No | Health check global |
+| `GET` | `/openapi.json` | No | Spec OpenAPI 3.0 |
+| `GET` | `/docs` | No | Swagger UI (Scalar) |
+| `GET` | `/dcfl/health` | No | Health check del microsite dcfl |
+| `POST` | `/dcfl/wizard/project` | Sí | Crear proyecto |
+| `GET` | `/dcfl/wizard/project/:id` | Sí | Contexto del proyecto |
+| `GET` | `/dcfl/wizard/projects` | Sí | Listar proyectos del usuario |
+| `POST` | `/dcfl/wizard/step` | Sí | Guardar datos de un paso |
+| `POST` | `/dcfl/wizard/extract` | Sí | Extraer contexto compacto de fases previas |
+| `POST` | `/dcfl/wizard/generate` | Sí | Generar documento con IA |
+| `POST` | `/dcfl/wizard/generate-form` | Sí | Generar esquema de formulario dinámico |
+
+### Ejemplo rápido
+
+```bash
+# Health
+curl http://api.localhost/health
+
+# Crear proyecto (dev)
+curl -X POST http://api.localhost/dcfl/wizard/project \
+  -H "Authorization: Bearer dev-local-bypass" \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Curso Seguridad Industrial","clientName":"Juan Pérez","industry":"Manufactura"}'
+```
+
+---
+
+## Tests
+
+```bash
+# Backend — Vitest
+cd backend
+npm test               # 80 tests
+npm run test:coverage  # con reporte de cobertura HTML
+
+# Frontend dcfl — verificación de tipos TypeScript
+cd frontend/dcfl
+npm run type-check     # tsc --noEmit
+
+# Frontend root
+cd frontend/root
+npm run type-check
+```
+
+| Suite | Qué cubre |
+|---|---|
+| `auth.middleware.test.ts` | Bypass dev, JWT prod, tokens inválidos |
+| `ai.service.test.ts` | Ollama (dev) y Workers AI (prod) |
+| `supabase.service.test.ts` | Mocks dev y llamadas RPC prod |
+| `prompt-registry.test.ts` | PromptRegistry, flow-map, plantillas |
+| `health.e2e.test.ts` | Health global, `/dcfl/health`, spec OpenAPI |
+| `wizard.e2e.test.ts` | Todos los endpoints `/dcfl/wizard/*` |
+
+---
+
+## Variables de entorno
+
+### Backend — `backend/.dev.vars` (desarrollo nativo, no commitear)
+
+```ini
+ENVIRONMENT=development
+OLLAMA_URL=http://localhost:11434
+OLLAMA_MODEL=llama3.2:3b
+SUPABASE_URL=http://localhost:54321
+SUPABASE_SERVICE_ROLE_KEY=dummy-service-role-key
+SUPABASE_JWT_SECRET=dummy-jwt-secret
+```
+
+En Docker las variables vienen de `docker-compose.yml`; `.dev.vars` se ignora.
+
+### Backend — `wrangler.toml` (valores por defecto / Docker)
+
+```toml
+[vars]
+ENVIRONMENT   = "development"
+OLLAMA_URL    = "http://ollama:11434"   # nombre de servicio Docker
+OLLAMA_MODEL  = "llama3.2:3b"
+```
+
+### Backend — producción (secretos en Cloudflare Dashboard o wrangler)
+
+```bash
+wrangler secret put SUPABASE_URL              --env production
+wrangler secret put SUPABASE_SERVICE_ROLE_KEY --env production
+wrangler secret put SUPABASE_JWT_SECRET       --env production
+```
+
+`ENVIRONMENT=production` ya está en `wrangler.toml` bajo `[env.production.vars]`.
+
+### Frontend — `.env.local` por microsite (opcional)
+
+```ini
+# frontend/dcfl/.env.local
+VITE_SUPABASE_URL=https://tu-proyecto.supabase.co
+VITE_SUPABASE_ANON_KEY=tu-anon-key
+# VITE_API_BASE_URL=   # solo si apuntas a una API externa (staging, etc.)
+```
+
+En Docker las variables vienen de `docker-compose.yml`.
+
+---
+
+## Scripts del backend
+
+| Script | Descripción |
+|---|---|
+| `npm run dev` | Servidor Node.js en :8787, lee `.dev.vars` |
+| `npm run dev:debug` | Igual + inspector Node.js en :9229 (VS Code attach) |
+| `npm run dev:wrangler` | Servidor workerd (solo para verificar compatibilidad CF) |
+| `npm test` | Vitest — 80 tests |
+| `npm run test:watch` | Vitest en modo watch |
+| `npm run test:prompts` | Solo la suite de prompts (verbose) |
+| `wrangler deploy --env production` | Deploy a Cloudflare Workers |
+
+---
+
+## Comandos Docker
+
+| Comando | Descripción |
+|---|---|
+| `docker compose up -d` | Arrancar todo |
+| `docker compose down` | Detener y eliminar contenedores |
+| `docker compose restart nginx` | Recargar config de Nginx sin reiniciar todo |
+| `docker compose restart backend` | Reiniciar solo el backend |
+| `docker compose logs -f backend` | Logs del backend en tiempo real |
+| `docker compose logs -f frontend-dcfl` | Logs del frontend dcfl |
+| `docker compose logs -f nginx` | Logs de routing |
+| `docker compose up -d --scale ollama=0` | Levantar sin Ollama (sin GPU / sin modelo) |
+| `docker compose logs -f ollama` | Ver progreso de descarga del modelo |
 
 ---
 
 ## Debug con VS Code
 
-Ver [DEBUG.md](DEBUG.md) para la guía completa. Resumen:
+### Arquitectura de red en Docker
 
-### Con Docker (recomendado)
+```
+Browser (dcfl.localhost)
+    ↓  HTTP/WS  →  Nginx :80
+                      ↓  proxy
+                 frontend-dcfl :5173   (Vite + HMR)
+                 backend :8787         ← debuggable
+                      ↓  fetch
+                 ollama :11434
+```
 
-1. `docker compose up -d`
-2. En VS Code: `Ctrl+Shift+P` → **Debug: Select and Start Debugging**
-3. Seleccionar **"Backend: Attach (Docker)"** o el compound **"Full Stack (Docker)"**
-4. Poner breakpoints en `backend/src/` — se activan en la siguiente petición
+### Opción A — Con Docker (recomendado)
 
-### Sin Docker
+```bash
+docker compose up -d
+# esperar ~20s a que el backend termine de instalar dependencias
+curl http://api.localhost/health   # debe devolver {"success":true,...}
+```
 
-1. `cd backend && npm run dev:debug` (lanza con `--inspect=0.0.0.0:9229`)
-2. En VS Code: seleccionar **"Backend: Launch (Host)"** — lanza y adjunta automáticamente
+1. `Ctrl+Shift+P` → **Debug: Select and Start Debugging**
+2. Seleccionar **"Backend: Attach (Docker)"** o el compound **"Full Stack (Docker)"**
+3. Poner breakpoints en `backend/src/` — se activan en la siguiente petición
 
-### Configuraciones disponibles en `launch.json`
+> Si VS Code dice "could not connect", espera 5 s y reintenta.
+> El config tiene `"restart": true` para reintentar automáticamente.
+
+### Opción B — Sin Docker (nativo)
+
+```bash
+# Prerrequisito: Ollama corriendo en el host
+ollama list   # ver modelos; si falta llama3.2:3b → ollama pull llama3.2:3b
+
+cd backend
+npm run dev:debug   # Node.js en :8787 + inspector en :9229
+```
+
+1. `Ctrl+Shift+P` → **"Backend: Launch (Host)"** — lanza y adjunta automáticamente
+2. Poner breakpoints en `backend/src/`
+
+### Configuraciones `launch.json`
 
 | Nombre | Descripción |
 |---|---|
@@ -149,225 +469,128 @@ Ver [DEBUG.md](DEBUG.md) para la guía completa. Resumen:
 
 ---
 
-## Resolución dinámica de URLs
+## Script de prueba funcional
 
-Sin dominios hardcodeados. El mismo bundle funciona en cualquier dominio.
+Abre las DevTools en `http://dcfl.localhost` (Docker) o `http://localhost:5173` (nativo)
+y pega este script en la consola:
 
-### Frontend (`endpoints.ts`) — resuelve en runtime
+```javascript
+// KnowTo — prueba funcional de la API
+// Ajusta API según tu entorno:
+//   Docker:  'http://api.localhost'
+//   Nativo:  'http://localhost:8787'
 
-```
-localhost:5173   →  http://localhost:8787
-knowto.dev       →  https://api.knowto.dev
-knowto.mx        →  https://api.knowto.mx
-elsitio.com.mx   →  https://api.elsitio.com.mx
-```
+const API  = 'http://api.localhost';
+const AUTH = { Authorization: 'Bearer dev-local-bypass', 'Content-Type': 'application/json' };
 
-### Backend (`index.ts`) — CORS derivado del host de la petición
+async function check(label, fn) {
+  try {
+    const r = await fn();
+    console.log(`✅ ${label}`, r);
+    return r;
+  } catch (e) {
+    console.error(`❌ ${label}`, e.message ?? e);
+    return null;
+  }
+}
 
-```
-Worker en api.knowto.dev   →  acepta Origin: knowto.dev, www.knowto.dev
-Worker en localhost:8787   →  acepta cualquier localhost (cualquier puerto)
+(async () => {
+  console.group('KnowTo API — prueba funcional');
+
+  // 1. Health
+  const health = await check('GET /health', async () => {
+    return (await fetch(`${API}/health`)).json();
+  });
+  if (!health?.success) { console.groupEnd(); return; }
+
+  // 2. Crear proyecto
+  const proj = await check('POST /dcfl/wizard/project', async () => {
+    return (await fetch(`${API}/dcfl/wizard/project`, {
+      method: 'POST', headers: AUTH,
+      body: JSON.stringify({ name: 'Curso Test', clientName: 'Ana García', industry: 'Manufactura' })
+    })).json();
+  });
+  if (!proj?.data?.projectId) { console.groupEnd(); return; }
+  const projectId = proj.data.projectId;
+
+  // 3. Guardar paso
+  const step = await check('POST /dcfl/wizard/step', async () => {
+    return (await fetch(`${API}/dcfl/wizard/step`, {
+      method: 'POST', headers: AUTH,
+      body: JSON.stringify({ projectId, stepNumber: 0, inputData: { courseTopic: 'Seguridad' } })
+    })).json();
+  });
+  const stepId = step?.data?.stepId;
+
+  // 4. Generar documento — puede tardar 60-180s en CPU
+  console.log('⏳ Generando documento con Ollama (puede tardar ~60s en CPU)...');
+  const gen = await check('POST /dcfl/wizard/generate', async () => {
+    return (await fetch(`${API}/dcfl/wizard/generate`, {
+      method: 'POST', headers: AUTH,
+      body: JSON.stringify({
+        projectId, stepId,
+        phaseId: 'F0', promptId: 'F0',
+        context: { projectName: 'Curso Test', clientName: 'Ana García', industry: 'Manufactura' },
+        userInputs: { courseTopic: 'Seguridad industrial' }
+      })
+    })).json();
+  });
+
+  if (gen?.data?.content) {
+    console.log('📄 Primeras 300 chars:', gen.data.content.substring(0, 300) + '...');
+    console.log(gen.data.content.includes('Preguntas para el cliente')
+      ? '✅ F0 contiene "Preguntas para el cliente" — Step 1 las mostrará como inputs'
+      : '⚠️  F0 no generó "Preguntas para el cliente"');
+  }
+
+  console.groupEnd();
+  console.log('✅ Prueba completa.');
+})();
 ```
 
 ---
 
-## Motores de IA por entorno
-
-| Entorno | Motor | Cómo |
-|---|---|---|
-| `development` | Ollama local | `fetch(OLLAMA_URL/api/generate)` — sin auth |
-| `production` | Workers AI | `env.AI.run('@cf/meta/llama-3.2-3b-instruct')` — binding Cloudflare |
-
-El modelo de Ollama es configurable con `OLLAMA_MODEL` (default: `llama3.2:3b`).
-
-> **Tiempos esperados en dev (CPU sin GPU):** generar un documento tarda 60–180 s.
-> En producción con Workers AI: 5–15 s. Si tienes GPU NVIDIA, descomenta
-> la sección `deploy.resources` en `docker-compose.yml`.
-
----
-
-## API REST
-
-Documentación interactiva (Scalar): `GET /api/docs`
-Spec OpenAPI 3.0: `GET /api/openapi.json`
-
-### Autenticación
-
-| Entorno | Token válido |
-|---|---|
-| Desarrollo | `dev-local-bypass` (literal, sin firma) |
-| Producción | JWT de Google OAuth emitido por Supabase |
-
-```
-Authorization: Bearer <token>
-```
-
-### Endpoints
-
-| Método | Ruta | Descripción |
-|---|---|---|
-| `GET` | `/api/health` | Health check (sin auth) |
-| `GET` | `/api/openapi.json` | Spec OpenAPI 3.0 |
-| `GET` | `/api/docs` | Documentación interactiva (Scalar) |
-| `POST` | `/api/wizard/project` | Crear proyecto |
-| `GET` | `/api/wizard/project/:projectId` | Contexto del proyecto |
-| `GET` | `/api/wizard/projects` | Listar proyectos del usuario |
-| `POST` | `/api/wizard/step` | Guardar datos de un paso |
-| `POST` | `/api/wizard/extract` | Extraer contexto compacto de fases previas |
-| `POST` | `/api/wizard/generate` | Generar documento con IA |
-| `POST` | `/api/wizard/generate-form` | Generar esquema de formulario dinámico con IA |
-
-### Ejemplo rápido
+## Verificar conectividad Ollama
 
 ```bash
-# Health
-curl http://localhost:8787/api/health
+# Modelos disponibles
+curl http://localhost:11434/api/tags
 
-# Crear proyecto
-curl -X POST http://localhost:8787/api/wizard/project \
-  -H "Authorization: Bearer dev-local-bypass" \
+# Prueba rápida de generación
+curl -X POST http://localhost:11434/api/generate \
   -H "Content-Type: application/json" \
-  -d '{"name":"Curso Seguridad Industrial","clientName":"Juan Pérez","industry":"Manufactura"}'
+  -d '{"model":"llama3.2:3b","prompt":"Di hola en español","stream":false}'
 ```
 
 ---
 
-## Fases del proceso EC0366
+## Tiempos esperados (CPU, sin GPU)
 
-| Paso | ID | Documento | Entradas del usuario | Generado por IA |
-|---|---|---|---|---|
-| 0 | F0 | Marco de referencia del cliente | Datos básicos del proyecto | Análisis de sector, competencia, gaps y preguntas para el cliente |
-| 1 | F1 | Informe de necesidades | Respuestas a las preguntas de F0 + confirma/edita brechas propuestas | Declara problema, objetivos SMART+Bloom, perfil del participante, resultados esperados |
-| 2 | F2 | Especificaciones de análisis y diseño | Notas adicionales opcionales | Modalidad, SCORM, estructura temática, perfil de ingreso EC0366 |
-| 3 | F2.5 | Recomendaciones pedagógicas | — | Actividades, frecuencia de reportes, cantidad y duración de videos con justificación bibliográfica (Mayer, Bloom, Guo et al.) |
-| 4 | F3 | Especificaciones técnicas | LMS, SCORM, fecha inicio | Sección 1a: datos del usuario verbatim · Sección 1b: análisis técnico del LMS indicado |
-| 5 | F4 | Producción de contenidos (8 productos) | Aprobación secuencial de cada producto | Sub-wizard: 8 documentos EC0366 generados uno a uno (cronograma, info general, guías, calendario, textos, presentación, guión, evaluación) |
-| 6 | F5 | Verificación y evaluación (E1221) | Participantes, observaciones | Checklist técnico, checklist pedagógico, reporte de pruebas |
-| 7 | F5.2 | Anexo de evidencias | URLs del LMS y reportes | Plantillas vacías con instrucciones para llenar — sin datos inventados |
-| 8 | F6 | Ajustes post-evaluación | Formulario dinámico generado por IA | Clasificación de ajustes, plan de ajustes, control de versiones |
-| 9 | F6.2a | Inventario del expediente y firmas | CURP, revisor, coordinador | Inventario de los 16 documentos del expediente EC0366 con espacios de firma |
-| 10 | F6.2b | Resumen ejecutivo y declaración final | — | Resumen ejecutivo del curso completo y declaración bajo protesta de decir verdad |
-| 11 | CLOSE | Finalización | — | — |
-
-> **Flujo F0 → F1:** Las preguntas que genera F0 en la sección "Preguntas para el cliente" se
-> presentan automáticamente como campos de entrada en F1. El sistema también extrae los gaps
-> iniciales de F0 y pre-rellena las brechas para que el usuario solo confirme o edite.
-
-> **Extracción de contexto (F2 en adelante):** A partir del paso 2 el contexto acumulado supera
-> la ventana del modelo (~4096 tokens). El sistema llama automáticamente a `/api/wizard/extract`
-> al montar cada paso: extrae solo las secciones relevantes mediante parser markdown (regex) con
-> fallback a IA a temperatura 0. El extracto (~800 tokens) se inyecta al prompt en lugar del
-> contexto completo. Existen nodos extractor dedicados para F2, F2.5, F3, F4, F5, F5.2, F6, F6.2a y F6.2b.
->
-> **Formulario dinámico (F6):** En el paso 8, antes de generar el documento de ajustes, el sistema
-> llama a `/api/wizard/generate-form` con el prompt `F6_FORM`. La IA devuelve un JSON con el
-> esquema del formulario (campos, tipos, etiquetas) adaptado a las observaciones del checklist F5.
-> El usuario llena el formulario y luego genera el documento.
+| Operación | Tiempo |
+|---|---|
+| Health check | < 50 ms |
+| Crear / listar proyecto | < 100 ms |
+| Generar documento (Ollama CPU) | 60–180 s |
+| Generar documento (Workers AI prod) | 5–15 s |
 
 ---
 
-## Comportamiento por entorno
+## Problemas comunes
 
-| Servicio | Desarrollo | Producción |
+| Error | Causa | Solución |
 |---|---|---|
-| **Runtime backend** | Node.js (`server.dev.ts`) | Cloudflare Workers (workerd) |
-| **IA** | Ollama Docker (`llama3.2:3b`) | Workers AI (`llama-3.2-3b-instruct`) |
-| **Base de datos** | Mocks en memoria (UUIDs) | Supabase — stored procedures RPC |
-| **Auth** | Token literal `dev-local-bypass` | JWT Google OAuth via Supabase |
-| **CORS** | Acepta cualquier `localhost` | Solo `{dominio}` y `www.{dominio}` |
-| **Login Cloudflare** | No requerido | Requerido para `wrangler deploy` |
+| `ENOENT /app/api/package.json` | `working_dir` incorrecto en docker-compose | El `package.json` está en `backend/`, el `working_dir` debe ser `/app` |
+| `ENOTFOUND dcfl.localhost` (en logs del contenedor) | `hmr.host` resuelve dentro del contenedor donde no existe | Usar `hmr.clientPort` en vez de `hmr.host` en `vite.config.ts` |
+| Recargas infinitas en el navegador | Windows Docker genera eventos inotify espurios | `server.watch: { usePolling: true, interval: 1000 }` en `vite.config.ts` |
+| `Network connection lost` | workerd bloqueando IPs privadas | Usar `npm run dev` (Node.js), no `npm run dev:wrangler` |
+| `AI generation failed: model not found` | Modelo no descargado | `ollama pull llama3.2:3b` o editar `OLLAMA_MODEL` en `.dev.vars` |
+| `Cannot attach: port 9229 not open` | Backend aún arrancando | Esperar 15 s y reintentar; `"restart": true` en `launch.json` reintenta solo |
+| `EADDRINUSE 8787` | Otra instancia corriendo | `pkill -f server.dev` o reiniciar Docker |
+| `Unauthorized` | Token incorrecto | Usar exactamente `Bearer dev-local-bypass` |
+| `502 Bad Gateway` en Nginx | Contenedor del microsite aún arrancando | Esperar ~30 s o ver `docker compose logs -f frontend-dcfl` |
 
 ---
 
-## Tests
+## Añadir un microsite nuevo
 
-```bash
-# Backend — Vitest
-cd backend
-npm test              # 78 tests
-npm run test:coverage # Con reporte de cobertura HTML
-
-# Frontend — verificación de tipos TypeScript
-cd frontend
-npm run type-check    # tsc --noEmit (sin errores)
-```
-
-| Suite | Qué cubre |
-|---|---|
-| `auth.middleware.test.ts` | Bypass dev, JWT prod, tokens inválidos |
-| `ai.service.test.ts` | Ollama (dev) y Workers AI (prod) — backends separados |
-| `supabase.service.test.ts` | Mocks dev y llamadas RPC prod |
-| `health.e2e.test.ts` | Health check y spec OpenAPI |
-| `wizard.e2e.test.ts` | Todos los endpoints del wizard, incluidos `/extract` y `/generate-form` |
-
----
-
-## Variables de entorno
-
-### Backend — `backend/.dev.vars` (desarrollo nativo, no commitear)
-
-```ini
-ENVIRONMENT=development
-OLLAMA_URL=http://localhost:11434
-OLLAMA_MODEL=llama3.2:3b        # Cambiar al modelo que tengas: ollama list
-SUPABASE_URL=http://localhost:54321
-SUPABASE_SERVICE_ROLE_KEY=dummy-service-role-key
-SUPABASE_JWT_SECRET=dummy-jwt-secret
-```
-
-En Docker las variables vienen de `docker-compose.yml`; `.dev.vars` se ignora.
-
-### Backend — `wrangler.toml` (valores para Docker / defaults)
-
-```toml
-[vars]
-ENVIRONMENT   = "development"
-OLLAMA_URL    = "http://ollama:11434"   # nombre de servicio Docker
-OLLAMA_MODEL  = "llama3.2:3b"
-```
-
-### Backend — producción (secretos en Cloudflare)
-
-```bash
-wrangler secret put SUPABASE_URL --env production
-wrangler secret put SUPABASE_SERVICE_ROLE_KEY --env production
-wrangler secret put SUPABASE_JWT_SECRET --env production
-```
-
-`ENVIRONMENT=production` ya está en `wrangler.toml` bajo `[env.production.vars]`.
-
-### Frontend — `frontend/.env.development`
-
-```ini
-VITE_DEV_API_PORT=8787          # Puerto del backend local
-VITE_SUPABASE_URL=http://localhost:54321
-VITE_SUPABASE_ANON_KEY=dummy-key-for-local
-```
-
-`frontend/.env.production` no necesita dominio — la URL se resuelve en runtime.
-
----
-
-## Scripts del backend
-
-| Script | Descripción |
-|---|---|
-| `npm run dev` | Servidor Node.js en :8787, lee `.dev.vars` |
-| `npm run dev:debug` | Igual + inspector Node.js en :9229 (VS Code) |
-| `npm run dev:wrangler` | Servidor wrangler/workerd (solo para test de compatibilidad CF) |
-| `npm test` | Vitest — 78 tests |
-| `npm run test:watch` | Vitest en modo watch |
-| `wrangler deploy --env production` | Deploy a Cloudflare Workers |
-
----
-
-## Comandos Docker
-
-| Comando | Descripción |
-|---|---|
-| `docker compose up -d` | Iniciar todos los servicios |
-| `docker compose down` | Detener y eliminar contenedores |
-| `docker compose restart backend` | Reiniciar solo el backend |
-| `docker compose up -d --scale ollama=0` | Levantar sin Ollama (sin GPU / sin modelo) |
-| `docker compose logs -f backend` | Logs del backend en tiempo real |
-| `docker compose logs -f ollama` | Logs de Ollama (ver progreso de descarga del modelo) |
+Ver [docs/ADDING-A-MICROSITE.md](docs/ADDING-A-MICROSITE.md) para la guía completa.
