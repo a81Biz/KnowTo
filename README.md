@@ -1,6 +1,6 @@
 # KnowTo
 
-Plataforma de certificación EC0366 (CONOCER) asistida por IA. Guía al evaluador a través de 10 pasos para generar los documentos oficiales del proceso de certificación.
+Plataforma de certificación EC0366 (CONOCER) asistida por IA. Guía al evaluador a través de 12 pasos para generar los documentos oficiales del proceso de certificación.
 
 ## Stack
 
@@ -12,7 +12,7 @@ Plataforma de certificación EC0366 (CONOCER) asistida por IA. Guía al evaluado
 | IA — desarrollo | Ollama local — `llama3.2:3b` (configurable) |
 | Base de datos | Supabase (PostgreSQL) vía stored procedures |
 | Dev local | Docker Compose + Postgres + Ollama |
-| Tests | Vitest (73 tests, 100 % pass) |
+| Tests | Vitest (78 tests, 100 % pass) |
 
 ---
 
@@ -89,11 +89,11 @@ knowto/
 │   │   ├── prompts/
 │   │   │   ├── index.ts                # PromptRegistry singleton
 │   │   │   ├── flow-map.json           # Mapa de flujo: fases, extractores, patrones
-│   │   │   └── templates/              # 10 plantillas Markdown (F0–F6_2 + EXTRACTOR)
+│   │   │   └── templates/              # 20 plantillas Markdown (F0–F6_2b, F2_5, F4_P0–F4_P7, F6_FORM + EXTRACTOR)
 │   │   └── types/
 │   │       ├── env.ts                  # Bindings de Cloudflare Workers
 │   │       └── wizard.types.ts         # PhaseId, PromptId, ProjectContext…
-│   ├── src/__tests__/             # Vitest — 73 tests
+│   ├── src/__tests__/             # Vitest — 78 tests
 │   │   ├── middleware/auth.middleware.test.ts
 │   │   ├── routes/health.e2e.test.ts
 │   │   ├── routes/wizard.e2e.test.ts
@@ -105,7 +105,7 @@ knowto/
 ├── frontend/
 │   └── src/
 │       ├── main.ts               # Orquestador: auth + dashboard + wizard
-│       ├── controllers/          # Un controlador por paso (step0–step9); step1 es clase personalizada
+│       ├── controllers/          # Un controlador por paso (step0–step11); step4.production y step7.adjustments son clases personalizadas
 │       ├── stores/wizard.store.ts
 │       ├── shared/
 │       │   ├── endpoints.ts      # URL base resuelta en runtime desde window.location
@@ -215,6 +215,7 @@ Authorization: Bearer <token>
 | `POST` | `/api/wizard/step` | Guardar datos de un paso |
 | `POST` | `/api/wizard/extract` | Extraer contexto compacto de fases previas |
 | `POST` | `/api/wizard/generate` | Generar documento con IA |
+| `POST` | `/api/wizard/generate-form` | Generar esquema de formulario dinámico con IA |
 
 ### Ejemplo rápido
 
@@ -238,23 +239,30 @@ curl -X POST http://localhost:8787/api/wizard/project \
 | 0 | F0 | Marco de referencia del cliente | Datos básicos del proyecto | Análisis de sector, competencia, gaps y preguntas para el cliente |
 | 1 | F1 | Informe de necesidades | Respuestas a las preguntas de F0 + confirma/edita brechas propuestas | Declara problema, objetivos SMART+Bloom, perfil del participante, resultados esperados |
 | 2 | F2 | Especificaciones de análisis y diseño | Notas adicionales opcionales | Modalidad, SCORM, estructura temática, perfil de ingreso EC0366 |
-| 3 | F3 | Especificaciones técnicas | LMS, SCORM, fecha inicio | Configuración LMS, duración, multimedia, criterios de aprobación |
-| 4 | F4 | Producción de contenidos (8 productos) | Fecha inicio, nombres | 8 productos EC0366: cronograma, info general, guías, calendario, textos, presentación, guión, evaluación |
-| 5 | F5 | Verificación y evaluación (E1221) | Participantes, observaciones | Checklist técnico, checklist pedagógico, reporte de pruebas |
-| 6 | F5.2 | Anexo de evidencias | URLs del LMS y reportes | Documento formal de evidencias para el expediente CONOCER |
-| 7 | F6 | Ajustes post-evaluación | Observaciones recibidas | Clasificación de ajustes, plan de ajustes, control de versiones |
-| 8 | F6.2 | Lista de verificación y firmas | CURP, revisores | Inventario del expediente, espacios de firma, resumen ejecutivo |
-| 9 | CLOSE | Finalización | — | — |
+| 3 | F2.5 | Recomendaciones pedagógicas | — | Actividades, frecuencia de reportes, cantidad y duración de videos con justificación bibliográfica (Mayer, Bloom, Guo et al.) |
+| 4 | F3 | Especificaciones técnicas | LMS, SCORM, fecha inicio | Sección 1a: datos del usuario verbatim · Sección 1b: análisis técnico del LMS indicado |
+| 5 | F4 | Producción de contenidos (8 productos) | Aprobación secuencial de cada producto | Sub-wizard: 8 documentos EC0366 generados uno a uno (cronograma, info general, guías, calendario, textos, presentación, guión, evaluación) |
+| 6 | F5 | Verificación y evaluación (E1221) | Participantes, observaciones | Checklist técnico, checklist pedagógico, reporte de pruebas |
+| 7 | F5.2 | Anexo de evidencias | URLs del LMS y reportes | Plantillas vacías con instrucciones para llenar — sin datos inventados |
+| 8 | F6 | Ajustes post-evaluación | Formulario dinámico generado por IA | Clasificación de ajustes, plan de ajustes, control de versiones |
+| 9 | F6.2a | Inventario del expediente y firmas | CURP, revisor, coordinador | Inventario de los 16 documentos del expediente EC0366 con espacios de firma |
+| 10 | F6.2b | Resumen ejecutivo y declaración final | — | Resumen ejecutivo del curso completo y declaración bajo protesta de decir verdad |
+| 11 | CLOSE | Finalización | — | — |
 
 > **Flujo F0 → F1:** Las preguntas que genera F0 en la sección "Preguntas para el cliente" se
 > presentan automáticamente como campos de entrada en F1. El sistema también extrae los gaps
 > iniciales de F0 y pre-rellena las brechas para que el usuario solo confirme o edite.
 
-> **Extracción de contexto (F2 en adelante):** A partir de F2 el contexto acumulado supera
+> **Extracción de contexto (F2 en adelante):** A partir del paso 2 el contexto acumulado supera
 > la ventana del modelo (~4096 tokens). El sistema llama automáticamente a `/api/wizard/extract`
 > al montar cada paso: extrae solo las secciones relevantes mediante parser markdown (regex) con
 > fallback a IA a temperatura 0. El extracto (~800 tokens) se inyecta al prompt en lugar del
-> contexto completo. Esto elimina el error "Lo siento, no puedo generar el documento".
+> contexto completo. Existen nodos extractor dedicados para F2, F2.5, F3, F4, F5, F5.2, F6, F6.2a y F6.2b.
+>
+> **Formulario dinámico (F6):** En el paso 8, antes de generar el documento de ajustes, el sistema
+> llama a `/api/wizard/generate-form` con el prompt `F6_FORM`. La IA devuelve un JSON con el
+> esquema del formulario (campos, tipos, etiquetas) adaptado a las observaciones del checklist F5.
+> El usuario llena el formulario y luego genera el documento.
 
 ---
 
@@ -276,7 +284,7 @@ curl -X POST http://localhost:8787/api/wizard/project \
 ```bash
 # Backend — Vitest
 cd backend
-npm test              # 73 tests
+npm test              # 78 tests
 npm run test:coverage # Con reporte de cobertura HTML
 
 # Frontend — verificación de tipos TypeScript
@@ -290,7 +298,7 @@ npm run type-check    # tsc --noEmit (sin errores)
 | `ai.service.test.ts` | Ollama (dev) y Workers AI (prod) — backends separados |
 | `supabase.service.test.ts` | Mocks dev y llamadas RPC prod |
 | `health.e2e.test.ts` | Health check y spec OpenAPI |
-| `wizard.e2e.test.ts` | Todos los endpoints del wizard, incluido `/extract` |
+| `wizard.e2e.test.ts` | Todos los endpoints del wizard, incluidos `/extract` y `/generate-form` |
 
 ---
 
@@ -347,7 +355,7 @@ VITE_SUPABASE_ANON_KEY=dummy-key-for-local
 | `npm run dev` | Servidor Node.js en :8787, lee `.dev.vars` |
 | `npm run dev:debug` | Igual + inspector Node.js en :9229 (VS Code) |
 | `npm run dev:wrangler` | Servidor wrangler/workerd (solo para test de compatibilidad CF) |
-| `npm test` | Vitest — 73 tests |
+| `npm test` | Vitest — 78 tests |
 | `npm run test:watch` | Vitest en modo watch |
 | `wrangler deploy --env production` | Deploy a Cloudflare Workers |
 

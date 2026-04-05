@@ -184,11 +184,31 @@ async function check(label, fn) {
       : '⚠️  F0 no generó "Preguntas para el cliente" — Step 1 mostrará mensaje de advertencia');
   }
 
+  // 8. Generar formulario dinámico (F6_FORM) — valida el endpoint generate-form
+  const form = await check('POST /api/wizard/generate-form', async () => {
+    const r = await fetch(`${API}/api/wizard/generate-form`, {
+      method: 'POST', headers: AUTH,
+      body: JSON.stringify({
+        projectId,
+        promptId: 'F6_FORM',
+        context: { projectName: 'Curso Test Debug', clientName: 'Ana García', industry: 'Manufactura' }
+      })
+    });
+    return r.json();
+  });
+  if (form?.data?.formSchema) {
+    console.log('\n📋 Esquema de formulario generado:');
+    console.log('  formTitle:', form.data.formSchema.formTitle);
+    console.log('  campos:', form.data.formSchema.fields?.length ?? 0);
+  }
+
   console.groupEnd();
   console.log('\n✅ Prueba completa. Todos los endpoints respondieron correctamente.');
   console.log('\nℹ️  Nota: el Step 1 (F1) depende de que F0 esté generado.');
   console.log('   Las preguntas de F0 se muestran automáticamente como campos en F1.');
   console.log('   Las brechas se pre-rellenan con los gaps del Marco de Referencia.');
+  console.log('\nℹ️  generate-form (paso 8 / F6) genera el esquema JSON del formulario dinámico.');
+  console.log('   El usuario llena el formulario y luego genera el documento de ajustes.');
 })();
 ```
 

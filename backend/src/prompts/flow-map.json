@@ -1,5 +1,5 @@
 {
-  "_version": "1.0.0",
+  "_version": "2.0.0",
   "_description": "Mapa de flujo del wizard EC0366. Cada nodo 'fase' produce documentos; cada nodo 'extractor' extrae secciones específicas de fases previas para alimentar la siguiente fase sin saturar el contexto.",
 
   "F0": {
@@ -158,6 +158,69 @@
         "patron": "##\\s+6\\.\\s+SUPUESTOS Y RESTRICCIONES"
       }
     },
+    "next": "EXTRACTOR_F2_5"
+  },
+
+  "EXTRACTOR_F2_5": {
+    "tipo": "extractor",
+    "label": "Extractor de contexto para F2_5 (recomendaciones pedagógicas)",
+    "fuentes": [
+      {
+        "fase": "F0",
+        "campos": [
+          "sector_industria",
+          "mejores_practicas"
+        ]
+      },
+      {
+        "fase": "F1",
+        "campos": [
+          "perfil_participante",
+          "objetivos_aprendizaje"
+        ]
+      },
+      {
+        "fase": "F2",
+        "campos": [
+          "decision_modalidad",
+          "nivel_interactividad",
+          "estructura_tematica",
+          "perfil_ingreso"
+        ]
+      }
+    ],
+    "next": "F2_5"
+  },
+
+  "F2_5": {
+    "tipo": "fase",
+    "step": 3,
+    "label": "Recomendaciones Pedagógicas de Producción",
+    "promptId": "F2_5",
+    "entrada": {
+      "form": {
+        "additionalNotes": "Observaciones o preferencias adicionales (opcional)"
+      },
+      "contexto": "EXTRACTOR_F2_5.salida"
+    },
+    "salida": {
+      "actividades_recomendadas": {
+        "header": "## 1. ACTIVIDADES DE APRENDIZAJE RECOMENDADAS",
+        "patron": "##\\s+1\\.\\s+ACTIVIDADES DE APRENDIZAJE"
+      },
+      "reporteo_seguimiento": {
+        "header": "## 2. MÉTRICAS A REPORTEAR Y FRECUENCIA DE SEGUIMIENTO",
+        "patron": "##\\s+2\\.\\s+M[ÉE]TRICAS A REPORTEAR"
+      },
+      "estructura_videos": {
+        "header": "## 3. ESTRUCTURA DE VIDEOS RECOMENDADA",
+        "patron": "##\\s+3\\.\\s+ESTRUCTURA DE VIDEOS"
+      },
+      "resumen_produccion": {
+        "header": "### 3.3 Resumen ejecutivo para F3",
+        "patron": "###\\s+3\\.3\\s+Resumen ejecutivo"
+      }
+    },
     "next": "EXTRACTOR_F3"
   },
 
@@ -174,6 +237,14 @@
           "perfil_ingreso",
           "estrategias_instruccionales"
         ]
+      },
+      {
+        "fase": "F2_5",
+        "campos": [
+          "actividades_recomendadas",
+          "reporteo_seguimiento",
+          "resumen_produccion"
+        ]
       }
     ],
     "next": "F3"
@@ -181,7 +252,7 @@
 
   "F3": {
     "tipo": "fase",
-    "step": 3,
+    "step": 4,
     "label": "Especificaciones Técnicas del Curso",
     "promptId": "F3",
     "entrada": {
@@ -225,14 +296,30 @@
 
   "EXTRACTOR_F4": {
     "tipo": "extractor",
-    "label": "Extractor de contexto para F4",
+    "label": "Extractor de contexto para F4 (sub-wizard de 8 productos)",
     "fuentes": [
+      {
+        "fase": "F1",
+        "campos": [
+          "objetivos_aprendizaje",
+          "perfil_participante",
+          "resultados_esperados"
+        ]
+      },
       {
         "fase": "F2",
         "campos": [
           "estructura_tematica",
           "perfil_ingreso",
           "estrategias_instruccionales"
+        ]
+      },
+      {
+        "fase": "F2_5",
+        "campos": [
+          "actividades_recomendadas",
+          "estructura_videos",
+          "resumen_produccion"
         ]
       },
       {
@@ -249,10 +336,20 @@
   },
 
   "F4": {
-    "tipo": "fase",
-    "step": 4,
+    "tipo": "fase-subwizard",
+    "step": 5,
     "label": "Producción de Contenidos EC0366",
-    "promptId": "F4",
+    "descripcion": "Sub-wizard de 8 productos. Cada producto se genera con su propio prompt (F4_P0 a F4_P7) y se aprueba antes de continuar al siguiente.",
+    "productos": [
+      { "index": 0, "promptId": "F4_P0", "label": "Cronograma de Desarrollo",         "elementoEC": "E1219 - Producto #1" },
+      { "index": 1, "promptId": "F4_P1", "label": "Documento de Información General",  "elementoEC": "E1219 - Producto #2" },
+      { "index": 2, "promptId": "F4_P2", "label": "Guías de Actividades por Módulo",   "elementoEC": "E1220 - Producto #1" },
+      { "index": 3, "promptId": "F4_P3", "label": "Calendario General de Actividades", "elementoEC": "E1220 - Producto #2" },
+      { "index": 4, "promptId": "F4_P4", "label": "Documentos de Texto",               "elementoEC": "E1220 - Producto #3" },
+      { "index": 5, "promptId": "F4_P5", "label": "Presentación Electrónica",          "elementoEC": "E1220 - Producto #4" },
+      { "index": 6, "promptId": "F4_P6", "label": "Guiones de Material Multimedia",    "elementoEC": "E1220 - Producto #5" },
+      { "index": 7, "promptId": "F4_P7", "label": "Instrumentos de Evaluación",        "elementoEC": "E1220 - Producto #6" }
+    ],
     "entrada": {
       "form": {
         "startDate": "Fecha de inicio del cronograma (requerido)",
@@ -263,38 +360,14 @@
       "contexto": "EXTRACTOR_F4.salida"
     },
     "salida": {
-      "cronograma": {
-        "header": "## PRODUCTO 0: CRONOGRAMA DE DESARROLLO (E1219 - producto #1)",
-        "patron": "##\\s+PRODUCTO 0"
-      },
-      "informacion_general": {
-        "header": "## PRODUCTO 1: DOCUMENTO DE INFORMACIÓN GENERAL (E1219 - producto #2)",
-        "patron": "##\\s+PRODUCTO 1"
-      },
-      "guias_actividades": {
-        "header": "## PRODUCTO 2: GUÍAS DE ACTIVIDADES POR MÓDULO (E1220 - producto #1)",
-        "patron": "##\\s+PRODUCTO 2"
-      },
-      "calendario_actividades": {
-        "header": "## PRODUCTO 3: CALENDARIO GENERAL DE ACTIVIDADES (E1220 - producto #2)",
-        "patron": "##\\s+PRODUCTO 3"
-      },
-      "documentos_texto": {
-        "header": "## PRODUCTO 4: DOCUMENTOS DE TEXTO (E1220 - producto #3)",
-        "patron": "##\\s+PRODUCTO 4"
-      },
-      "presentacion_electronica": {
-        "header": "## PRODUCTO 5: PRESENTACIÓN ELECTRÓNICA (E1220 - producto #4)",
-        "patron": "##\\s+PRODUCTO 5"
-      },
-      "guion_multimedia": {
-        "header": "## PRODUCTO 6: MATERIAL MULTIMEDIA — GUIÓN DE VIDEO (E1220 - producto #5)",
-        "patron": "##\\s+PRODUCTO 6"
-      },
-      "instrumentos_evaluacion": {
-        "header": "## PRODUCTO 7: INSTRUMENTOS DE EVALUACIÓN (E1220 - producto #6)",
-        "patron": "##\\s+PRODUCTO 7"
-      }
+      "P0_cronograma":             { "promptId": "F4_P0", "patron": "# PRODUCTO 0" },
+      "P1_info_general":           { "promptId": "F4_P1", "patron": "# PRODUCTO 1" },
+      "P2_guias_actividades":      { "promptId": "F4_P2", "patron": "# PRODUCTO 2" },
+      "P3_calendario":             { "promptId": "F4_P3", "patron": "# PRODUCTO 3" },
+      "P4_documentos_texto":       { "promptId": "F4_P4", "patron": "# PRODUCTO 4" },
+      "P5_presentacion":           { "promptId": "F4_P5", "patron": "# PRODUCTO 5" },
+      "P6_guion_multimedia":       { "promptId": "F4_P6", "patron": "# PRODUCTO 6" },
+      "P7_instrumentos_evaluacion":{ "promptId": "F4_P7", "patron": "# PRODUCTO 7" }
     },
     "next": "EXTRACTOR_F5"
   },
@@ -313,9 +386,9 @@
       {
         "fase": "F4",
         "campos": [
-          "cronograma",
-          "informacion_general",
-          "instrumentos_evaluacion"
+          "P0_cronograma",
+          "P1_info_general",
+          "P7_instrumentos_evaluacion"
         ]
       }
     ],
@@ -324,7 +397,7 @@
 
   "F5": {
     "tipo": "fase",
-    "step": 5,
+    "step": 6,
     "label": "Verificación y Evaluación del Curso (E1221)",
     "promptId": "F5",
     "entrada": {
@@ -376,7 +449,7 @@
 
   "F5_2": {
     "tipo": "fase",
-    "step": 6,
+    "step": 7,
     "label": "Anexo de Evidencias del Curso",
     "promptId": "F5_2",
     "entrada": {
@@ -411,7 +484,7 @@
 
   "EXTRACTOR_F6": {
     "tipo": "extractor",
-    "label": "Extractor de contexto para F6",
+    "label": "Extractor de contexto para F6 (formulario dinámico + documento)",
     "fuentes": [
       {
         "fase": "F5",
@@ -426,16 +499,14 @@
   },
 
   "F6": {
-    "tipo": "fase",
-    "step": 7,
+    "tipo": "fase-form-dinamico",
+    "step": 8,
     "label": "Documento de Ajustes Post-Evaluación",
     "promptId": "F6",
+    "promptIdForm": "F6_FORM",
+    "descripcion": "Primero genera un formulario dinámico basado en los resultados de F5. El usuario llena el formulario. Luego genera el documento de ajustes con esos datos.",
     "entrada": {
-      "form": {
-        "courseVersion": "Versión del curso (ej: 1.1)",
-        "observationsReceived": "Observaciones recibidas de participantes/evaluador (requerido)",
-        "priorityAdjustments": "Ajustes de alta prioridad identificados (opcional)"
-      },
+      "form": "DINÁMICO — generado por F6_FORM en base al contexto de F5",
       "contexto": "EXTRACTOR_F6.salida"
     },
     "salida": {
@@ -460,49 +531,34 @@
         "patron": "##\\s+5\\.\\s+DECLARACI[ÓO]N DE CONFORMIDAD"
       }
     },
-    "next": "EXTRACTOR_F6_2"
+    "next": "EXTRACTOR_F6_2a"
   },
 
-  "EXTRACTOR_F6_2": {
+  "EXTRACTOR_F6_2a": {
     "tipo": "extractor",
-    "label": "Extractor de contexto para F6_2 (cierre del expediente)",
+    "label": "Extractor de contexto para F6_2a (inventario + firmas)",
     "fuentes": [
       {
         "fase": "F2",
-        "campos": [
-          "decision_modalidad",
-          "estructura_tematica"
-        ]
+        "campos": ["decision_modalidad", "estructura_tematica"]
       },
       {
         "fase": "F3",
-        "campos": [
-          "plataforma_lms",
-          "duracion_calculada"
-        ]
-      },
-      {
-        "fase": "F4",
-        "campos": [
-          "informacion_general"
-        ]
+        "campos": ["plataforma_lms", "duracion_calculada"]
       },
       {
         "fase": "F6",
-        "campos": [
-          "control_versiones",
-          "declaracion_conformidad"
-        ]
+        "campos": ["control_versiones", "declaracion_conformidad"]
       }
     ],
-    "next": "F6_2"
+    "next": "F6_2a"
   },
 
-  "F6_2": {
+  "F6_2a": {
     "tipo": "fase",
-    "step": 8,
-    "label": "Lista de Verificación de Firmas y Cierre EC0366",
-    "promptId": "F6_2",
+    "step": 9,
+    "label": "Inventario del Expediente y Firmas",
+    "promptId": "F6_2a",
     "entrada": {
       "form": {
         "candidateCurp": "CURP del candidato (requerido)",
@@ -511,7 +567,7 @@
         "certifierOrg": "Organismo certificador (opcional)",
         "certifierName": "Nombre del coordinador del proceso (opcional)"
       },
-      "contexto": "EXTRACTOR_F6_2.salida"
+      "contexto": "EXTRACTOR_F6_2a.salida"
     },
     "salida": {
       "inventario_expediente": {
@@ -521,7 +577,53 @@
       "firmas_cierre": {
         "header": "## 2. FIRMAS DE CIERRE",
         "patron": "##\\s+2\\.\\s+FIRMAS DE CIERRE"
+      }
+    },
+    "next": "EXTRACTOR_F6_2b"
+  },
+
+  "EXTRACTOR_F6_2b": {
+    "tipo": "extractor",
+    "label": "Extractor de contexto para F6_2b (resumen ejecutivo + declaración)",
+    "fuentes": [
+      {
+        "fase": "F0",
+        "campos": ["sector_industria"]
       },
+      {
+        "fase": "F2",
+        "campos": ["decision_modalidad", "estructura_tematica"]
+      },
+      {
+        "fase": "F2_5",
+        "campos": ["resumen_produccion"]
+      },
+      {
+        "fase": "F3",
+        "campos": ["plataforma_lms", "duracion_calculada"]
+      },
+      {
+        "fase": "F4",
+        "campos": ["P1_info_general"]
+      },
+      {
+        "fase": "F6",
+        "campos": ["control_versiones"]
+      }
+    ],
+    "next": "F6_2b"
+  },
+
+  "F6_2b": {
+    "tipo": "fase",
+    "step": 10,
+    "label": "Resumen Ejecutivo y Declaración Final",
+    "promptId": "F6_2b",
+    "entrada": {
+      "form": {},
+      "contexto": "EXTRACTOR_F6_2b.salida"
+    },
+    "salida": {
       "resumen_ejecutivo": {
         "header": "## 3. RESUMEN EJECUTIVO DEL PROCESO",
         "patron": "##\\s+3\\.\\s+RESUMEN EJECUTIVO"
@@ -536,7 +638,7 @@
 
   "CLOSE": {
     "tipo": "cierre",
-    "step": 9,
+    "step": 11,
     "label": "Expediente completo — listo para certificación",
     "promptId": null,
     "entrada": {

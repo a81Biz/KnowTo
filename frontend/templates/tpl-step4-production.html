@@ -1,58 +1,93 @@
 <template id="tpl-step4-production">
-  <div id="step-4-container" class="step-container space-y-6">
+  <div id="step-5-container" class="step-container space-y-6">
     <div>
       <h2 class="text-2xl font-bold text-gray-900">Producción de Contenidos (8 Productos EC0366)</h2>
-      <p class="text-gray-500 mt-1">La IA generará los 8 productos obligatorios de los Elementos E1219 y E1220.</p>
+      <p class="text-gray-500 mt-1">Cada producto se genera y aprueba por separado antes de continuar al siguiente. Esto garantiza calidad en cada entregable.</p>
     </div>
-    <div class="bg-blue-50 border border-blue-200 rounded-xl p-4">
-      <p class="text-blue-800 font-medium text-sm mb-2">📋 Productos que se generarán:</p>
-      <div class="grid md:grid-cols-2 gap-1 text-blue-700 text-sm">
-        <div>P0: Cronograma de desarrollo (E1219)</div>
-        <div>P1: Documento de Información General (E1219)</div>
-        <div>P2: Guías de actividades por módulo (E1220)</div>
-        <div>P3: Calendario general de actividades (E1220)</div>
-        <div>P4: Documentos de texto (E1220, mín. 5 págs)</div>
-        <div>P5: Presentación electrónica (E1220)</div>
-        <div>P6: Material multimedia - guión de video (E1220)</div>
-        <div>P7: Instrumentos de evaluación (E1220)</div>
+
+    <!-- Progreso del sub-wizard -->
+    <div id="product-progress" class="bg-gray-50 border border-gray-200 rounded-xl p-4">
+      <p class="text-xs font-semibold text-gray-500 uppercase tracking-widest mb-3">Progreso de productos</p>
+      <div id="product-indicators" class="flex flex-wrap gap-2">
+        <!-- Generado dinámicamente por el controller -->
       </div>
     </div>
-    <form id="form-step4" class="space-y-5" novalidate>
-      <div class="group">
-        <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">
-          Detalles adicionales para la producción
-        </label>
-        <textarea id="textarea-production-notes" name="productionNotes" rows="3"
-          placeholder="Ej: El curso tendrá 4 módulos de 2 semanas cada uno. Los videos serán screencasts..."
-          class="input-field w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500"></textarea>
-      </div>
-      <div class="grid md:grid-cols-2 gap-4">
-        <div class="group">
-          <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Fecha de inicio estimada</label>
-          <input id="input-start-date" name="startDate" type="date"
-            class="input-field w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500" />
+
+    <!-- Formulario de datos compartidos (se muestra solo en el Producto 0) -->
+    <div id="production-form-container">
+      <form id="form-step5" class="space-y-4" novalidate>
+        <div class="grid md:grid-cols-2 gap-4">
+          <div class="group">
+            <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Fecha de inicio del cronograma *</label>
+            <input id="input-start-date" name="startDate" type="date"
+              class="input-field w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500" />
+          </div>
+          <div class="group">
+            <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Nombre del desarrollador/instructor *</label>
+            <input id="input-instructor-name" name="instructorName" type="text"
+              placeholder="Nombre completo del candidato"
+              class="input-field w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500" />
+          </div>
         </div>
-        <div class="group">
-          <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Materiales existentes</label>
-          <input id="input-existing-materials" name="existingMaterials" type="text"
-            placeholder="Ej: 5 videos, un libro, ninguno"
-            class="input-field w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500" />
+        <div class="grid md:grid-cols-2 gap-4">
+          <div class="group">
+            <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Nombre del revisor (opcional)</label>
+            <input id="input-reviewer-name" name="reviewerName" type="text"
+              placeholder="Nombre de quien revisará el expediente"
+              class="input-field w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500" />
+          </div>
+          <div class="group">
+            <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Notas adicionales (opcional)</label>
+            <input id="input-production-notes" name="additionalNotes" type="text"
+              placeholder="Indicaciones específicas de producción"
+              class="input-field w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500" />
+          </div>
+        </div>
+      </form>
+    </div>
+
+    <!-- Panel del producto actual -->
+    <div id="current-product-panel" class="border border-blue-200 rounded-xl overflow-hidden">
+      <!-- Encabezado del producto -->
+      <div class="bg-blue-50 border-b border-blue-200 px-6 py-4">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-xs font-semibold text-blue-600 uppercase tracking-widest" id="product-element-label">—</p>
+            <h3 class="text-lg font-bold text-gray-900 mt-1" id="product-title">Selecciona un producto</h3>
+          </div>
+          <span id="product-counter" class="text-sm text-gray-500 bg-white border border-gray-200 px-3 py-1 rounded-full">0 / 8</span>
         </div>
       </div>
-      <div class="bg-amber-50 border border-amber-200 rounded-xl p-3">
-        <p class="text-amber-800 text-sm">⚠️ Este es el paso más largo. La IA generará ~8,000 palabras. Puede tardar hasta 2 minutos.</p>
+
+      <!-- Área del documento generado -->
+      <div class="p-6 space-y-4">
+        <div id="product-not-started" class="text-center py-8 text-gray-400">
+          <p class="text-4xl mb-3">📄</p>
+          <p class="text-sm">Llena los datos de producción y genera el primer producto.</p>
+        </div>
+
+        <div id="product-preview-area" class="hidden space-y-4">
+          <div id="product-document-preview" class="bg-gray-50 border border-gray-200 rounded-xl p-6 max-h-80 overflow-y-auto text-sm"></div>
+          <div class="flex gap-2 flex-wrap">
+            <button id="btn-copy-doc" class="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm hover:bg-gray-50">📋 Copiar</button>
+            <button id="btn-regenerate" class="px-4 py-2 border border-amber-300 text-amber-700 rounded-lg text-sm hover:bg-amber-50">🔄 Regenerar este producto</button>
+            <button id="btn-approve-product" class="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-semibold hover:bg-green-700">✅ Aprobar y continuar →</button>
+          </div>
+        </div>
+
+        <!-- Botón de generar (cuando no hay preview) -->
+        <div id="product-generate-area">
+          <button id="btn-submit"
+            class="btn-primary w-full bg-blue-900 text-white py-4 px-8 rounded-xl font-bold text-lg hover:bg-blue-800 transition-all disabled:opacity-50">
+            ✨ Generar Producto
+          </button>
+        </div>
       </div>
-      <button id="btn-submit" type="submit"
-        class="btn-primary w-full bg-blue-900 text-white py-4 px-8 rounded-xl font-bold text-lg hover:bg-blue-800 transition-all disabled:opacity-50">
-        ✨ Generar 8 Productos de Producción
-      </button>
-    </form>
+    </div>
+
+    <!-- Panel de todos los productos completados (preview-panel requerido por BaseStep) -->
     <div id="preview-panel" class="hidden">
-      <div id="document-preview" class="document-preview bg-gray-50 border border-gray-200 rounded-xl p-6 max-h-96 overflow-y-auto text-sm"></div>
-      <div class="mt-3 flex gap-2">
-        <button id="btn-copy-doc" class="px-4 py-2 border border-gray-300 rounded-lg text-sm">📋 Copiar</button>
-        <button id="btn-regenerate" class="px-4 py-2 border border-blue-300 text-blue-700 rounded-lg text-sm">🔄 Regenerar</button>
-      </div>
+      <div id="document-preview" class="hidden"></div>
     </div>
   </div>
 </template>

@@ -2,8 +2,8 @@
 // HTML en: /templates/tpl-step3-specs.html
 import { createStep } from '../shared/step.factory';
 
-export const Step3Specs = createStep({
-  stepNumber: 3,
+export const Step4Specs = createStep({
+  stepNumber: 4,
   templateId: 'tpl-step3-specs',
   phaseId: 'F3',
   promptId: 'F3',

@@ -10,18 +10,30 @@ import { buildEndpoint, ENDPOINTS } from './shared/endpoints';
 import { Step0ClientData } from './controllers/step0.clientdata';
 import { Step1Needs } from './controllers/step1.needs';
 import { Step2Analysis } from './controllers/step2.analysis';
-import { Step3Specs } from './controllers/step3.specs';
-import { Step4Production } from './controllers/step4.production';
-import { Step5Checklist } from './controllers/step5.checklist';
-import { Step6Evidence } from './controllers/step6.evidence';
-import { Step7Adjustments } from './controllers/step7.adjustments';
-import { Step8Payment } from './controllers/step8.payment';
-import { Step9Closing } from './controllers/step9.closing';
+import { Step3Recommendations } from './controllers/step3.recommendations';
+import { Step4Specs } from './controllers/step3.specs';
+import { Step5Production } from './controllers/step4.production';
+import { Step6Checklist } from './controllers/step5.checklist';
+import { Step7Evidence } from './controllers/step6.evidence';
+import { Step8Adjustments } from './controllers/step7.adjustments';
+import { Step9Inventory } from './controllers/step8.payment';
+import { Step10Summary } from './controllers/step10.summary';
+import { Step11Closing } from './controllers/step9.closing';
 
-// Registro de controladores — SSOT para navegación
+// Registro de controladores — SSOT para navegación (índice = stepNumber)
 const STEP_CONTROLLERS = [
-  Step0ClientData, Step1Needs, Step2Analysis, Step3Specs, Step4Production,
-  Step5Checklist, Step6Evidence, Step7Adjustments, Step8Payment, Step9Closing,
+  Step0ClientData,    // 0  F0  — Marco de Referencia
+  Step1Needs,         // 1  F1  — Informe de Necesidades
+  Step2Analysis,      // 2  F2  — Especificaciones de Análisis
+  Step3Recommendations, // 3  F2.5 — Recomendaciones Pedagógicas
+  Step4Specs,         // 4  F3  — Especificaciones Técnicas
+  Step5Production,    // 5  F4  — Producción (sub-wizard 8 productos)
+  Step6Checklist,     // 6  F5.1 — Verificación
+  Step7Evidence,      // 7  F5.2 — Evidencias
+  Step8Adjustments,   // 8  F6.1 — Ajustes (formulario dinámico)
+  Step9Inventory,     // 9  F6.2a — Inventario y Firmas
+  Step10Summary,      // 10 F6.2b — Resumen Ejecutivo y Declaración
+  Step11Closing,      // 11 CLOSE — Finalización
 ] as const;
 
 // ============================================================================
@@ -181,7 +193,7 @@ async function loadStep(n: number): Promise<void> {
   wizardStepContent.innerHTML = '';
   btnPrev.disabled = n === 0;
   btnPrev.classList.toggle('opacity-50', n === 0);
-  btnNext.textContent = n === 9 ? '🎉 Finalizar' : 'Siguiente →';
+  btnNext.textContent = n === 11 ? '🎉 Finalizar' : 'Siguiente →';
 
   // Usar mount() — API pública correcta del controlador
   await controller.mount(wizardStepContent);

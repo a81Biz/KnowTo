@@ -79,8 +79,9 @@ describe('Autenticación', () => {
       () => app.request('/api/wizard/project/not-checked', {}, DEV_ENV),
       () => app.request('/api/wizard/project', { method: 'POST', headers: JSON_HEADER, body: '{}' }, DEV_ENV),
       () => app.request('/api/wizard/step',    { method: 'POST', headers: JSON_HEADER, body: '{}' }, DEV_ENV),
-      () => app.request('/api/wizard/generate',{ method: 'POST', headers: JSON_HEADER, body: '{}' }, DEV_ENV),
-      () => app.request('/api/wizard/extract', { method: 'POST', headers: JSON_HEADER, body: '{}' }, DEV_ENV),
+      () => app.request('/api/wizard/generate',      { method: 'POST', headers: JSON_HEADER, body: '{}' }, DEV_ENV),
+      () => app.request('/api/wizard/extract',       { method: 'POST', headers: JSON_HEADER, body: '{}' }, DEV_ENV),
+      () => app.request('/api/wizard/generate-form', { method: 'POST', headers: JSON_HEADER, body: '{}' }, DEV_ENV),
     ];
     for (const call of endpoints) {
       const res = await call();
@@ -206,10 +207,10 @@ describe('POST /api/wizard/step', () => {
     expect(res.status).toBe(400);
   });
 
-  it('devuelve 400 si stepNumber está fuera de rango [0-9]', async () => {
+  it('devuelve 400 si stepNumber está fuera de rango [0-11]', async () => {
     const res = await post('/api/wizard/step', {
       projectId: VALID_PROJECT_ID,
-      stepNumber: 10,
+      stepNumber: 12,
       inputData: {},
     });
     expect(res.status).toBe(400);
@@ -334,5 +335,62 @@ describe('POST /api/wizard/extract', () => {
     const body = await res.json() as { success: boolean; error: string };
     expect(body.success).toBe(false);
     expect(body.error).toContain('Extractor node not found');
+  });
+});
+
+// ── POST /api/wizard/generate-form ──────────────────────────────────────────
+describe('POST /api/wizard/generate-form', () => {
+  beforeEach(() => { vi.clearAllMocks(); });
+
+  const VALID_FORM_BODY = {
+    projectId: VALID_PROJECT_ID,
+    promptId: 'F6_FORM',
+    context: { projectName: 'Proyecto Test', clientName: 'Juan Pérez', industry: 'Manufactura' },
+  };
+
+  const FORM_SCHEMA_JSON = JSON.stringify({
+    formTitle: 'Ajustes post-evaluación',
+    description: 'Complete los campos con los ajustes identificados.',
+    fields: [
+      { id: 'observaciones', label: 'Observaciones', type: 'textarea', required: true },
+    ],
+  });
+
+  it('genera esquema de formulario y devuelve 200 con formSchema', async () => {
+    mockAiGenerate.mockResolvedValueOnce(FORM_SCHEMA_JSON);
+    const res = await post('/api/wizard/generate-form', VALID_FORM_BODY);
+    expect(res.status).toBe(200);
+    const body = await res.json() as { success: boolean; data: { formSchema: Record<string, unknown> } };
+    expect(body.success).toBe(true);
+    expect(body.data.formSchema).toHaveProperty('formTitle');
+    expect(body.data.formSchema).toHaveProperty('fields');
+    expect(mockAiGenerate).toHaveBeenCalledOnce();
+  });
+
+  it('devuelve 400 si projectId no es UUID', async () => {
+    const res = await post('/api/wizard/generate-form', { ...VALID_FORM_BODY, projectId: 'not-uuid' });
+    expect(res.status).toBe(400);
+    expect(mockAiGenerate).not.toHaveBeenCalled();
+  });
+
+  it('devuelve 400 si promptId no es F6_FORM', async () => {
+    const res = await post('/api/wizard/generate-form', { ...VALID_FORM_BODY, promptId: 'F0' });
+    expect(res.status).toBe(400);
+    expect(mockAiGenerate).not.toHaveBeenCalled();
+  });
+
+  it('devuelve 400 si context falta', async () => {
+    const { context: _, ...body } = VALID_FORM_BODY;
+    const res = await post('/api/wizard/generate-form', body);
+    expect(res.status).toBe(400);
+  });
+
+  it('devuelve formSchema de fallback si la IA no retorna JSON válido', async () => {
+    mockAiGenerate.mockResolvedValueOnce('Lo siento, no puedo generar el formulario.');
+    const res = await post('/api/wizard/generate-form', VALID_FORM_BODY);
+    expect(res.status).toBe(200);
+    const body = await res.json() as { success: boolean; data: { formSchema: Record<string, unknown> } };
+    expect(body.success).toBe(true);
+    expect(body.data.formSchema).toHaveProperty('fields');
   });
 });

@@ -12,13 +12,15 @@ import type { PhaseId, PromptId } from '../types/wizard.types';
 // Mapa de paso → ID del extractor que prepara su contexto.
 // Solo los pasos que necesitan contexto compacto (2 en adelante).
 const EXTRACTOR_FOR_STEP: Record<number, string> = {
-  2: 'EXTRACTOR_F2',
-  3: 'EXTRACTOR_F3',
-  4: 'EXTRACTOR_F4',
-  5: 'EXTRACTOR_F5',
-  6: 'EXTRACTOR_F5_2',
-  7: 'EXTRACTOR_F6',
-  8: 'EXTRACTOR_F6_2',
+  2:  'EXTRACTOR_F2',
+  3:  'EXTRACTOR_F2_5',
+  4:  'EXTRACTOR_F3',
+  5:  'EXTRACTOR_F4',
+  6:  'EXTRACTOR_F5',
+  7:  'EXTRACTOR_F5_2',
+  8:  'EXTRACTOR_F6',
+  9:  'EXTRACTOR_F6_2a',
+  10: 'EXTRACTOR_F6_2b',
 };
 
 // ============================================================================

@@ -108,7 +108,12 @@ describe('AIService — modo desarrollo (Ollama)', () => {
   });
 
   it('todos los promptIds válidos se renderizan sin error', async () => {
-    const ids = ['F0', 'F1', 'F2', 'F3', 'F4', 'F5', 'F5_2', 'F6', 'F6_2'] as const;
+    const ids = [
+      'F0', 'F1', 'F2', 'F2_5', 'F3',
+      'F4_P0', 'F4_P1', 'F4_P2', 'F4_P3', 'F4_P4', 'F4_P5', 'F4_P6', 'F4_P7',
+      'F5', 'F5_2',
+      'F6', 'F6_FORM', 'F6_2a', 'F6_2b',
+    ] as const;
     for (const id of ids) {
       mockFetch({ response: AI_CONTENT });
       await expect(

@@ -29,7 +29,7 @@ const CreateProjectBody = z
 const SaveStepBody = z
   .object({
     projectId: z.string().uuid().openapi({ example: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890' }),
-    stepNumber: z.number().int().min(0).max(9).openapi({ example: 0 }),
+    stepNumber: z.number().int().min(0).max(11).openapi({ example: 0 }),
     inputData: z.record(z.unknown()).openapi({ example: { courseTopic: 'Seguridad industrial' } }),
   })
   .openapi('SaveStepBody');
@@ -38,8 +38,13 @@ const GenerateDocumentBody = z
   .object({
     projectId: z.string().uuid(),
     stepId: z.string().uuid(),
-    phaseId: z.enum(['F0', 'F1', 'F2', 'F3', 'F4', 'F5.1', 'F5.2', 'F6.1', 'F6.2', 'CLOSE']),
-    promptId: z.enum(['F0', 'F1', 'F2', 'F3', 'F4', 'F5', 'F5_2', 'F6', 'F6_2']),
+    phaseId: z.enum(['F0', 'F1', 'F2', 'F2.5', 'F3', 'F4', 'F5.1', 'F5.2', 'F6.1', 'F6.2a', 'F6.2b', 'CLOSE']),
+    promptId: z.enum([
+      'F0', 'F1', 'F2', 'F2_5', 'F3',
+      'F4_P0', 'F4_P1', 'F4_P2', 'F4_P3', 'F4_P4', 'F4_P5', 'F4_P6', 'F4_P7',
+      'F5', 'F5_2',
+      'F6', 'F6_FORM', 'F6_2a', 'F6_2b',
+    ]),
     context: z.object({
       projectName: z.string(),
       clientName: z.string(),
@@ -50,6 +55,20 @@ const GenerateDocumentBody = z
     userInputs: z.record(z.unknown()),
   })
   .openapi('GenerateDocumentBody');
+
+const GenerateFormBody = z
+  .object({
+    projectId: z.string().uuid(),
+    promptId: z.enum(['F6_FORM']),
+    context: z.object({
+      projectName: z.string(),
+      clientName: z.string(),
+      industry: z.string().optional(),
+      email: z.string().optional(),
+      previousData: z.record(z.unknown()).optional(),
+    }),
+  })
+  .openapi('GenerateFormBody');
 
 const ProjectIdParam = z.object({ projectId: z.string().uuid() });
 
@@ -237,6 +256,37 @@ const routeGenerate = createRoute({
   },
 });
 
+const routeGenerateForm = createRoute({
+  method: 'post',
+  path: '/generate-form',
+  tags: TAG,
+  summary: 'Generar formulario dinámico con IA',
+  description:
+    'Genera un formulario dinámico en JSON basado en el contexto del proyecto. ' +
+    'Usado actualmente en F6 (ajustes post-evaluación) para crear campos específicos según ' +
+    'las observaciones del checklist de F5. Reutilizable para cualquier fase que requiera formularios adaptativos.',
+  security: BEARER,
+  request: {
+    body: { content: { 'application/json': { schema: GenerateFormBody } }, required: true },
+  },
+  responses: {
+    200: {
+      description: 'Formulario generado',
+      content: {
+        'application/json': {
+          schema: z
+            .object({
+              success: z.literal(true),
+              data: z.object({ formSchema: z.record(z.unknown()) }),
+              timestamp: z.string(),
+            })
+            .openapi('GenerateFormResponse'),
+        },
+      },
+    },
+  },
+});
+
 // ============================================================================
 // ROUTER
 // ============================================================================
@@ -320,6 +370,40 @@ wizard.openapi(routeGenerate, async (c) => {
   });
 
   return c.json({ success: true as const, data: { documentId, content }, timestamp: new Date().toISOString() });
+});
+
+wizard.openapi(routeGenerateForm, async (c) => {
+  const { promptId, context } = c.req.valid('json');
+  const ai = new AIService(c.env);
+
+  const rawJson = await ai.generate({
+    promptId: promptId as PromptId,
+    context,
+    userInputs: {},
+  });
+
+  // Extraer el bloque JSON de la respuesta (el prompt devuelve markdown con ```json)
+  const jsonMatch = rawJson.match(/```json\s*([\s\S]*?)```/) ?? rawJson.match(/(\{[\s\S]*\})/);
+  const jsonStr = jsonMatch?.[1]?.trim() ?? rawJson.trim();
+
+  let formSchema: Record<string, unknown>;
+  try {
+    formSchema = JSON.parse(jsonStr) as Record<string, unknown>;
+  } catch {
+    // Si el modelo no devolvió JSON válido, devolver schema de fallback
+    formSchema = {
+      formTitle: 'Ajustes Post-Evaluación',
+      description: 'Describe los ajustes realizados al curso.',
+      fields: [
+        { id: 'courseVersion', label: 'Versión del curso', type: 'text', required: true, placeholder: 'Ej: 1.1' },
+        { id: 'observationSummary', label: 'Resumen de observaciones', type: 'textarea', required: true, placeholder: 'Describe las observaciones recibidas.' },
+        { id: 'adjustmentsDetail', label: 'Detalle de ajustes realizados', type: 'textarea', required: true, placeholder: 'Describe qué cambios realizaste y cómo los verificaste.' },
+        { id: 'completionDate', label: 'Fecha de finalización de ajustes', type: 'text', required: true, placeholder: 'DD/MM/AAAA' },
+      ],
+    };
+  }
+
+  return c.json({ success: true as const, data: { formSchema }, timestamp: new Date().toISOString() });
 });
 
 export { wizard };

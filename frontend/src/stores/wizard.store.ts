@@ -9,16 +9,18 @@ type Listener = (state: WizardState) => void;
 const STORAGE_KEY = 'knowto_wizard_state';
 
 const STEP_DEFINITIONS: Omit<WizardStep, 'status' | 'inputData'>[] = [
-  { stepNumber: 0, phaseId: 'F0',    promptId: 'F0',   label: 'Marco de Referencia', icon: 'search' },
-  { stepNumber: 1, phaseId: 'F1',    promptId: 'F1',   label: 'Necesidades',         icon: 'analytics' },
-  { stepNumber: 2, phaseId: 'F2',    promptId: 'F2',   label: 'Análisis',            icon: 'architecture' },
-  { stepNumber: 3, phaseId: 'F3',    promptId: 'F3',   label: 'Especificaciones',    icon: 'settings' },
-  { stepNumber: 4, phaseId: 'F4',    promptId: 'F4',   label: 'Producción',          icon: 'construction' },
-  { stepNumber: 5, phaseId: 'F5.1',  promptId: 'F5',   label: 'Verificación',        icon: 'fact_check' },
-  { stepNumber: 6, phaseId: 'F5.2',  promptId: 'F5_2', label: 'Evidencias',          icon: 'photo_library' },
-  { stepNumber: 7, phaseId: 'F6.1',  promptId: 'F6',   label: 'Ajustes',             icon: 'tune' },
-  { stepNumber: 8, phaseId: 'F6.2',  promptId: 'F6_2', label: 'Firmas',              icon: 'draw' },
-  { stepNumber: 9, phaseId: 'CLOSE', promptId: 'F6_2', label: 'Finalización',        icon: 'celebration' },
+  { stepNumber: 0,  phaseId: 'F0',    promptId: 'F0',    label: 'Marco de Referencia',   icon: 'search' },
+  { stepNumber: 1,  phaseId: 'F1',    promptId: 'F1',    label: 'Necesidades',            icon: 'analytics' },
+  { stepNumber: 2,  phaseId: 'F2',    promptId: 'F2',    label: 'Análisis',               icon: 'architecture' },
+  { stepNumber: 3,  phaseId: 'F2.5',  promptId: 'F2_5',  label: 'Recomendaciones',        icon: 'lightbulb' },
+  { stepNumber: 4,  phaseId: 'F3',    promptId: 'F3',    label: 'Especificaciones',       icon: 'settings' },
+  { stepNumber: 5,  phaseId: 'F4',    promptId: 'F4_P0', label: 'Producción',             icon: 'construction' },
+  { stepNumber: 6,  phaseId: 'F5.1',  promptId: 'F5',    label: 'Verificación',           icon: 'fact_check' },
+  { stepNumber: 7,  phaseId: 'F5.2',  promptId: 'F5_2',  label: 'Evidencias',             icon: 'photo_library' },
+  { stepNumber: 8,  phaseId: 'F6.1',  promptId: 'F6',    label: 'Ajustes',                icon: 'tune' },
+  { stepNumber: 9,  phaseId: 'F6.2a', promptId: 'F6_2a', label: 'Inventario y Firmas',    icon: 'inventory' },
+  { stepNumber: 10, phaseId: 'F6.2b', promptId: 'F6_2b', label: 'Resumen y Declaración',  icon: 'summarize' },
+  { stepNumber: 11, phaseId: 'CLOSE', promptId: 'F6_2b', label: 'Finalización',            icon: 'celebration' },
 ];
 
 const initialState: WizardState = {
@@ -72,9 +74,10 @@ class WizardStoreClass {
 
   getStepData<T>(stepId: number): T | null {
     const keys: Record<number, keyof WizardState> = {
-      0: 'clientData', 1: 'needsData', 2: 'analysisData', 3: 'specsData',
-      4: 'productionData', 5: 'checklistData', 6: 'evidenceData',
-      7: 'adjustmentsData', 8: 'paymentData', 9: 'closingData',
+      0: 'clientData', 1: 'needsData', 2: 'analysisData', 3: 'analysisData',
+      4: 'specsData', 5: 'productionData', 6: 'checklistData',
+      7: 'evidenceData', 8: 'adjustmentsData', 9: 'paymentData',
+      10: 'closingData', 11: 'closingData',
     };
     const key = keys[stepId];
     return key ? (this.state[key] as T) ?? null : null;
@@ -90,9 +93,10 @@ class WizardStoreClass {
 
   setStepData(stepId: number, data: unknown): void {
     const keys: Record<number, keyof WizardState> = {
-      0: 'clientData', 1: 'needsData', 2: 'analysisData', 3: 'specsData',
-      4: 'productionData', 5: 'checklistData', 6: 'evidenceData',
-      7: 'adjustmentsData', 8: 'paymentData', 9: 'closingData',
+      0: 'clientData', 1: 'needsData', 2: 'analysisData', 3: 'analysisData',
+      4: 'specsData', 5: 'productionData', 6: 'checklistData',
+      7: 'evidenceData', 8: 'adjustmentsData', 9: 'paymentData',
+      10: 'closingData', 11: 'closingData',
     };
     const key = keys[stepId];
     if (key) { (this.state as unknown as Record<string, unknown>)[key] = data; this.saveToLocalStorage(); this.notify(); }
@@ -140,9 +144,9 @@ class WizardStoreClass {
   }
 
   // Navegación
-  nextStep(): void { if (this.state.currentStep < 9) this.setCurrentStep(this.state.currentStep + 1); }
+  nextStep(): void { if (this.state.currentStep < 11) this.setCurrentStep(this.state.currentStep + 1); }
   prevStep(): void { if (this.state.currentStep > 0) this.setCurrentStep(this.state.currentStep - 1); }
-  goToStep(n: number): void { if (n >= 0 && n <= 9) this.setCurrentStep(n); }
+  goToStep(n: number): void { if (n >= 0 && n <= 11) this.setCurrentStep(n); }
 
   reset(): void {
     this.state = {

@@ -32,7 +32,11 @@ export function showModal(options: {
   title.textContent = options.title;
   message.textContent = options.message;
   btnConfirm.textContent = options.confirmText ?? 'Confirmar';
-  btnCancel.textContent = options.cancelText ?? 'Cancelar';
+
+  // Ocultar el botón cancelar cuando no se proporciona texto (modales de alerta/aviso)
+  const showCancel = !!options.cancelText;
+  btnCancel.textContent = options.cancelText ?? '';
+  btnCancel.classList.toggle('hidden', !showCancel);
 
   overlay.classList.remove('hidden');
 
@@ -60,15 +64,14 @@ export function hideModal(): void {
 }
 
 export function showError(message: string): void {
-  showModal({ title: '⚠️ Error', message, confirmText: 'Cerrar', onConfirm: () => {} });
+  showModal({ title: '⚠️ Error', message, confirmText: 'Aceptar', onConfirm: () => {} });
 }
 
 export function showSuccess(message: string, onClose?: () => void): void {
   showModal({
     title: '✅ Éxito',
     message,
-    confirmText: 'Continuar',
-    cancelText: '',
+    confirmText: 'Aceptar',
     onConfirm: onClose,
   });
 }
