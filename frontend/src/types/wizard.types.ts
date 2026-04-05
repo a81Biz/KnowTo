@@ -199,6 +199,18 @@ export interface ClosingData {
 }
 
 // ============================================================================
+// EXTRACTED CONTEXT
+// ============================================================================
+
+/** Contexto compacto extraído de fases previas, listo para inyectarse al prompt. */
+export interface ExtractedContextEntry {
+  /** ID del registro en base de datos */
+  extractedContextId: string;
+  /** Contenido markdown compacto extraído */
+  content: string;
+}
+
+// ============================================================================
 // WIZARD STATE (coincide con FRONTEND ARCHITECTURE DOCUMENT sección 9)
 // ============================================================================
 export interface WizardState {
@@ -216,6 +228,11 @@ export interface WizardState {
   closingData: ClosingData | null;
   // Steps metadata para el progress indicator
   steps: WizardStep[];
+  /**
+   * Contextos extraídos indexados por stepNumber del paso destino.
+   * Ej: extractedContexts[2] = contexto compacto preparado para el paso F2.
+   */
+  extractedContexts: Record<number, ExtractedContextEntry>;
 }
 
 export interface ApiResponse<T = unknown> {

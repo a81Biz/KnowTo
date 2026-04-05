@@ -175,10 +175,20 @@ async function check(label, fn) {
   if (gen?.data?.content) {
     console.log('\n📄 Documento generado (primeras 300 chars):');
     console.log(gen.data.content.substring(0, 300) + '...');
+
+    // 7. Verificar que el documento F0 contiene las preguntas para el cliente
+    //    (el frontend las extraerá y las mostrará como campos en F1)
+    const hasQuestions = gen.data.content.includes('Preguntas para el cliente');
+    console.log(hasQuestions
+      ? '✅ F0 contiene sección "Preguntas para el cliente" → Step 1 las mostrará como inputs'
+      : '⚠️  F0 no generó "Preguntas para el cliente" — Step 1 mostrará mensaje de advertencia');
   }
 
   console.groupEnd();
   console.log('\n✅ Prueba completa. Todos los endpoints respondieron correctamente.');
+  console.log('\nℹ️  Nota: el Step 1 (F1) depende de que F0 esté generado.');
+  console.log('   Las preguntas de F0 se muestran automáticamente como campos en F1.');
+  console.log('   Las brechas se pre-rellenan con los gaps del Marco de Referencia.');
 })();
 ```
 

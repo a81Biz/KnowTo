@@ -43,7 +43,7 @@ function mockFetch(body: unknown, ok = true, status = 200) {
 
 // ─────────────────────────────────────────────────────────────────────────────
 describe('AIService — modo desarrollo (Ollama)', () => {
-  afterEach(() => vi.restoreAllMocks());
+  afterEach(() => { vi.restoreAllMocks(); });
 
   it('llama a Ollama y devuelve el contenido generado', async () => {
     const fetchSpy = mockFetch({ response: AI_CONTENT });
@@ -120,7 +120,7 @@ describe('AIService — modo desarrollo (Ollama)', () => {
 
 // ─────────────────────────────────────────────────────────────────────────────
 describe('AIService — modo producción (Workers AI)', () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => { vi.clearAllMocks(); });
 
   it('llama a Workers AI con el modelo correcto', async () => {
     const env = makeProdEnv();

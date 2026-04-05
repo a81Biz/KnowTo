@@ -12,7 +12,7 @@ Plataforma de certificación EC0366 (CONOCER) asistida por IA. Guía al evaluado
 | IA — desarrollo | Ollama local — `llama3.2:3b` (configurable) |
 | Base de datos | Supabase (PostgreSQL) vía stored procedures |
 | Dev local | Docker Compose + Postgres + Ollama |
-| Tests | Vitest (67 tests, 100 % pass) |
+| Tests | Vitest (73 tests, 100 % pass) |
 
 ---
 
@@ -83,15 +83,17 @@ knowto/
 │   │   │   ├── health.route.ts         # GET /api/health
 │   │   │   └── wizard.route.ts         # /api/wizard/*
 │   │   ├── services/
-│   │   │   ├── ai.service.ts           # Ollama (dev) / Workers AI (prod)
-│   │   │   └── supabase.service.ts     # Mocks UUID (dev) / RPC real (prod)
+│   │   │   ├── ai.service.ts               # Ollama (dev) / Workers AI (prod)
+│   │   │   ├── context-extractor.service.ts # Extrae secciones de docs anteriores
+│   │   │   └── supabase.service.ts          # Mocks UUID (dev) / RPC real (prod)
 │   │   ├── prompts/
 │   │   │   ├── index.ts                # PromptRegistry singleton
-│   │   │   └── templates/              # 9 plantillas Markdown (F0–F6_2)
+│   │   │   ├── flow-map.json           # Mapa de flujo: fases, extractores, patrones
+│   │   │   └── templates/              # 10 plantillas Markdown (F0–F6_2 + EXTRACTOR)
 │   │   └── types/
 │   │       ├── env.ts                  # Bindings de Cloudflare Workers
 │   │       └── wizard.types.ts         # PhaseId, PromptId, ProjectContext…
-│   ├── src/__tests__/             # Vitest — 67 tests
+│   ├── src/__tests__/             # Vitest — 73 tests
 │   │   ├── middleware/auth.middleware.test.ts
 │   │   ├── routes/health.e2e.test.ts
 │   │   ├── routes/wizard.e2e.test.ts
@@ -103,7 +105,7 @@ knowto/
 ├── frontend/
 │   └── src/
 │       ├── main.ts               # Orquestador: auth + dashboard + wizard
-│       ├── controllers/          # Un controlador por paso (step0–step9)
+│       ├── controllers/          # Un controlador por paso (step0–step9); step1 es clase personalizada
 │       ├── stores/wizard.store.ts
 │       ├── shared/
 │       │   ├── endpoints.ts      # URL base resuelta en runtime desde window.location
@@ -211,6 +213,7 @@ Authorization: Bearer <token>
 | `GET` | `/api/wizard/project/:projectId` | Contexto del proyecto |
 | `GET` | `/api/wizard/projects` | Listar proyectos del usuario |
 | `POST` | `/api/wizard/step` | Guardar datos de un paso |
+| `POST` | `/api/wizard/extract` | Extraer contexto compacto de fases previas |
 | `POST` | `/api/wizard/generate` | Generar documento con IA |
 
 ### Ejemplo rápido
@@ -230,16 +233,28 @@ curl -X POST http://localhost:8787/api/wizard/project \
 
 ## Fases del proceso EC0366
 
-| Paso | ID | Documento |
-|---|---|---|
-| 0 | F0 | Marco de referencia del cliente |
-| 1 | F1 | Informe de necesidades |
-| 2 | F2 | Especificaciones de análisis |
-| 3 | F3 | Especificaciones técnicas |
-| 4 | F4 | Producción de instrumentos |
-| 5 | F5 / F5.2 | Lista de verificación / Evidencias |
-| 6 | F6 / F6.2 | Ajustes / Firmas |
-| 7–9 | — | Pago y cierre |
+| Paso | ID | Documento | Entradas del usuario | Generado por IA |
+|---|---|---|---|---|
+| 0 | F0 | Marco de referencia del cliente | Datos básicos del proyecto | Análisis de sector, competencia, gaps y preguntas para el cliente |
+| 1 | F1 | Informe de necesidades | Respuestas a las preguntas de F0 + confirma/edita brechas propuestas | Declara problema, objetivos SMART+Bloom, perfil del participante, resultados esperados |
+| 2 | F2 | Especificaciones de análisis y diseño | Notas adicionales opcionales | Modalidad, SCORM, estructura temática, perfil de ingreso EC0366 |
+| 3 | F3 | Especificaciones técnicas | LMS, SCORM, fecha inicio | Configuración LMS, duración, multimedia, criterios de aprobación |
+| 4 | F4 | Producción de contenidos (8 productos) | Fecha inicio, nombres | 8 productos EC0366: cronograma, info general, guías, calendario, textos, presentación, guión, evaluación |
+| 5 | F5 | Verificación y evaluación (E1221) | Participantes, observaciones | Checklist técnico, checklist pedagógico, reporte de pruebas |
+| 6 | F5.2 | Anexo de evidencias | URLs del LMS y reportes | Documento formal de evidencias para el expediente CONOCER |
+| 7 | F6 | Ajustes post-evaluación | Observaciones recibidas | Clasificación de ajustes, plan de ajustes, control de versiones |
+| 8 | F6.2 | Lista de verificación y firmas | CURP, revisores | Inventario del expediente, espacios de firma, resumen ejecutivo |
+| 9 | CLOSE | Finalización | — | — |
+
+> **Flujo F0 → F1:** Las preguntas que genera F0 en la sección "Preguntas para el cliente" se
+> presentan automáticamente como campos de entrada en F1. El sistema también extrae los gaps
+> iniciales de F0 y pre-rellena las brechas para que el usuario solo confirme o edite.
+
+> **Extracción de contexto (F2 en adelante):** A partir de F2 el contexto acumulado supera
+> la ventana del modelo (~4096 tokens). El sistema llama automáticamente a `/api/wizard/extract`
+> al montar cada paso: extrae solo las secciones relevantes mediante parser markdown (regex) con
+> fallback a IA a temperatura 0. El extracto (~800 tokens) se inyecta al prompt en lugar del
+> contexto completo. Esto elimina el error "Lo siento, no puedo generar el documento".
 
 ---
 
@@ -259,9 +274,14 @@ curl -X POST http://localhost:8787/api/wizard/project \
 ## Tests
 
 ```bash
+# Backend — Vitest
 cd backend
-npm test              # 67 tests
+npm test              # 73 tests
 npm run test:coverage # Con reporte de cobertura HTML
+
+# Frontend — verificación de tipos TypeScript
+cd frontend
+npm run type-check    # tsc --noEmit (sin errores)
 ```
 
 | Suite | Qué cubre |
@@ -270,7 +290,7 @@ npm run test:coverage # Con reporte de cobertura HTML
 | `ai.service.test.ts` | Ollama (dev) y Workers AI (prod) — backends separados |
 | `supabase.service.test.ts` | Mocks dev y llamadas RPC prod |
 | `health.e2e.test.ts` | Health check y spec OpenAPI |
-| `wizard.e2e.test.ts` | Todos los endpoints del wizard |
+| `wizard.e2e.test.ts` | Todos los endpoints del wizard, incluido `/extract` |
 
 ---
 
@@ -327,7 +347,7 @@ VITE_SUPABASE_ANON_KEY=dummy-key-for-local
 | `npm run dev` | Servidor Node.js en :8787, lee `.dev.vars` |
 | `npm run dev:debug` | Igual + inspector Node.js en :9229 (VS Code) |
 | `npm run dev:wrangler` | Servidor wrangler/workerd (solo para test de compatibilidad CF) |
-| `npm test` | Vitest — 67 tests |
+| `npm test` | Vitest — 73 tests |
 | `npm run test:watch` | Vitest en modo watch |
 | `wrangler deploy --env production` | Deploy a Cloudflare Workers |
 

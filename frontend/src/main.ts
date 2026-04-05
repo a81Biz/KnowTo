@@ -2,8 +2,8 @@
 // Orquestador principal — FRONTEND ARCHITECTURE DOCUMENT
 import { getCurrentUser, signInWithGoogle, signOut, onAuthStateChange } from './shared/auth';
 import { wizardStore } from './stores/wizard.store';
-import { showError, showLoading, hideLoading, renderMarkdown } from './shared/ui';
-import { getData, postData } from './shared/http.client';
+import { showError, showLoading, hideLoading } from './shared/ui';
+import { getData } from './shared/http.client';
 import { buildEndpoint, ENDPOINTS } from './shared/endpoints';
 
 // Importar controladores con la API correcta: { mount, getData }

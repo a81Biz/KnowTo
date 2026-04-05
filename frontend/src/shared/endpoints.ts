@@ -47,6 +47,7 @@ export const ENDPOINTS = {
     createProject: '/api/wizard/project',
     saveStep:      '/api/wizard/step',
     generate:      '/api/wizard/generate',
+    extract:       '/api/wizard/extract',
     getProject:    (projectId: string) => `/api/wizard/project/${projectId}`,
     listProjects:  '/api/wizard/projects',
     getProgress:   '/api/wizard/progress',

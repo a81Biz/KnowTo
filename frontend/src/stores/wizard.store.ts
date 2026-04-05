@@ -2,10 +2,7 @@
 // Singleton — FRONTEND ARCHITECTURE DOCUMENT sección 9
 import type {
   WizardState, WizardStep, StepStatus,
-  ClientData, NeedsData, AnalysisData, SpecsData,
-  ProductionData, ChecklistData, EvidenceData,
-  AdjustmentsData, PaymentData, ClosingData,
-  PhaseId, PromptId,
+  ClientData, ExtractedContextEntry,
 } from '../types/wizard.types';
 
 type Listener = (state: WizardState) => void;
@@ -38,6 +35,7 @@ const initialState: WizardState = {
   paymentData: null,
   closingData: null,
   steps: STEP_DEFINITIONS.map((d) => ({ ...d, status: 'pending' as StepStatus, inputData: {} })),
+  extractedContexts: {},
 };
 
 class WizardStoreClass {
@@ -97,7 +95,7 @@ class WizardStoreClass {
       7: 'adjustmentsData', 8: 'paymentData', 9: 'closingData',
     };
     const key = keys[stepId];
-    if (key) { (this.state as Record<string, unknown>)[key] = data; this.saveToLocalStorage(); this.notify(); }
+    if (key) { (this.state as unknown as Record<string, unknown>)[key] = data; this.saveToLocalStorage(); this.notify(); }
   }
 
   // Métodos de Steps (metadata del wizard)
@@ -133,30 +131,56 @@ class WizardStoreClass {
     this.saveToLocalStorage();
   }
 
+  setExtractedContext(stepNumber: number, entry: ExtractedContextEntry): void {
+    this.state = {
+      ...this.state,
+      extractedContexts: { ...this.state.extractedContexts, [stepNumber]: entry },
+    };
+    this.saveToLocalStorage();
+  }
+
   // Navegación
   nextStep(): void { if (this.state.currentStep < 9) this.setCurrentStep(this.state.currentStep + 1); }
   prevStep(): void { if (this.state.currentStep > 0) this.setCurrentStep(this.state.currentStep - 1); }
   goToStep(n: number): void { if (n >= 0 && n <= 9) this.setCurrentStep(n); }
 
   reset(): void {
-    this.state = { ...initialState, steps: STEP_DEFINITIONS.map((d) => ({ ...d, status: 'pending' as StepStatus, inputData: {} })) };
+    this.state = {
+      ...initialState,
+      steps: STEP_DEFINITIONS.map((d) => ({ ...d, status: 'pending' as StepStatus, inputData: {} })),
+      extractedContexts: {},
+    };
     localStorage.removeItem(STORAGE_KEY);
     this.notify();
   }
 
-  // Construir contexto acumulado para el prompt
-  buildContext(): Record<string, unknown> {
+  /**
+   * Construye el contexto para el prompt de un paso dado.
+   * - Pasos 0-1: contexto acumulado completo (previousData con todos los docs completados).
+   * - Pasos 2+: usa el extractedContext compacto si está disponible, caída al acumulado si no.
+   */
+  buildContext(forStep?: number): Record<string, unknown> {
     const prev: Record<string, unknown> = {};
     this.state.steps.filter((s) => s.status === 'completed').forEach((s) => {
       prev[s.phaseId] = { inputData: s.inputData, content: s.documentContent };
     });
-    return {
+
+    const base = {
       projectName: this.state.clientData.projectName,
       clientName: this.state.clientData.clientName,
       industry: this.state.clientData.industry,
       email: this.state.clientData.email,
-      previousData: prev,
     };
+
+    // Pasos 2+ usan el contexto extraído compacto cuando esté disponible
+    if (forStep !== undefined && forStep >= 2) {
+      const extracted = this.state.extractedContexts[forStep];
+      if (extracted) {
+        return { ...base, previousData: { extractedContext: extracted.content } };
+      }
+    }
+
+    return { ...base, previousData: prev };
   }
 }
 

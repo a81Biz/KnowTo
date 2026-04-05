@@ -10,6 +10,7 @@ import { OpenAPIHono, createRoute, z } from '@hono/zod-openapi';
 import { authMiddleware } from '../middleware/auth.middleware';
 import { SupabaseService } from '../services/supabase.service';
 import { AIService } from '../services/ai.service';
+import { ContextExtractorService } from '../services/context-extractor.service';
 import type { Env } from '../types/env';
 import type { PromptId } from '../types/wizard.types';
 
@@ -51,6 +52,16 @@ const GenerateDocumentBody = z
   .openapi('GenerateDocumentBody');
 
 const ProjectIdParam = z.object({ projectId: z.string().uuid() });
+
+const ExtractContextBody = z
+  .object({
+    projectId: z.string().uuid(),
+    extractorId: z.string().min(1).openapi({ example: 'EXTRACTOR_F2' }),
+    sourceDocuments: z.record(z.string()).openapi({
+      example: { F0: '# MARCO DE REFERENCIA...', F1: '# INFORME DE NECESIDADES...' },
+    }),
+  })
+  .openapi('ExtractContextBody');
 
 // ============================================================================
 // RUTAS
@@ -163,6 +174,40 @@ const routeSaveStep = createRoute({
   },
 });
 
+const routeExtract = createRoute({
+  method: 'post',
+  path: '/extract',
+  tags: TAG,
+  summary: 'Extraer contexto compacto de fases previas',
+  description:
+    'Lee los documentos de fases anteriores y extrae solo las secciones necesarias para la siguiente fase, evitando overflow del contexto del LLM.',
+  security: BEARER,
+  request: {
+    body: { content: { 'application/json': { schema: ExtractContextBody } }, required: true },
+  },
+  responses: {
+    200: {
+      description: 'Contexto extraído',
+      content: {
+        'application/json': {
+          schema: z
+            .object({
+              success: z.literal(true),
+              data: z.object({
+                extractorId: z.string(),
+                content: z.string(),
+                parserUsed: z.record(z.boolean()),
+                extractedContextId: z.string().uuid(),
+              }),
+              timestamp: z.string(),
+            })
+            .openapi('ExtractContextResponse'),
+        },
+      },
+    },
+  },
+});
+
 const routeGenerate = createRoute({
   method: 'post',
   path: '/generate',
@@ -231,6 +276,29 @@ wizard.openapi(routeSaveStep, async (c) => {
   const supabase = new SupabaseService(c.env);
   const data = await supabase.saveStep({ projectId, stepNumber, inputData });
   return c.json({ success: true as const, data, timestamp: new Date().toISOString() });
+});
+
+wizard.openapi(routeExtract, async (c) => {
+  const { projectId, extractorId, sourceDocuments } = c.req.valid('json');
+  const extractor = new ContextExtractorService(c.env);
+  const supabase = new SupabaseService(c.env);
+
+  const result = await extractor.extract({ projectId, extractorId, sourceDocuments });
+
+  // Derivar fromPhases y toPhase desde el extractorId (ej: EXTRACTOR_F2 → to = F2)
+  const toPhase = extractorId.replace(/^EXTRACTOR_/, '');
+  const fromPhases = Object.keys(sourceDocuments);
+
+  await supabase.saveExtractedContext({
+    projectId,
+    extractorId,
+    fromPhases,
+    toPhase,
+    content: result.content,
+    parserUsed: result.parserUsed,
+  });
+
+  return c.json({ success: true as const, data: result, timestamp: new Date().toISOString() });
 });
 
 wizard.openapi(routeGenerate, async (c) => {

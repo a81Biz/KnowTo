@@ -118,4 +118,50 @@ export class SupabaseService {
     if (error) throw new Error(`getUserProjects failed: ${error.message}`);
     return data ?? [];
   }
+
+  async saveExtractedContext(params: {
+    projectId: string;
+    extractorId: string;
+    fromPhases: string[];
+    toPhase: string;
+    content: string;
+    parserUsed: Record<string, boolean>;
+  }): Promise<{ extractedContextId: string }> {
+    if (this.isDev) {
+      return { extractedContextId: crypto.randomUUID() };
+    }
+
+    const { data, error } = await this.client!.rpc('sp_save_extracted_context', {
+      p_project_id: params.projectId,
+      p_extractor_id: params.extractorId,
+      p_from_phases: params.fromPhases,
+      p_to_phase: params.toPhase,
+      p_content: params.content,
+      p_parser_used: params.parserUsed,
+    });
+
+    if (error) throw new Error(`sp_save_extracted_context failed: ${error.message}`);
+    if (!data.success) throw new Error(data.error);
+    return { extractedContextId: data.extracted_context_id };
+  }
+
+  async getExtractedContext(params: {
+    projectId: string;
+    extractorId: string;
+  }): Promise<{ content: string } | null> {
+    if (this.isDev) return null;
+
+    const { data, error } = await this.client!
+      .from('extracted_contexts')
+      .select('content')
+      .eq('project_id', params.projectId)
+      .eq('extractor_id', params.extractorId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (error) throw new Error(`getExtractedContext failed: ${error.message}`);
+    if (!data) return null;
+    return { content: (data as { content: string }).content };
+  }
 }

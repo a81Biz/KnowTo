@@ -14,6 +14,7 @@ import F5 from './templates/F5-verificacion.md';
 import F5_2 from './templates/F5_2-evidencias.md';
 import F6 from './templates/F6-ajustes.md';
 import F6_2 from './templates/F6_2-firmas.md';
+import EXTRACTOR from './templates/EXTRACTOR.md';
 
 interface PromptMetadata {
   id: string;
@@ -37,6 +38,7 @@ const PROMPT_MAP: Record<PromptId, string> = {
   F5_2,
   F6,
   F6_2,
+  EXTRACTOR,
 };
 
 class PromptRegistry {

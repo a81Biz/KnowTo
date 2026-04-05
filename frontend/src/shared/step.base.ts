@@ -5,9 +5,21 @@
 import { TemplateLoader } from './template.loader';
 import { postData } from './http.client';
 import { ENDPOINTS, buildEndpoint } from './endpoints';
-import { showLoading, hideLoading, showError, renderMarkdown } from './ui';
+import { showLoading, hideLoading, showError, showSuccess, renderMarkdown, printDocument } from './ui';
 import { wizardStore } from '../stores/wizard.store';
 import type { PhaseId, PromptId } from '../types/wizard.types';
+
+// Mapa de paso → ID del extractor que prepara su contexto.
+// Solo los pasos que necesitan contexto compacto (2 en adelante).
+const EXTRACTOR_FOR_STEP: Record<number, string> = {
+  2: 'EXTRACTOR_F2',
+  3: 'EXTRACTOR_F3',
+  4: 'EXTRACTOR_F4',
+  5: 'EXTRACTOR_F5',
+  6: 'EXTRACTOR_F5_2',
+  7: 'EXTRACTOR_F6',
+  8: 'EXTRACTOR_F6_2',
+};
 
 // ============================================================================
 // 1. TIPOS
@@ -43,6 +55,7 @@ export class BaseStep {
     documentPreview?: HTMLElement;
     btnCopy?: HTMLButtonElement;
     btnRegenerate?: HTMLButtonElement;
+    btnPrint?: HTMLButtonElement;
   } = {};
 
   protected _uiConfig = {
@@ -71,6 +84,31 @@ export class BaseStep {
     if (!this._dom.previewPanel || !this._dom.documentPreview) return;
     this._dom.documentPreview.innerHTML = renderMarkdown(markdown);
     this._dom.previewPanel.classList.remove('hidden');
+    this._ensurePrintButton(markdown);
+  }
+
+  /** Inyecta el botón de impresión la primera vez que se muestra el preview. */
+  private _ensurePrintButton(markdown: string): void {
+    if (!this._dom.previewPanel) return;
+    if (this._dom.btnPrint) {
+      // Actualizar referencia al markdown actual para reimprimir correctamente
+      this._dom.btnPrint.onclick = () => printDocument(markdown,
+        wizardStore.getState().clientData.projectName || 'Documento KnowTo');
+      return;
+    }
+    const btnContainer = this._dom.previewPanel.querySelector<HTMLElement>('.flex.gap-2');
+    if (!btnContainer) return;
+
+    const btn = document.createElement('button');
+    btn.id = 'btn-print';
+    btn.textContent = '🖨️ Imprimir / PDF';
+    btn.className =
+      'px-4 py-2 border border-green-300 text-green-700 rounded-lg text-sm hover:bg-green-50';
+    btn.onclick = () => printDocument(markdown,
+      wizardStore.getState().clientData.projectName || 'Documento KnowTo');
+
+    btnContainer.appendChild(btn);
+    this._dom.btnPrint = btn;
   }
 
   protected _setLoading(loading: boolean): void {
@@ -156,7 +194,7 @@ export class BaseStep {
     wizardStore.setStepInputData(this._config.stepNumber, formData);
 
     try {
-      const context = wizardStore.buildContext() as {
+      const context = wizardStore.buildContext(this._config.stepNumber) as {
         projectName: string;
         clientName: string;
         industry?: string;
@@ -204,13 +242,61 @@ export class BaseStep {
       const step = wizardStore.getState().steps[this._config.stepNumber];
       if (step?.documentContent) {
         navigator.clipboard.writeText(step.documentContent)
-          .then(() => alert('Documento copiado al portapapeles'));
+          .then(() => showSuccess('Documento copiado al portapapeles.'))
+          .catch(() => showError('No se pudo copiar al portapapeles. Intenta seleccionar y copiar el texto manualmente.'));
       }
     });
 
     this._dom.btnRegenerate?.addEventListener('click', () => {
       void this._generateDocument();
     });
+  }
+
+  /**
+   * Llama al endpoint /extract para preparar el contexto compacto de este paso.
+   * Solo actúa si el paso tiene un extractor asignado y aún no hay contexto extraído.
+   * Guarda el resultado en el store para que buildContext() lo use.
+   */
+  private async _ensureExtractedContext(): Promise<void> {
+    const extractorId = EXTRACTOR_FOR_STEP[this._config.stepNumber];
+    if (!extractorId) return;
+
+    const state = wizardStore.getState();
+    // Si ya hay contexto extraído para este paso, no volver a llamar
+    if (state.extractedContexts[this._config.stepNumber]) return;
+
+    const projectId = state.projectId;
+    if (!projectId) return;
+
+    // Recolectar documentos fuente (todas las fases completadas)
+    const sourceDocuments: Record<string, string> = {};
+    for (const step of state.steps) {
+      if (step.status === 'completed' && step.documentContent) {
+        sourceDocuments[step.phaseId] = step.documentContent;
+      }
+    }
+    if (Object.keys(sourceDocuments).length === 0) return;
+
+    try {
+      showLoading('Preparando contexto...');
+      const res = await postData<{
+        extractorId: string;
+        content: string;
+        parserUsed: Record<string, boolean>;
+        extractedContextId: string;
+      }>(buildEndpoint(ENDPOINTS.wizard.extract), { projectId, extractorId, sourceDocuments });
+
+      if (res.data) {
+        wizardStore.setExtractedContext(this._config.stepNumber, {
+          extractedContextId: res.data.extractedContextId,
+          content: res.data.content,
+        });
+      }
+    } catch {
+      // Extracción fallida no es bloqueante: buildContext() caerá al modo acumulado
+    } finally {
+      hideLoading();
+    }
   }
 
   // 7. API PÚBLICA
@@ -223,6 +309,9 @@ export class BaseStep {
     container.appendChild(fragment);
 
     this._cacheDOM();
+
+    // Preparar contexto compacto antes de mostrar el paso (pasos 2+)
+    await this._ensureExtractedContext();
 
     // Restaurar datos previos si existen
     const step = wizardStore.getState().steps[this._config.stepNumber];

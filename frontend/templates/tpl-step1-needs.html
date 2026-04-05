@@ -2,46 +2,39 @@
   <div id="step-1-container" class="step-container space-y-6">
     <div>
       <h2 class="text-2xl font-bold text-gray-900">Informe de Necesidades de Capacitación</h2>
-      <p class="text-gray-500 mt-1">Identifica la brecha de competencias y define objetivos SMART con Taxonomía de Bloom.</p>
+      <p class="text-gray-500 mt-1">Responde las preguntas del Marco de Referencia y confirma las brechas propuestas.</p>
     </div>
     <form id="form-step1" class="space-y-5" novalidate>
+
+      <!-- Preguntas dinámicas del cliente (extraídas del documento F0) -->
+      <div id="client-questions-section" class="space-y-4">
+        <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <h3 class="text-sm font-bold text-blue-800 uppercase tracking-widest mb-1">Preguntas del Marco de Referencia</h3>
+          <p class="text-xs text-blue-600">El sistema identificó las siguientes preguntas a partir del análisis de F0. Respóndelas para completar el diagnóstico.</p>
+        </div>
+        <div id="dynamic-questions-container" class="space-y-4">
+          <!-- Las preguntas se generan dinámicamente desde el documento F0 -->
+          <p class="text-gray-400 text-sm italic">Cargando preguntas del Marco de Referencia...</p>
+        </div>
+      </div>
+
+      <!-- Brechas identificadas (pre-propuestas por el sistema, editables por el usuario) -->
       <div class="group">
-        <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">
+        <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-1">
           Confirma las brechas identificadas *
         </label>
-        <textarea id="textarea-confirmed-gaps" name="confirmedGaps" rows="4" required
-          placeholder="Describe las brechas de Conocimiento (saber), Habilidad (saber hacer) o Actitud (saber ser) identificadas en el Marco de Referencia..."
+        <p class="text-xs text-gray-400 mb-2">El sistema propone las siguientes brechas a partir del Marco de Referencia. Puedes editarlas, agregar o eliminar según sea necesario.</p>
+        <textarea id="textarea-confirmed-gaps" name="confirmedGaps" rows="6" required
+          placeholder="Cargando brechas propuestas por el sistema..."
           class="input-field w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500"></textarea>
       </div>
-      <div class="group">
-        <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">
-          Resultados esperados del curso *
-        </label>
-        <textarea id="textarea-expected-results" name="expectedResults" rows="3" required
-          placeholder="¿Qué podrán hacer los participantes al finalizar el curso?"
-          class="input-field w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500"></textarea>
-      </div>
-      <div class="group">
-        <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">
-          Perfil del participante ideal *
-        </label>
-        <input id="input-participant-profile" name="participantProfile" type="text" required
-          placeholder="Ej: Técnicos con 2 años de experiencia en el área, bachillerato terminado"
-          class="input-field w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500" />
-      </div>
-      <div class="group">
-        <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">
-          ¿Cuántos alumnos esperas?
-        </label>
-        <input id="input-expected-students" name="expectedStudents" type="text"
-          placeholder="Ej: 50 en el primer mes, no definido"
-          class="input-field w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500" />
-      </div>
+
       <button id="btn-submit" type="submit"
         class="btn-primary w-full bg-blue-900 text-white py-4 px-8 rounded-xl font-bold text-lg hover:bg-blue-800 transition-all disabled:opacity-50">
         ✨ Generar Informe de Necesidades
       </button>
     </form>
+
     <div id="preview-panel" class="hidden">
       <h3 class="font-semibold text-gray-700 mb-3">📄 Documento generado:</h3>
       <div id="document-preview" class="document-preview bg-gray-50 border border-gray-200 rounded-xl p-6 max-h-96 overflow-y-auto text-sm"></div>

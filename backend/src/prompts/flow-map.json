@@ -1,0 +1,549 @@
+{
+  "_version": "1.0.0",
+  "_description": "Mapa de flujo del wizard EC0366. Cada nodo 'fase' produce documentos; cada nodo 'extractor' extrae secciones específicas de fases previas para alimentar la siguiente fase sin saturar el contexto.",
+
+  "F0": {
+    "tipo": "fase",
+    "step": 0,
+    "label": "Marco de Referencia del Cliente",
+    "promptId": "F0",
+    "entrada": {
+      "form": {
+        "courseTopic": "Tema del curso (requerido)",
+        "targetAudience": "Audiencia objetivo (requerido)",
+        "courseObjective": "Objetivo principal (requerido)",
+        "currentSituation": "Situación actual (opcional)",
+        "additionalContext": "Contexto adicional (opcional)"
+      },
+      "contexto": null
+    },
+    "salida": {
+      "sector_industria": {
+        "header": "## 1. ANÁLISIS DEL SECTOR/INDUSTRIA",
+        "patron": "##\\s+1\\.\\s+AN[ÁA]LISIS DEL SECTOR"
+      },
+      "mejores_practicas": {
+        "header": "## 2. MEJORES PRÁCTICAS PARA CURSOS EN LÍNEA EN ESTE SECTOR",
+        "patron": "##\\s+2\\.\\s+MEJORES PR[ÁA]CTICAS"
+      },
+      "competencia": {
+        "header": "## 3. COMPETENCIA IDENTIFICADA",
+        "patron": "##\\s+3\\.\\s+COMPETENCIA IDENTIFICADA"
+      },
+      "ec_relacionados": {
+        "header": "## 4. ESTÁNDARES EC RELACIONADOS (CONOCER)",
+        "patron": "##\\s+4\\.\\s+EST[ÁA]NDARES EC"
+      },
+      "gaps_iniciales": {
+        "header": "## 5. ANÁLISIS DE GAPS INICIALES",
+        "patron": "##\\s+5\\.\\s+AN[ÁA]LISIS DE GAPS"
+      },
+      "preguntas_cliente": {
+        "header": "### Preguntas para el cliente (máximo 10)",
+        "patron": "###\\s+Preguntas para el cliente"
+      },
+      "recomendaciones": {
+        "header": "## 6. RECOMENDACIONES INICIALES",
+        "patron": "##\\s+6\\.\\s+RECOMENDACIONES"
+      }
+    },
+    "next": "F1"
+  },
+
+  "F1": {
+    "tipo": "fase",
+    "step": 1,
+    "label": "Informe de Necesidades de Capacitación",
+    "promptId": "F1",
+    "entrada": {
+      "form": {
+        "clientAnswer_0..N": "Respuestas a las preguntas generadas en F0 (dinámico)",
+        "confirmedGaps": "Brechas propuestas por F0, confirmadas por el usuario"
+      },
+      "contexto": "F0 (completo — el contexto acumulado en paso 1 es solo F0)"
+    },
+    "salida": {
+      "sintesis_contexto": {
+        "header": "## 1. SÍNTESIS DEL CONTEXTO",
+        "patron": "##\\s+1\\.\\s+S[ÍI]NTESIS DEL CONTEXTO"
+      },
+      "brechas_competencia": {
+        "header": "## 2. ANÁLISIS DE BRECHAS DE COMPETENCIA",
+        "patron": "##\\s+2\\.\\s+AN[ÁA]LISIS DE BRECHAS"
+      },
+      "problema_capacitacion": {
+        "header": "## 3. DECLARACIÓN DEL PROBLEMA DE CAPACITACIÓN",
+        "patron": "##\\s+3\\.\\s+DECLARACI[ÓO]N DEL PROBLEMA"
+      },
+      "objetivos_aprendizaje": {
+        "header": "## 4. OBJETIVOS DE APRENDIZAJE (SMART + Taxonomía de Bloom)",
+        "patron": "##\\s+4\\.\\s+OBJETIVOS DE APRENDIZAJE"
+      },
+      "perfil_participante": {
+        "header": "## 5. PERFIL DEL PARTICIPANTE IDEAL",
+        "patron": "##\\s+5\\.\\s+PERFIL DEL PARTICIPANTE"
+      },
+      "resultados_esperados": {
+        "header": "## 6. RESULTADOS ESPERADOS DEL CURSO",
+        "patron": "##\\s+6\\.\\s+RESULTADOS ESPERADOS"
+      },
+      "recomendaciones_diseno": {
+        "header": "## 7. RECOMENDACIONES PARA EL DISEÑO",
+        "patron": "##\\s+7\\.\\s+RECOMENDACIONES PARA EL DISE"
+      }
+    },
+    "next": "EXTRACTOR_F2"
+  },
+
+  "EXTRACTOR_F2": {
+    "tipo": "extractor",
+    "label": "Extractor de contexto para F2",
+    "fuentes": [
+      {
+        "fase": "F0",
+        "campos": [
+          "sector_industria",
+          "mejores_practicas",
+          "ec_relacionados",
+          "gaps_iniciales"
+        ]
+      },
+      {
+        "fase": "F1",
+        "campos": [
+          "brechas_competencia",
+          "objetivos_aprendizaje",
+          "perfil_participante",
+          "resultados_esperados"
+        ]
+      }
+    ],
+    "next": "F2"
+  },
+
+  "F2": {
+    "tipo": "fase",
+    "step": 2,
+    "label": "Especificaciones de Análisis y Diseño",
+    "promptId": "F2",
+    "entrada": {
+      "form": {
+        "additionalNotes": "Notas adicionales opcionales del usuario"
+      },
+      "contexto": "EXTRACTOR_F2.salida"
+    },
+    "salida": {
+      "decision_modalidad": {
+        "header": "## 1. DECISIÓN DE MODALIDAD",
+        "patron": "##\\s+1\\.\\s+DECISI[ÓO]N DE MODALIDAD"
+      },
+      "nivel_interactividad": {
+        "header": "## 2. NIVEL DE INTERACTIVIDAD (SCORM)",
+        "patron": "##\\s+2\\.\\s+NIVEL DE INTERACTIVIDAD"
+      },
+      "estructura_tematica": {
+        "header": "## 3. ESTRUCTURA TEMÁTICA PRELIMINAR",
+        "patron": "##\\s+3\\.\\s+ESTRUCTURA TEM[ÁA]TICA"
+      },
+      "perfil_ingreso": {
+        "header": "## 4. PERFIL DE INGRESO (Obligatorio EC0366)",
+        "patron": "##\\s+4\\.\\s+PERFIL DE INGRESO"
+      },
+      "estrategias_instruccionales": {
+        "header": "## 5. ESTRATEGIAS INSTRUCCIONALES",
+        "patron": "##\\s+5\\.\\s+ESTRATEGIAS INSTRUCCIONALES"
+      },
+      "supuestos_restricciones": {
+        "header": "## 6. SUPUESTOS Y RESTRICCIONES",
+        "patron": "##\\s+6\\.\\s+SUPUESTOS Y RESTRICCIONES"
+      }
+    },
+    "next": "EXTRACTOR_F3"
+  },
+
+  "EXTRACTOR_F3": {
+    "tipo": "extractor",
+    "label": "Extractor de contexto para F3",
+    "fuentes": [
+      {
+        "fase": "F2",
+        "campos": [
+          "decision_modalidad",
+          "nivel_interactividad",
+          "estructura_tematica",
+          "perfil_ingreso",
+          "estrategias_instruccionales"
+        ]
+      }
+    ],
+    "next": "F3"
+  },
+
+  "F3": {
+    "tipo": "fase",
+    "step": 3,
+    "label": "Especificaciones Técnicas del Curso",
+    "promptId": "F3",
+    "entrada": {
+      "form": {
+        "lmsName": "LMS seleccionado (requerido)",
+        "lmsUrl": "URL del LMS (opcional)",
+        "scormVersion": "Estándar SCORM (1.2 / 2004 / xAPI)",
+        "startDate": "Fecha de inicio estimada (opcional)",
+        "additionalNotes": "Observaciones técnicas adicionales (opcional)"
+      },
+      "contexto": "EXTRACTOR_F3.salida"
+    },
+    "salida": {
+      "plataforma_lms": {
+        "header": "## 1. PLATAFORMA LMS",
+        "patron": "##\\s+1\\.\\s+PLATAFORMA LMS"
+      },
+      "reporteo_seguimiento": {
+        "header": "## 2. REQUISITOS DE REPORTEO Y SEGUIMIENTO",
+        "patron": "##\\s+2\\.\\s+REQUISITOS DE REPORTEO"
+      },
+      "duracion_calculada": {
+        "header": "## 3. DURACIÓN CALCULADA",
+        "patron": "##\\s+3\\.\\s+DURACI[ÓO]N CALCULADA"
+      },
+      "especificaciones_multimedia": {
+        "header": "## 4. ESPECIFICACIONES MULTIMEDIA",
+        "patron": "##\\s+4\\.\\s+ESPECIFICACIONES MULTIMEDIA"
+      },
+      "criterios_aprobacion": {
+        "header": "## 5. CRITERIOS DE APROBACIÓN",
+        "patron": "##\\s+5\\.\\s+CRITERIOS DE APROBACI[ÓO]N"
+      },
+      "arquitectura_evaluacion": {
+        "header": "## 6. ARQUITECTURA DE EVALUACIÓN",
+        "patron": "##\\s+6\\.\\s+ARQUITECTURA DE EVALUACI[ÓO]N"
+      }
+    },
+    "next": "EXTRACTOR_F4"
+  },
+
+  "EXTRACTOR_F4": {
+    "tipo": "extractor",
+    "label": "Extractor de contexto para F4",
+    "fuentes": [
+      {
+        "fase": "F2",
+        "campos": [
+          "estructura_tematica",
+          "perfil_ingreso",
+          "estrategias_instruccionales"
+        ]
+      },
+      {
+        "fase": "F3",
+        "campos": [
+          "plataforma_lms",
+          "duracion_calculada",
+          "criterios_aprobacion",
+          "arquitectura_evaluacion"
+        ]
+      }
+    ],
+    "next": "F4"
+  },
+
+  "F4": {
+    "tipo": "fase",
+    "step": 4,
+    "label": "Producción de Contenidos EC0366",
+    "promptId": "F4",
+    "entrada": {
+      "form": {
+        "startDate": "Fecha de inicio del cronograma (requerido)",
+        "instructorName": "Nombre del desarrollador/instructor (requerido)",
+        "reviewerName": "Nombre del revisor (opcional)",
+        "additionalNotes": "Indicaciones adicionales de producción (opcional)"
+      },
+      "contexto": "EXTRACTOR_F4.salida"
+    },
+    "salida": {
+      "cronograma": {
+        "header": "## PRODUCTO 0: CRONOGRAMA DE DESARROLLO (E1219 - producto #1)",
+        "patron": "##\\s+PRODUCTO 0"
+      },
+      "informacion_general": {
+        "header": "## PRODUCTO 1: DOCUMENTO DE INFORMACIÓN GENERAL (E1219 - producto #2)",
+        "patron": "##\\s+PRODUCTO 1"
+      },
+      "guias_actividades": {
+        "header": "## PRODUCTO 2: GUÍAS DE ACTIVIDADES POR MÓDULO (E1220 - producto #1)",
+        "patron": "##\\s+PRODUCTO 2"
+      },
+      "calendario_actividades": {
+        "header": "## PRODUCTO 3: CALENDARIO GENERAL DE ACTIVIDADES (E1220 - producto #2)",
+        "patron": "##\\s+PRODUCTO 3"
+      },
+      "documentos_texto": {
+        "header": "## PRODUCTO 4: DOCUMENTOS DE TEXTO (E1220 - producto #3)",
+        "patron": "##\\s+PRODUCTO 4"
+      },
+      "presentacion_electronica": {
+        "header": "## PRODUCTO 5: PRESENTACIÓN ELECTRÓNICA (E1220 - producto #4)",
+        "patron": "##\\s+PRODUCTO 5"
+      },
+      "guion_multimedia": {
+        "header": "## PRODUCTO 6: MATERIAL MULTIMEDIA — GUIÓN DE VIDEO (E1220 - producto #5)",
+        "patron": "##\\s+PRODUCTO 6"
+      },
+      "instrumentos_evaluacion": {
+        "header": "## PRODUCTO 7: INSTRUMENTOS DE EVALUACIÓN (E1220 - producto #6)",
+        "patron": "##\\s+PRODUCTO 7"
+      }
+    },
+    "next": "EXTRACTOR_F5"
+  },
+
+  "EXTRACTOR_F5": {
+    "tipo": "extractor",
+    "label": "Extractor de contexto para F5",
+    "fuentes": [
+      {
+        "fase": "F3",
+        "campos": [
+          "plataforma_lms",
+          "criterios_aprobacion"
+        ]
+      },
+      {
+        "fase": "F4",
+        "campos": [
+          "cronograma",
+          "informacion_general",
+          "instrumentos_evaluacion"
+        ]
+      }
+    ],
+    "next": "F5"
+  },
+
+  "F5": {
+    "tipo": "fase",
+    "step": 5,
+    "label": "Verificación y Evaluación del Curso (E1221)",
+    "promptId": "F5",
+    "entrada": {
+      "form": {
+        "testParticipants": "Número de participantes en prueba piloto",
+        "testDate": "Fecha de prueba (opcional)",
+        "technicalObservations": "Observaciones técnicas detectadas (opcional)",
+        "pedagogicalObservations": "Observaciones pedagógicas detectadas (opcional)"
+      },
+      "contexto": "EXTRACTOR_F5.salida"
+    },
+    "salida": {
+      "checklist_tecnico": {
+        "header": "## 1. CHECKLIST DE VERIFICACIÓN TÉCNICA",
+        "patron": "##\\s+1\\.\\s+CHECKLIST DE VERIFICACI[ÓO]N T[ÉE]CNICA"
+      },
+      "checklist_pedagogico": {
+        "header": "## 2. CHECKLIST DE VERIFICACIÓN PEDAGÓGICA",
+        "patron": "##\\s+2\\.\\s+CHECKLIST DE VERIFICACI[ÓO]N PEDAG"
+      },
+      "reporte_pruebas": {
+        "header": "## 3. PLANTILLA DE REPORTE DE PRUEBAS DE USUARIO",
+        "patron": "##\\s+3\\.\\s+PLANTILLA DE REPORTE"
+      }
+    },
+    "next": "EXTRACTOR_F5_2"
+  },
+
+  "EXTRACTOR_F5_2": {
+    "tipo": "extractor",
+    "label": "Extractor de contexto para F5_2",
+    "fuentes": [
+      {
+        "fase": "F5",
+        "campos": [
+          "reporte_pruebas"
+        ]
+      },
+      {
+        "fase": "F3",
+        "campos": [
+          "plataforma_lms",
+          "criterios_aprobacion"
+        ]
+      }
+    ],
+    "next": "F5_2"
+  },
+
+  "F5_2": {
+    "tipo": "fase",
+    "step": 6,
+    "label": "Anexo de Evidencias del Curso",
+    "promptId": "F5_2",
+    "entrada": {
+      "form": {
+        "lmsUrl": "URL del curso en el LMS (requerido)",
+        "reportUrl": "URL del reporte de seguimiento (opcional)",
+        "certificateCapture": "Descripción o URL de captura del certificado (opcional)",
+        "additionalEvidence": "Evidencias adicionales (opcional)"
+      },
+      "contexto": "EXTRACTOR_F5_2.salida"
+    },
+    "salida": {
+      "evidencia_lms": {
+        "header": "## EVIDENCIA 1: CURSO PUBLICADO EN LMS",
+        "patron": "##\\s+EVIDENCIA 1"
+      },
+      "evidencia_reporteo": {
+        "header": "## EVIDENCIA 2: SEGUIMIENTO Y REPORTEO",
+        "patron": "##\\s+EVIDENCIA 2"
+      },
+      "evidencia_evaluaciones": {
+        "header": "## EVIDENCIA 3: RESULTADOS DE EVALUACIONES",
+        "patron": "##\\s+EVIDENCIA 3"
+      },
+      "evidencia_certificados": {
+        "header": "## EVIDENCIA 4: CERTIFICADOS EMITIDOS",
+        "patron": "##\\s+EVIDENCIA 4"
+      }
+    },
+    "next": "EXTRACTOR_F6"
+  },
+
+  "EXTRACTOR_F6": {
+    "tipo": "extractor",
+    "label": "Extractor de contexto para F6",
+    "fuentes": [
+      {
+        "fase": "F5",
+        "campos": [
+          "checklist_tecnico",
+          "checklist_pedagogico",
+          "reporte_pruebas"
+        ]
+      }
+    ],
+    "next": "F6"
+  },
+
+  "F6": {
+    "tipo": "fase",
+    "step": 7,
+    "label": "Documento de Ajustes Post-Evaluación",
+    "promptId": "F6",
+    "entrada": {
+      "form": {
+        "courseVersion": "Versión del curso (ej: 1.1)",
+        "observationsReceived": "Observaciones recibidas de participantes/evaluador (requerido)",
+        "priorityAdjustments": "Ajustes de alta prioridad identificados (opcional)"
+      },
+      "contexto": "EXTRACTOR_F6.salida"
+    },
+    "salida": {
+      "resumen_observaciones": {
+        "header": "## 1. RESUMEN DE OBSERVACIONES RECIBIDAS",
+        "patron": "##\\s+1\\.\\s+RESUMEN DE OBSERVACIONES"
+      },
+      "clasificacion_ajustes": {
+        "header": "## 2. CLASIFICACIÓN DE AJUSTES",
+        "patron": "##\\s+2\\.\\s+CLASIFICACI[ÓO]N DE AJUSTES"
+      },
+      "plan_ajustes": {
+        "header": "## 3. PLAN DE AJUSTES DETALLADO",
+        "patron": "##\\s+3\\.\\s+PLAN DE AJUSTES"
+      },
+      "control_versiones": {
+        "header": "## 4. CONTROL DE VERSIONES",
+        "patron": "##\\s+4\\.\\s+CONTROL DE VERSIONES"
+      },
+      "declaracion_conformidad": {
+        "header": "## 5. DECLARACIÓN DE CONFORMIDAD",
+        "patron": "##\\s+5\\.\\s+DECLARACI[ÓO]N DE CONFORMIDAD"
+      }
+    },
+    "next": "EXTRACTOR_F6_2"
+  },
+
+  "EXTRACTOR_F6_2": {
+    "tipo": "extractor",
+    "label": "Extractor de contexto para F6_2 (cierre del expediente)",
+    "fuentes": [
+      {
+        "fase": "F2",
+        "campos": [
+          "decision_modalidad",
+          "estructura_tematica"
+        ]
+      },
+      {
+        "fase": "F3",
+        "campos": [
+          "plataforma_lms",
+          "duracion_calculada"
+        ]
+      },
+      {
+        "fase": "F4",
+        "campos": [
+          "informacion_general"
+        ]
+      },
+      {
+        "fase": "F6",
+        "campos": [
+          "control_versiones",
+          "declaracion_conformidad"
+        ]
+      }
+    ],
+    "next": "F6_2"
+  },
+
+  "F6_2": {
+    "tipo": "fase",
+    "step": 8,
+    "label": "Lista de Verificación de Firmas y Cierre EC0366",
+    "promptId": "F6_2",
+    "entrada": {
+      "form": {
+        "candidateCurp": "CURP del candidato (requerido)",
+        "reviewerName": "Nombre del revisor técnico (opcional)",
+        "reviewerRole": "Cargo del revisor (opcional)",
+        "certifierOrg": "Organismo certificador (opcional)",
+        "certifierName": "Nombre del coordinador del proceso (opcional)"
+      },
+      "contexto": "EXTRACTOR_F6_2.salida"
+    },
+    "salida": {
+      "inventario_expediente": {
+        "header": "## 1. INVENTARIO COMPLETO DEL EXPEDIENTE",
+        "patron": "##\\s+1\\.\\s+INVENTARIO COMPLETO"
+      },
+      "firmas_cierre": {
+        "header": "## 2. FIRMAS DE CIERRE",
+        "patron": "##\\s+2\\.\\s+FIRMAS DE CIERRE"
+      },
+      "resumen_ejecutivo": {
+        "header": "## 3. RESUMEN EJECUTIVO DEL PROCESO",
+        "patron": "##\\s+3\\.\\s+RESUMEN EJECUTIVO"
+      },
+      "declaracion_final": {
+        "header": "## 4. DECLARACIÓN FINAL",
+        "patron": "##\\s+4\\.\\s+DECLARACI[ÓO]N FINAL"
+      }
+    },
+    "next": "CLOSE"
+  },
+
+  "CLOSE": {
+    "tipo": "cierre",
+    "step": 9,
+    "label": "Expediente completo — listo para certificación",
+    "promptId": null,
+    "entrada": {
+      "form": {},
+      "contexto": null
+    },
+    "salida": {},
+    "next": null
+  }
+}

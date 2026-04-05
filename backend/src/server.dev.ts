@@ -28,7 +28,7 @@ const devEnv: Env = {
   AI: {
     // Solo se invocaría si ENVIRONMENT=production — no debería ocurrir en dev
     run: async () => { throw new Error('[server.dev] env.AI.run no disponible en modo desarrollo'); },
-  } as Ai,
+  } as unknown as Ai,
 };
 
 serve(
