@@ -1,8 +1,8 @@
 // __tests__/prompts/prompt-registry.test.ts
 // TDD: Validación del Prompt Registry (BACKEND ARCHITECTURE DOCUMENT sección 8)
 import { describe, it, expect, beforeEach } from 'vitest';
-import { getPromptRegistry } from '../../prompts';
-import type { PromptId } from '../../types/wizard.types';
+import { getPromptRegistry } from '../../dcfl/prompts';
+import type { PromptId } from '../../dcfl/types/wizard.types';
 
 const ALL_PROMPT_IDS: PromptId[] = [
   'F0', 'F1', 'F2', 'F2_5', 'F3',

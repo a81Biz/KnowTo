@@ -4,8 +4,8 @@
 // Modo producción: se mockea createClient para verificar las llamadas RPC.
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { SupabaseService } from '../../services/supabase.service';
-import type { Env } from '../../types/env';
+import { SupabaseService } from '../../dcfl/services/supabase.service';
+import type { Env } from '../../core/types/env';
 
 // ── Mock de Supabase ─────────────────────────────────────────────────────────
 const mockRpc = vi.fn();
@@ -38,8 +38,6 @@ describe('SupabaseService', () => {
   // ── Modo desarrollo ──────────────────────────────────────────────────────
   describe('modo desarrollo (ENVIRONMENT !== production)', () => {
     it('NO instancia createClient en dev (evita crash con vars no definidas)', () => {
-      // createClient se ha mockeado al inicio; verificamos que con DEV_ENV no se llama.
-      // El servicio no debe lanzar aunque SUPABASE_URL sea undefined.
       vi.clearAllMocks();
       expect(() => new SupabaseService(DEV_ENV)).not.toThrow();
       expect(mockRpc).not.toHaveBeenCalled();

@@ -12,7 +12,7 @@
 
 import { serve } from '@hono/node-server';
 import app from './index';
-import type { Env } from './types/env';
+import type { Env } from './core/types/env';
 
 const port = parseInt(process.env['PORT'] ?? '8787', 10);
 
@@ -41,6 +41,6 @@ serve(
     console.log(`[knowto-dev] Backend corriendo en http://0.0.0.0:${port}`);
     console.log(`[knowto-dev] OLLAMA_URL  : ${devEnv.OLLAMA_URL}`);
     console.log(`[knowto-dev] OLLAMA_MODEL: ${devEnv.OLLAMA_MODEL}`);
-    console.log(`[knowto-dev] Docs        : http://localhost:${port}/api/docs`);
+    console.log(`[knowto-dev] Docs        : http://api.localhost/docs  (o http://localhost:${port}/docs en nativo)`);
   }
 );

@@ -5,8 +5,8 @@
 //   production  → Workers AI  (se mockea env.AI.run)
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { AIService } from '../../services/ai.service';
-import type { Env } from '../../types/env';
+import { AIService } from '../../dcfl/services/ai.service';
+import type { Env } from '../../core/types/env';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 const AI_CONTENT = '# Marco de Referencia\nContenido generado por IA.';

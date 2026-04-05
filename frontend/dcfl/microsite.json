@@ -1,0 +1,11 @@
+{
+  "slug": "dcfl",
+  "name": "Certificación EC0366",
+  "description": "Plataforma asistida por IA para la certificación de Diseñadores de Cursos de Formación para el Trabajo (EC0366 CONOCER).",
+  "localDomain": "dcfl.localhost",
+  "prodDomain": "dcfl.sitio",
+  "icon": "school",
+  "accentColor": "#000f43",
+  "status": "active",
+  "tags": ["certificación", "EC0366", "formación", "CONOCER"]
+}

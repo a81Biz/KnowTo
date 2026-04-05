@@ -1,0 +1,27 @@
+<template id="tpl-step5-checklist">
+  <div id="step-5-container" class="step-container space-y-6">
+    <div>
+      <h2 class="text-2xl font-bold text-gray-900">Verificación del Curso (E1221)</h2>
+      <p class="text-gray-500 mt-1">Genera checklist técnico y pedagógico, y plantilla de reporte de pruebas.</p>
+    </div>
+    <form id="form-step6" class="space-y-5" novalidate>
+      <div class="group">
+        <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Notas e información adicional</label>
+        <textarea id="textarea-notes" name="notes" rows="5"
+          placeholder="Proporciona la información relevante para este paso..."
+          class="input-field w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500"></textarea>
+      </div>
+      <button id="btn-submit" type="submit"
+        class="btn-primary w-full bg-blue-900 text-white py-4 px-8 rounded-xl font-bold text-lg hover:bg-blue-800 transition-all disabled:opacity-50">
+        ✨ Generar Checklist de Verificación
+      </button>
+    </form>
+    <div id="preview-panel" class="hidden">
+      <div id="document-preview" class="document-preview bg-gray-50 border border-gray-200 rounded-xl p-6 max-h-96 overflow-y-auto text-sm"></div>
+      <div class="mt-3 flex gap-2">
+        <button id="btn-copy-doc" class="px-4 py-2 border border-gray-300 rounded-lg text-sm">📋 Copiar</button>
+        <button id="btn-regenerate" class="px-4 py-2 border border-blue-300 text-blue-700 rounded-lg text-sm">🔄 Regenerar</button>
+      </div>
+    </div>
+  </div>
+</template>

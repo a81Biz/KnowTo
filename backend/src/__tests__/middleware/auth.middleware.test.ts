@@ -4,8 +4,8 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Hono } from 'hono';
-import { authMiddleware, DEV_TOKEN, DEV_USER_ID } from '../../middleware/auth.middleware';
-import type { Env } from '../../types/env';
+import { authMiddleware, DEV_TOKEN, DEV_USER_ID } from '../../core/middleware/auth.middleware';
+import type { Env } from '../../core/types/env';
 
 // ── Mock de @supabase/supabase-js ────────────────────────────────────────────
 const mockGetUser = vi.fn();

@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="es" class="h-full">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>KnowTo — Plataformas de Certificación</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Inter', system-ui, sans-serif;
+      background: #f8fafc;
+      color: #0f172a;
+      min-height: 100vh;
+    }
+    header {
+      background: #000f43;
+      color: white;
+      padding: 1.5rem 2rem;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+    header h1 { font-size: 1.75rem; font-weight: 800; letter-spacing: -0.02em; }
+    header p { font-size: 0.9rem; opacity: 0.7; margin-top: 0.15rem; }
+    main { max-width: 1100px; margin: 3rem auto; padding: 0 2rem; }
+    h2 { font-size: 1.4rem; font-weight: 700; margin-bottom: 1.5rem; color: #1e293b; }
+    #microsites-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 1.5rem;
+    }
+    .microsite-card {
+      background: white;
+      border: 1px solid #e2e8f0;
+      border-radius: 1rem;
+      padding: 1.75rem;
+      text-decoration: none;
+      color: inherit;
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+      transition: box-shadow 0.2s, transform 0.15s;
+      cursor: pointer;
+    }
+    .microsite-card:hover { box-shadow: 0 8px 24px rgba(0,0,0,0.1); transform: translateY(-2px); }
+    .microsite-card .icon {
+      width: 3rem; height: 3rem;
+      background: #f1f5f9;
+      border-radius: 0.75rem;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.5rem;
+    }
+    .microsite-card h3 { font-size: 1.05rem; font-weight: 700; color: #1e293b; }
+    .microsite-card p { font-size: 0.85rem; color: #64748b; line-height: 1.5; }
+    .badge {
+      display: inline-block;
+      background: #dcfce7;
+      color: #15803d;
+      font-size: 0.7rem;
+      font-weight: 600;
+      padding: 0.2rem 0.5rem;
+      border-radius: 999px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .loading { text-align: center; color: #64748b; padding: 3rem; font-size: 0.95rem; }
+    .api-link {
+      margin-top: 3rem;
+      padding: 1rem 1.5rem;
+      background: #f1f5f9;
+      border-radius: 0.75rem;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      color: #475569;
+      font-size: 0.85rem;
+    }
+    .api-link a { color: #2563eb; text-decoration: none; font-weight: 600; }
+    .api-link a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <h1>KnowTo</h1>
+      <p>Plataformas de certificación y formación asistidas por IA</p>
+    </div>
+  </header>
+  <main>
+    <h2>Plataformas disponibles</h2>
+    <div id="microsites-grid">
+      <p class="loading">Cargando plataformas...</p>
+    </div>
+    <div class="api-link">
+      <span class="material-symbols-outlined" style="font-size:1.25rem">api</span>
+      <span>API unificada disponible en
+        <a id="api-docs-link" href="#">api.localhost/docs</a>
+      </span>
+    </div>
+  </main>
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>

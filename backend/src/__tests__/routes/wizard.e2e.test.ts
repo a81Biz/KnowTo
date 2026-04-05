@@ -1,5 +1,5 @@
 // src/__tests__/routes/wizard.e2e.test.ts
-// Tests E2E de todos los endpoints /api/wizard/*.
+// Tests E2E de todos los endpoints /dcfl/wizard/*.
 //
 // Estrategia de aislamiento:
 //   • Se mockean SupabaseService y AIService → CERO escrituras a BD.
@@ -8,7 +8,7 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import app from '../../index';
-import type { Env } from '../../types/env';
+import type { Env } from '../../core/types/env';
 
 // ── Mocks de servicios ───────────────────────────────────────────────────────
 const mockCreateProject       = vi.fn().mockResolvedValue({ projectId: 'aaaaaaaa-bbbb-4ccc-dddd-eeeeeeeeeeee' });
@@ -25,7 +25,7 @@ const mockExtract             = vi.fn().mockResolvedValue({
   extractedContextId: 'dddddddd-eeee-4fff-aaaa-111111111111',
 });
 
-vi.mock('../../services/supabase.service', () => ({
+vi.mock('../../dcfl/services/supabase.service', () => ({
   SupabaseService: vi.fn().mockImplementation(() => ({
     createProject:        mockCreateProject,
     saveStep:             mockSaveStep,
@@ -37,13 +37,13 @@ vi.mock('../../services/supabase.service', () => ({
   })),
 }));
 
-vi.mock('../../services/ai.service', () => ({
+vi.mock('../../dcfl/services/ai.service', () => ({
   AIService: vi.fn().mockImplementation(() => ({
     generate: mockAiGenerate,
   })),
 }));
 
-vi.mock('../../services/context-extractor.service', () => ({
+vi.mock('../../dcfl/services/context-extractor.service', () => ({
   ContextExtractorService: vi.fn().mockImplementation(() => ({
     extract: mockExtract,
   })),
@@ -75,13 +75,13 @@ function get(path: string, auth = true) {
 describe('Autenticación', () => {
   it('todos los endpoints devuelven 401 sin token', async () => {
     const endpoints = [
-      () => app.request('/api/wizard/projects', {}, DEV_ENV),
-      () => app.request('/api/wizard/project/not-checked', {}, DEV_ENV),
-      () => app.request('/api/wizard/project', { method: 'POST', headers: JSON_HEADER, body: '{}' }, DEV_ENV),
-      () => app.request('/api/wizard/step',    { method: 'POST', headers: JSON_HEADER, body: '{}' }, DEV_ENV),
-      () => app.request('/api/wizard/generate',      { method: 'POST', headers: JSON_HEADER, body: '{}' }, DEV_ENV),
-      () => app.request('/api/wizard/extract',       { method: 'POST', headers: JSON_HEADER, body: '{}' }, DEV_ENV),
-      () => app.request('/api/wizard/generate-form', { method: 'POST', headers: JSON_HEADER, body: '{}' }, DEV_ENV),
+      () => app.request('/dcfl/wizard/projects', {}, DEV_ENV),
+      () => app.request('/dcfl/wizard/project/not-checked', {}, DEV_ENV),
+      () => app.request('/dcfl/wizard/project', { method: 'POST', headers: JSON_HEADER, body: '{}' }, DEV_ENV),
+      () => app.request('/dcfl/wizard/step',    { method: 'POST', headers: JSON_HEADER, body: '{}' }, DEV_ENV),
+      () => app.request('/dcfl/wizard/generate',      { method: 'POST', headers: JSON_HEADER, body: '{}' }, DEV_ENV),
+      () => app.request('/dcfl/wizard/extract',       { method: 'POST', headers: JSON_HEADER, body: '{}' }, DEV_ENV),
+      () => app.request('/dcfl/wizard/generate-form', { method: 'POST', headers: JSON_HEADER, body: '{}' }, DEV_ENV),
     ];
     for (const call of endpoints) {
       const res = await call();
@@ -90,12 +90,12 @@ describe('Autenticación', () => {
   });
 });
 
-// ── POST /api/wizard/project ─────────────────────────────────────────────────
-describe('POST /api/wizard/project', () => {
+// ── POST /dcfl/wizard/project ────────────────────────────────────────────────
+describe('POST /dcfl/wizard/project', () => {
   beforeEach(() => { vi.clearAllMocks(); });
 
   it('crea un proyecto y devuelve 201 con projectId UUID', async () => {
-    const res = await post('/api/wizard/project', {
+    const res = await post('/dcfl/wizard/project', {
       name: 'Curso de Seguridad Industrial',
       clientName: 'Juan Pérez',
       industry: 'Manufactura',
@@ -109,7 +109,7 @@ describe('POST /api/wizard/project', () => {
   });
 
   it('crea proyecto sin campos opcionales (industry/email)', async () => {
-    const res = await post('/api/wizard/project', {
+    const res = await post('/dcfl/wizard/project', {
       name: 'Proyecto Mínimo',
       clientName: 'Ana García',
     });
@@ -117,18 +117,18 @@ describe('POST /api/wizard/project', () => {
   });
 
   it('devuelve 400 si name tiene menos de 3 caracteres', async () => {
-    const res = await post('/api/wizard/project', { name: 'AB', clientName: 'Ana García' });
+    const res = await post('/dcfl/wizard/project', { name: 'AB', clientName: 'Ana García' });
     expect(res.status).toBe(400);
     expect(mockCreateProject).not.toHaveBeenCalled();
   });
 
   it('devuelve 400 si clientName falta', async () => {
-    const res = await post('/api/wizard/project', { name: 'Proyecto Válido' });
+    const res = await post('/dcfl/wizard/project', { name: 'Proyecto Válido' });
     expect(res.status).toBe(400);
   });
 
   it('devuelve 400 si email no tiene formato válido', async () => {
-    const res = await post('/api/wizard/project', {
+    const res = await post('/dcfl/wizard/project', {
       name: 'Proyecto',
       clientName: 'Ana',
       email: 'no-es-email',
@@ -137,17 +137,17 @@ describe('POST /api/wizard/project', () => {
   });
 
   it('devuelve 400 si el body está vacío', async () => {
-    const res = await post('/api/wizard/project', {});
+    const res = await post('/dcfl/wizard/project', {});
     expect(res.status).toBe(400);
   });
 });
 
-// ── GET /api/wizard/projects ─────────────────────────────────────────────────
-describe('GET /api/wizard/projects', () => {
+// ── GET /dcfl/wizard/projects ────────────────────────────────────────────────
+describe('GET /dcfl/wizard/projects', () => {
   beforeEach(() => { vi.clearAllMocks(); });
 
   it('devuelve 200 con lista vacía', async () => {
-    const res = await get('/api/wizard/projects');
+    const res = await get('/dcfl/wizard/projects');
     expect(res.status).toBe(200);
     const body = await res.json() as { success: boolean; data: unknown[] };
     expect(body.success).toBe(true);
@@ -158,19 +158,19 @@ describe('GET /api/wizard/projects', () => {
     mockGetProjects.mockResolvedValueOnce([
       { project_id: VALID_PROJECT_ID, name: 'Test', client_name: 'Client', progress_pct: 10 },
     ]);
-    const res = await get('/api/wizard/projects');
+    const res = await get('/dcfl/wizard/projects');
     expect(res.status).toBe(200);
     const body = await res.json() as { data: unknown[] };
     expect(body.data).toHaveLength(1);
   });
 });
 
-// ── GET /api/wizard/project/:projectId ──────────────────────────────────────
-describe('GET /api/wizard/project/:projectId', () => {
+// ── GET /dcfl/wizard/project/:projectId ─────────────────────────────────────
+describe('GET /dcfl/wizard/project/:projectId', () => {
   beforeEach(() => { vi.clearAllMocks(); });
 
   it('devuelve 200 con el contexto del proyecto', async () => {
-    const res = await get(`/api/wizard/project/${VALID_PROJECT_ID}`);
+    const res = await get(`/dcfl/wizard/project/${VALID_PROJECT_ID}`);
     expect(res.status).toBe(200);
     const body = await res.json() as { success: boolean; data: Record<string, unknown> };
     expect(body.success).toBe(true);
@@ -178,17 +178,17 @@ describe('GET /api/wizard/project/:projectId', () => {
   });
 
   it('devuelve 400 si projectId no es UUID', async () => {
-    const res = await get('/api/wizard/project/not-a-uuid');
+    const res = await get('/dcfl/wizard/project/not-a-uuid');
     expect(res.status).toBe(400);
   });
 });
 
-// ── POST /api/wizard/step ────────────────────────────────────────────────────
-describe('POST /api/wizard/step', () => {
+// ── POST /dcfl/wizard/step ───────────────────────────────────────────────────
+describe('POST /dcfl/wizard/step', () => {
   beforeEach(() => { vi.clearAllMocks(); });
 
   it('guarda el paso y devuelve stepId', async () => {
-    const res = await post('/api/wizard/step', {
+    const res = await post('/dcfl/wizard/step', {
       projectId: VALID_PROJECT_ID,
       stepNumber: 0,
       inputData: { courseTopic: 'Seguridad industrial' },
@@ -199,7 +199,7 @@ describe('POST /api/wizard/step', () => {
   });
 
   it('devuelve 400 si projectId no es UUID', async () => {
-    const res = await post('/api/wizard/step', {
+    const res = await post('/dcfl/wizard/step', {
       projectId: 'not-uuid',
       stepNumber: 0,
       inputData: {},
@@ -208,7 +208,7 @@ describe('POST /api/wizard/step', () => {
   });
 
   it('devuelve 400 si stepNumber está fuera de rango [0-11]', async () => {
-    const res = await post('/api/wizard/step', {
+    const res = await post('/dcfl/wizard/step', {
       projectId: VALID_PROJECT_ID,
       stepNumber: 12,
       inputData: {},
@@ -217,8 +217,8 @@ describe('POST /api/wizard/step', () => {
   });
 });
 
-// ── POST /api/wizard/generate ────────────────────────────────────────────────
-describe('POST /api/wizard/generate', () => {
+// ── POST /dcfl/wizard/generate ───────────────────────────────────────────────
+describe('POST /dcfl/wizard/generate', () => {
   beforeEach(() => { vi.clearAllMocks(); });
 
   const VALID_BODY = {
@@ -231,7 +231,7 @@ describe('POST /api/wizard/generate', () => {
   };
 
   it('genera documento y devuelve documentId + content', async () => {
-    const res = await post('/api/wizard/generate', VALID_BODY);
+    const res = await post('/dcfl/wizard/generate', VALID_BODY);
     expect(res.status).toBe(200);
     const body = await res.json() as { success: boolean; data: { documentId: string; content: string } };
     expect(body.success).toBe(true);
@@ -242,30 +242,30 @@ describe('POST /api/wizard/generate', () => {
   });
 
   it('pasa el contexto correcto al AIService', async () => {
-    await post('/api/wizard/generate', VALID_BODY);
+    await post('/dcfl/wizard/generate', VALID_BODY);
     const [opts] = mockAiGenerate.mock.calls[0] as [{ context: { projectName: string } }];
     expect(opts.context.projectName).toBe('Proyecto Test');
   });
 
   it('devuelve 400 si phaseId es inválido', async () => {
-    const res = await post('/api/wizard/generate', { ...VALID_BODY, phaseId: 'INVALID' });
+    const res = await post('/dcfl/wizard/generate', { ...VALID_BODY, phaseId: 'INVALID' });
     expect(res.status).toBe(400);
     expect(mockAiGenerate).not.toHaveBeenCalled();
   });
 
   it('devuelve 400 si promptId es inválido', async () => {
-    const res = await post('/api/wizard/generate', { ...VALID_BODY, promptId: 'INVALID' });
+    const res = await post('/dcfl/wizard/generate', { ...VALID_BODY, promptId: 'INVALID' });
     expect(res.status).toBe(400);
   });
 
   it('devuelve 400 si projectId no es UUID', async () => {
-    const res = await post('/api/wizard/generate', { ...VALID_BODY, projectId: 'not-uuid' });
+    const res = await post('/dcfl/wizard/generate', { ...VALID_BODY, projectId: 'not-uuid' });
     expect(res.status).toBe(400);
   });
 
   it('devuelve 500 si AIService lanza un error', async () => {
     mockAiGenerate.mockRejectedValueOnce(new Error('Workers AI timeout'));
-    const res = await post('/api/wizard/generate', VALID_BODY);
+    const res = await post('/dcfl/wizard/generate', VALID_BODY);
     expect(res.status).toBe(500);
     const body = await res.json() as { success: boolean; error: string };
     expect(body.success).toBe(false);
@@ -274,13 +274,13 @@ describe('POST /api/wizard/generate', () => {
 
   it('no persiste datos cuando AI falla (saveDocument no se llama)', async () => {
     mockAiGenerate.mockRejectedValueOnce(new Error('AI error'));
-    await post('/api/wizard/generate', VALID_BODY);
+    await post('/dcfl/wizard/generate', VALID_BODY);
     expect(mockSaveDocument).not.toHaveBeenCalled();
   });
 });
 
-// ── POST /api/wizard/extract ─────────────────────────────────────────────────
-describe('POST /api/wizard/extract', () => {
+// ── POST /dcfl/wizard/extract ────────────────────────────────────────────────
+describe('POST /dcfl/wizard/extract', () => {
   beforeEach(() => { vi.clearAllMocks(); });
 
   const VALID_EXTRACT_BODY = {
@@ -293,7 +293,7 @@ describe('POST /api/wizard/extract', () => {
   };
 
   it('extrae contexto y devuelve 200 con content + parserUsed', async () => {
-    const res = await post('/api/wizard/extract', VALID_EXTRACT_BODY);
+    const res = await post('/dcfl/wizard/extract', VALID_EXTRACT_BODY);
     expect(res.status).toBe(200);
     const body = await res.json() as { success: boolean; data: { extractorId: string; content: string; parserUsed: Record<string, boolean> } };
     expect(body.success).toBe(true);
@@ -304,7 +304,7 @@ describe('POST /api/wizard/extract', () => {
   });
 
   it('llama a saveExtractedContext con los parámetros correctos', async () => {
-    await post('/api/wizard/extract', VALID_EXTRACT_BODY);
+    await post('/dcfl/wizard/extract', VALID_EXTRACT_BODY);
     const [params] = mockSaveExtractedContext.mock.calls[0] as [{ projectId: string; extractorId: string; toPhase: string }];
     expect(params.projectId).toBe(VALID_PROJECT_ID);
     expect(params.extractorId).toBe('EXTRACTOR_F2');
@@ -312,25 +312,25 @@ describe('POST /api/wizard/extract', () => {
   });
 
   it('devuelve 400 si projectId no es UUID', async () => {
-    const res = await post('/api/wizard/extract', { ...VALID_EXTRACT_BODY, projectId: 'not-uuid' });
+    const res = await post('/dcfl/wizard/extract', { ...VALID_EXTRACT_BODY, projectId: 'not-uuid' });
     expect(res.status).toBe(400);
     expect(mockExtract).not.toHaveBeenCalled();
   });
 
   it('devuelve 400 si extractorId falta', async () => {
     const { extractorId: _, ...body } = VALID_EXTRACT_BODY;
-    const res = await post('/api/wizard/extract', body);
+    const res = await post('/dcfl/wizard/extract', body);
     expect(res.status).toBe(400);
   });
 
   it('devuelve 400 si sourceDocuments falta', async () => {
-    const res = await post('/api/wizard/extract', { projectId: VALID_PROJECT_ID, extractorId: 'EXTRACTOR_F2' });
+    const res = await post('/dcfl/wizard/extract', { projectId: VALID_PROJECT_ID, extractorId: 'EXTRACTOR_F2' });
     expect(res.status).toBe(400);
   });
 
   it('devuelve 500 si el extractor lanza un error', async () => {
     mockExtract.mockRejectedValueOnce(new Error('Extractor node not found'));
-    const res = await post('/api/wizard/extract', VALID_EXTRACT_BODY);
+    const res = await post('/dcfl/wizard/extract', VALID_EXTRACT_BODY);
     expect(res.status).toBe(500);
     const body = await res.json() as { success: boolean; error: string };
     expect(body.success).toBe(false);
@@ -338,8 +338,8 @@ describe('POST /api/wizard/extract', () => {
   });
 });
 
-// ── POST /api/wizard/generate-form ──────────────────────────────────────────
-describe('POST /api/wizard/generate-form', () => {
+// ── POST /dcfl/wizard/generate-form ─────────────────────────────────────────
+describe('POST /dcfl/wizard/generate-form', () => {
   beforeEach(() => { vi.clearAllMocks(); });
 
   const VALID_FORM_BODY = {
@@ -358,7 +358,7 @@ describe('POST /api/wizard/generate-form', () => {
 
   it('genera esquema de formulario y devuelve 200 con formSchema', async () => {
     mockAiGenerate.mockResolvedValueOnce(FORM_SCHEMA_JSON);
-    const res = await post('/api/wizard/generate-form', VALID_FORM_BODY);
+    const res = await post('/dcfl/wizard/generate-form', VALID_FORM_BODY);
     expect(res.status).toBe(200);
     const body = await res.json() as { success: boolean; data: { formSchema: Record<string, unknown> } };
     expect(body.success).toBe(true);
@@ -368,26 +368,26 @@ describe('POST /api/wizard/generate-form', () => {
   });
 
   it('devuelve 400 si projectId no es UUID', async () => {
-    const res = await post('/api/wizard/generate-form', { ...VALID_FORM_BODY, projectId: 'not-uuid' });
+    const res = await post('/dcfl/wizard/generate-form', { ...VALID_FORM_BODY, projectId: 'not-uuid' });
     expect(res.status).toBe(400);
     expect(mockAiGenerate).not.toHaveBeenCalled();
   });
 
   it('devuelve 400 si promptId no es F6_FORM', async () => {
-    const res = await post('/api/wizard/generate-form', { ...VALID_FORM_BODY, promptId: 'F0' });
+    const res = await post('/dcfl/wizard/generate-form', { ...VALID_FORM_BODY, promptId: 'F0' });
     expect(res.status).toBe(400);
     expect(mockAiGenerate).not.toHaveBeenCalled();
   });
 
   it('devuelve 400 si context falta', async () => {
     const { context: _, ...body } = VALID_FORM_BODY;
-    const res = await post('/api/wizard/generate-form', body);
+    const res = await post('/dcfl/wizard/generate-form', body);
     expect(res.status).toBe(400);
   });
 
   it('devuelve formSchema de fallback si la IA no retorna JSON válido', async () => {
     mockAiGenerate.mockResolvedValueOnce('Lo siento, no puedo generar el formulario.');
-    const res = await post('/api/wizard/generate-form', VALID_FORM_BODY);
+    const res = await post('/dcfl/wizard/generate-form', VALID_FORM_BODY);
     expect(res.status).toBe(200);
     const body = await res.json() as { success: boolean; data: { formSchema: Record<string, unknown> } };
     expect(body.success).toBe(true);

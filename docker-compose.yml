@@ -1,56 +1,64 @@
-version: '3.8'
+version: '3.9'
 
 # =============================================================================
-# KNOWTO - Docker Compose (desarrollo local)
-# Uso: docker compose up -d
-# NO usar: docker-compose build (no hay Dockerfiles, se usan imágenes base)
+# KNOWTO — Docker Compose (desarrollo local con arquitectura de microsites)
+#
+# Acceso:
+#   http://localhost          → Sitio raíz (lista de microsites)
+#   http://dcfl.localhost     → Microsite EC0366
+#   http://api.localhost      → API Gateway
+#   http://api.localhost/docs → Swagger UI (Scalar)
+#
+# Prerequisito (una sola vez en cada máquina):
+#   Añadir al archivo hosts del sistema operativo:
+#     127.0.0.1  dcfl.localhost
+#     127.0.0.1  api.localhost
+#
+#   Windows: C:\Windows\System32\drivers\etc\hosts  (requiere admin)
+#   Linux/Mac: /etc/hosts
+#
+# Uso:
+#   docker compose up -d          → Arrancar todo
+#   docker compose logs -f nginx  → Ver logs de routing
+#   docker compose restart nginx  → Recargar config de nginx sin reiniciar todo
 # =============================================================================
 
 services:
-  # ---------------------------------------------------------------------------
-  # BASE DE DATOS
-  # ---------------------------------------------------------------------------
-  postgres:
-    image: postgres:15-alpine
-    container_name: knowto-postgres
-    environment:
-      POSTGRES_USER: knowto
-      POSTGRES_PASSWORD: knowto123
-      POSTGRES_DB: knowto_dev
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-      - ./supabase/migrations:/docker-entrypoint-initdb.d:ro
-    networks:
-      knowto-network:
-        ipv4_address: 172.20.0.10
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U knowto -d knowto_dev"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 10s
 
   # ---------------------------------------------------------------------------
-  # BACKEND (Cloudflare Worker en modo desarrollo con wrangler)
+  # NGINX — Reverse proxy (ÚNICO puerto expuesto al host)
+  # Enruta subdominios al frontend o backend correcto.
+  # ---------------------------------------------------------------------------
+  nginx:
+    image: nginx:alpine
+    container_name: knowto-nginx
+    ports:
+      - "80:80"          # Único puerto expuesto — todo el tráfico entra aquí
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+    depends_on:
+      - backend
+      - frontend-dcfl
+      - frontend-root
+    networks:
+      - knowto-network
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # BACKEND — API Gateway (Hono + Node.js en dev, Cloudflare Workers en prod)
+  # Sin puerto expuesto al host — solo accesible vía nginx en api.localhost
   # ---------------------------------------------------------------------------
   backend:
     image: node:20
     container_name: knowto-backend
     working_dir: /app
-    # wrangler dev necesita --ip 0.0.0.0 para ser accesible desde fuera del contenedor
-    # dev:debug = Node.js puro vía tsx, sin sandbox de workerd.
-    # --loader ./src/md-loader.mjs: resuelve imports .md igual que wrangler [[rules]] type=Text
-    # --inspect=0.0.0.0:9229: habilita el debugger de Node.js para VS Code
     command: sh -c "npm install && npm run dev:debug"
-    ports:
-      - "8787:8787"
-      - "9229:9229"
+    expose:
+      - "8787"
+      - "9229"
     volumes:
       - ./backend:/app
-      # Volumen nombrado para node_modules — evita conflicto con el bind mount del host
       - backend_node_modules:/app/node_modules
     environment:
       NODE_ENV: development
@@ -72,23 +80,24 @@ services:
     restart: unless-stopped
 
   # ---------------------------------------------------------------------------
-  # FRONTEND (Vite dev server)
+  # FRONTEND DCFL — Microsite EC0366 (Vite dev server)
+  # Sin puerto expuesto al host — accesible vía nginx en dcfl.localhost
   # ---------------------------------------------------------------------------
-  frontend:
+  frontend-dcfl:
     image: node:20-alpine
-    container_name: knowto-frontend
-    working_dir: /app
+    container_name: knowto-frontend-dcfl
+    working_dir: /frontend/dcfl
     command: sh -c "npm install && npm run dev -- --host 0.0.0.0 --port 5173"
-    ports:
-      - "5173:5173"
+    expose:
+      - "5173"
     volumes:
-      - ./frontend:/app
-      - frontend_node_modules:/app/node_modules
+      - ./frontend:/frontend                  # frontend/ completo → /frontend/
+      - frontend_dcfl_node_modules:/frontend/dcfl/node_modules
     environment:
       NODE_ENV: development
-      VITE_API_URL: http://localhost:8787
       VITE_SUPABASE_URL: ${VITE_SUPABASE_URL:-http://localhost:54321}
       VITE_SUPABASE_ANON_KEY: ${VITE_SUPABASE_ANON_KEY:-dummy-key}
+      # VITE_API_BASE_URL no es necesaria — se resuelve en runtime desde dcfl.localhost
     depends_on:
       - backend
     networks:
@@ -97,16 +106,60 @@ services:
     restart: unless-stopped
 
   # ---------------------------------------------------------------------------
+  # FRONTEND ROOT — Sitio raíz / directorio de microsites
+  # Sin puerto expuesto — accesible vía nginx en localhost
+  # ---------------------------------------------------------------------------
+  frontend-root:
+    image: node:20-alpine
+    container_name: knowto-frontend-root
+    working_dir: /frontend/root
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0 --port 5174"
+    expose:
+      - "5174"
+    volumes:
+      - ./frontend:/frontend
+      - frontend_root_node_modules:/frontend/root/node_modules
+    environment:
+      NODE_ENV: development
+    networks:
+      knowto-network:
+        ipv4_address: 172.20.0.50
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # BASE DE DATOS
+  # ---------------------------------------------------------------------------
+  postgres:
+    image: postgres:15-alpine
+    container_name: knowto-postgres
+    environment:
+      POSTGRES_USER: knowto
+      POSTGRES_PASSWORD: knowto123
+      POSTGRES_DB: knowto_dev
+    expose:
+      - "5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./supabase/migrations:/docker-entrypoint-initdb.d:ro
+    networks:
+      - knowto-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U knowto -d knowto_dev"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # ---------------------------------------------------------------------------
   # OLLAMA (IA local)
-  # IP fija 172.20.0.20 — referenciada en extra_hosts del backend para que
-  # workerd (runtime de wrangler) pueda resolver el hostname "ollama".
   # Para deshabilitar: docker compose up -d --scale ollama=0
   # ---------------------------------------------------------------------------
   ollama:
     image: ollama/ollama:latest
     container_name: knowto-ollama
-    ports:
-      - "11435:11434"   # Puerto 11435 en host para no colisionar con Ollama local
+    expose:
+      - "11434"
     volumes:
       - ollama_data:/root/.ollama
     entrypoint: ["/bin/sh", "-c"]
@@ -121,13 +174,13 @@ services:
         ipv4_address: 172.20.0.20
     restart: unless-stopped
     # Descomenta si tienes GPU NVIDIA:
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: [gpu]
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: [gpu]
 
 networks:
   knowto-network:
@@ -140,4 +193,5 @@ volumes:
   postgres_data:
   ollama_data:
   backend_node_modules:
-  frontend_node_modules:
+  frontend_dcfl_node_modules:
+  frontend_root_node_modules:
