@@ -1,0 +1,129 @@
+<!-- templates/tpl-step7-strategy.html -->
+<!-- Step 7: Estrategia pedagógica (F2_5) + Especificaciones técnicas (F3) -->
+<template id="tpl-step7-strategy">
+  <div id="step-7-container" class="step-container space-y-6">
+    <div>
+      <h2 class="text-2xl font-bold text-gray-900">Estrategia y Especificaciones</h2>
+      <p class="text-gray-500 mt-1">
+        La IA diseñará la estrategia pedagógica y las especificaciones técnicas del programa
+        de intervención, incluyendo modalidades, metodologías y recursos necesarios.
+      </p>
+    </div>
+
+    <!-- Sub-tabs: F2_5 | F3 -->
+    <div class="flex gap-2 border-b border-gray-200">
+      <button id="tab-pedagogy" data-tab="pedagogy"
+        class="px-4 py-2 text-sm font-medium text-green-900 border-b-2 border-green-900">
+        Estrategia Pedagógica (F2.5)
+      </button>
+      <button id="tab-specs" data-tab="specs"
+        class="px-4 py-2 text-sm font-medium text-gray-500 border-b-2 border-transparent hover:text-gray-700">
+        Especificaciones (F3)
+      </button>
+    </div>
+
+    <!-- Panel F2_5 — Estrategia pedagógica -->
+    <div id="panel-pedagogy" class="space-y-5">
+      <!-- Badge IA -->
+      <div id="context-loaded-badge-strategy" class="hidden flex items-center gap-2 bg-green-50 border border-green-200 rounded-lg px-4 py-2 text-sm text-green-800">
+        <span>✓</span> <span>Sugerido por IA — puedes editar antes de generar</span>
+      </div>
+
+      <form id="form-step7" novalidate class="space-y-4">
+        <div>
+          <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">
+            Modalidad preferida del programa
+          </label>
+          <select name="modality" class="input-field w-full">
+            <option value="presencial">Presencial</option>
+            <option value="en_linea">En línea (asíncrono)</option>
+            <option value="hibrido">Híbrido</option>
+            <option value="taller">Talleres intensivos</option>
+            <option value="coaching">Coaching individual</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">
+            Metodologías de intervención preferidas
+          </label>
+          <input name="methodologies" type="text"
+            placeholder="Ej: Design Thinking, Lean, coaching, aprendizaje experiencial..."
+            class="input-field w-full" />
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">
+            Disponibilidad de los colaboradores
+          </label>
+          <input name="availability" type="text"
+            placeholder="Ej: 2 horas por semana, fines de semana, 1 día al mes..."
+            class="input-field w-full" />
+        </div>
+
+        <button id="btn-submit" type="submit" class="btn-primary w-full py-4 text-lg">
+          ✨ Generar Estrategia Pedagógica con IA
+        </button>
+      </form>
+
+      <!-- Preview panel pedagogy -->
+      <div id="preview-panel" class="hidden">
+        <h3 class="font-semibold text-gray-700 mb-3">📄 Estrategia Pedagógica (F2.5):</h3>
+        <div id="document-preview"
+          class="document-preview bg-gray-50 border border-gray-200 rounded-xl p-6 max-h-[500px] overflow-y-auto text-sm">
+        </div>
+        <div class="mt-3 flex gap-2">
+          <button id="btn-copy-doc" class="btn-secondary">📋 Copiar</button>
+          <button id="btn-regenerate" class="btn-green">🔄 Regenerar</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Panel F3 — Especificaciones técnicas -->
+    <div id="panel-specs" class="hidden space-y-5">
+      <form id="form-step7-specs" novalidate class="space-y-4">
+        <div>
+          <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">
+            Recursos tecnológicos disponibles
+          </label>
+          <input name="techResources" type="text"
+            placeholder="Ej: Proyector, laptops, plataforma e-learning, sala de conferencias"
+            class="input-field w-full" />
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">
+            Presupuesto detallado por intervención
+          </label>
+          <textarea name="detailedBudget" rows="3"
+            placeholder="Ej: $10,000 por taller, $5,000 por sesión de coaching..."
+            class="input-field w-full"></textarea>
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">
+            Facilitadores o recursos humanos disponibles
+          </label>
+          <input name="facilitators" type="text"
+            placeholder="Ej: Consultor externo, coach interno, proveedor certificado"
+            class="input-field w-full" />
+        </div>
+
+        <button id="btn-submit-specs" type="submit" class="btn-primary w-full py-4 text-lg">
+          ✨ Generar Especificaciones con IA
+        </button>
+      </form>
+
+      <div id="preview-panel-specs" class="hidden">
+        <h3 class="font-semibold text-gray-700 mb-3">📄 Especificaciones Técnicas (F3):</h3>
+        <div id="document-preview-specs"
+          class="document-preview bg-gray-50 border border-gray-200 rounded-xl p-6 max-h-[500px] overflow-y-auto text-sm">
+        </div>
+        <div class="mt-3 flex gap-2">
+          <button id="btn-copy-specs" class="btn-secondary">📋 Copiar</button>
+          <button id="btn-regenerate-specs" class="btn-green">🔄 Regenerar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>

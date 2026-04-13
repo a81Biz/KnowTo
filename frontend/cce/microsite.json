@@ -1,0 +1,11 @@
+{
+  "slug": "cce",
+  "name": "Consultoría EC0249",
+  "description": "Proceso de consultoría empresarial asistido por IA. Genera diagnóstico, instrumentos, plan de capacitación y expediente EC0249.",
+  "localDomain": "cce.localhost",
+  "prodDomain": "cce.knowto.dev",
+  "icon": "business_center",
+  "accentColor": "#1a5c3a",
+  "status": "active",
+  "tags": ["consultoria", "EC0249", "diagnostico", "capacitacion"]
+}

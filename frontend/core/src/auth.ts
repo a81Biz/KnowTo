@@ -55,6 +55,10 @@ export async function signOut(): Promise<void> {
 
 export async function getCurrentUser(): Promise<AuthUser | null> {
   if (isDevMode()) {
+    if (localStorage.getItem('disable_dev_bypass') === 'true') {
+      const hasToken = localStorage.getItem('knowto_auth_token');
+      if (!hasToken) return null;
+    }
     localStorage.setItem('knowto_auth_token', DEV_TOKEN);
     return DEV_USER;
   }
@@ -74,6 +78,15 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
 
 export function onAuthStateChange(callback: (user: AuthUser | null) => void): void {
   if (isDevMode()) {
+    if (localStorage.getItem('disable_dev_bypass') === 'true') {
+      const hasToken = localStorage.getItem('knowto_auth_token');
+      if (hasToken) {
+        callback(DEV_USER);
+      } else {
+        callback(null);
+      }
+      return;
+    }
     localStorage.setItem('knowto_auth_token', DEV_TOKEN);
     callback(DEV_USER);
     return;

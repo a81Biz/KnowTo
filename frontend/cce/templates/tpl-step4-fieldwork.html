@@ -1,0 +1,111 @@
+<!-- templates/tpl-step4-fieldwork.html -->
+<!-- Step 4: Trabajo de campo (F1_2_FIELDWORK) — subir instrumentos completados -->
+<template id="tpl-step4-fieldwork">
+  <div id="step-4-container" class="step-container space-y-6">
+    <div>
+      <h2 class="text-2xl font-bold text-gray-900">Trabajo de Campo</h2>
+      <p class="text-gray-500 mt-1">
+        Sube los instrumentos de diagnóstico completados en papel (PDF, JPG o PNG)
+        o añade múltiples instancias de cada instrumento según las personas entrevistadas.
+      </p>
+    </div>
+
+    <!-- Selector de instrumento -->
+    <div id="instrument-selector" class="flex flex-wrap gap-2">
+      <!-- Tabs: una por instrumento -->
+    </div>
+
+    <!-- Panel de carga del instrumento activo -->
+    <div id="upload-panel" class="space-y-4">
+      <div class="bg-white rounded-xl border border-gray-100 shadow-sm p-6 space-y-4">
+        <h3 id="active-instrument-label" class="font-semibold text-gray-800">Instrumento</h3>
+
+        <!-- Instancias existentes -->
+        <div id="instances-list" class="space-y-2">
+          <!-- Renderizado dinámicamente -->
+        </div>
+
+        <!-- Drop zone para nueva instancia -->
+        <div id="upload-zone" class="upload-zone">
+          <input id="file-input" type="file" accept=".pdf,.jpg,.jpeg,.png" class="hidden" multiple />
+          <div class="text-gray-400 pointer-events-none">
+            <p class="text-3xl mb-2">📷</p>
+            <p class="font-medium">Arrastra archivos aquí o haz clic para seleccionar</p>
+            <p class="text-xs mt-1">JPG o PNG → OCR automático · PDF → solo almacenamiento · Máx. 10 MB</p>
+          </div>
+        </div>
+
+        <!-- Botón: añadir instancia digital (sin subir archivo) -->
+        <div class="text-center">
+          <p class="text-xs text-gray-400 mb-2">— o —</p>
+          <button id="btn-add-digital-instance" class="btn-green text-sm">
+            ➕ Añadir nueva instancia (llenar digitalmente)
+          </button>
+        </div>
+      </div>
+
+      <!-- Formulario de instancia digital expandible -->
+      <div id="digital-instance-form" class="hidden bg-white rounded-xl border border-gray-100 shadow-sm p-6 space-y-4">
+        <div class="flex items-center justify-between">
+          <h4 id="digital-instance-title" class="font-semibold text-gray-800">Nueva instancia</h4>
+          <button id="btn-close-digital" class="text-gray-400 hover:text-gray-600 text-lg">✕</button>
+        </div>
+        <div id="digital-form-fields" class="space-y-3">
+          <!-- Campos básicos de la instancia digital -->
+          <div>
+            <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-1">
+              Nombre / Identificador de la persona
+            </label>
+            <input id="digital-person-name" type="text"
+              placeholder="Ej: Director General, Jefe de Producción #1"
+              class="input-field w-full" />
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-1">
+              Cargo / Puesto
+            </label>
+            <input id="digital-person-role" type="text"
+              placeholder="Ej: Director de Operaciones"
+              class="input-field w-full" />
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-1">
+              Fecha de aplicación
+            </label>
+            <input id="digital-application-date" type="date" class="input-field w-full" />
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-1">
+              Observaciones / Respuestas
+            </label>
+            <textarea id="digital-observations" rows="5"
+              placeholder="Ingresa las respuestas o hallazgos relevantes..."
+              class="input-field w-full"></textarea>
+          </div>
+          <button id="btn-save-digital-instance" class="btn-primary w-full">
+            💾 Guardar instancia
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Notas generales del trabajo de campo -->
+    <div class="bg-white rounded-xl border border-gray-100 shadow-sm p-6 space-y-3">
+      <h3 class="font-semibold text-gray-800">Notas del trabajo de campo</h3>
+      <textarea id="field-notes" rows="3"
+        placeholder="Observaciones generales, incidencias, condiciones del levantamiento de información..."
+        class="input-field w-full"></textarea>
+      <button id="btn-save-fieldwork" class="btn-primary w-full">
+        💾 Guardar trabajo de campo y continuar
+      </button>
+    </div>
+
+    <!-- Estado: completado -->
+    <div id="fieldwork-saved" class="hidden">
+      <div class="bg-green-50 border border-green-200 rounded-xl p-6 text-center">
+        <p class="text-green-800 font-semibold text-lg">✅ Trabajo de campo registrado</p>
+        <p class="text-green-600 text-sm mt-1">Los instrumentos han sido almacenados correctamente.</p>
+      </div>
+    </div>
+  </div>
+</template>

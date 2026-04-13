@@ -1,0 +1,281 @@
+version: "2.0.0"
+pipelines:
+  F0:
+    description: "Marco de referencia del cliente"
+    stages:
+      - id: extractor_web
+        agent: extractor
+        prompt_id: EXTRACTOR_WEB
+        inputs:
+          - crawlerData
+        output_guard: sector_raw
+        next: extractor_sintesis
+
+      - id: extractor_sintesis
+        agent: synthesizer
+        prompt_id: SINTETIZADOR_SECTOR
+        inputs:
+          - sector_raw
+        output_guard: sector_limpio
+        next: specialist_a
+
+      - id: specialist_a
+        agent: specialist_a
+        prompt_id: F0_SPECIALIST_NOMS
+        inputs:
+          - sector_limpio
+          - userInputs
+        output_guard: noms_list
+        parallel_with: specialist_b
+        next: synthesizer_final
+
+      - id: specialist_b
+        agent: specialist_b
+        prompt_id: F0_SPECIALIST_ECS
+        inputs:
+          - sector_limpio
+          - userInputs
+        output_guard: ecs_list
+
+      - id: synthesizer_final
+        agent: synthesizer
+        prompt_id: SINTETIZADOR_F0
+        inputs:
+          - noms_list
+          - ecs_list
+        output_guard: borrador_f0
+        next: judge
+
+      - id: judge
+        agent: judge
+        prompt_id: JUEZ_F0
+        inputs:
+          - borrador_f0
+        output_guard: resultado_final
+        retry_on_reject: true
+        max_retries: 3
+        fallthrough_on_error: true
+
+  F1_P1:
+    description: "Generación de instrumentos de diagnóstico"
+    stages:
+      - id: specialist
+        agent: specialist_a
+        prompt_id: F1_P1_SPECIALIST
+        inputs:
+          - userInputs
+          - F0.analisis_sector
+          - F0.gaps_iniciales
+          - F0.estandares_ec
+        output_guard: instrumentos_raw
+        next: judge
+
+      - id: judge
+        agent: judge
+        prompt_id: JUEZ_F1_P1
+        inputs:
+          - instrumentos_raw
+        output_guard: instrumentos_validados
+        retry_on_reject: true
+        max_retries: 3
+        fallthrough_on_error: true
+
+  F1_P2:
+    description: "Diagnóstico y 5 Porqués"
+    stages:
+      - id: specialist
+        agent: specialist_a
+        prompt_id: F1_P2_SPECIALIST
+        inputs:
+          - userInputs
+          - F1_P1.instrumentos_validados
+        output_guard: diagnostico_raw
+        next: judge
+
+      - id: judge
+        agent: judge
+        prompt_id: JUEZ_F1_P2
+        inputs:
+          - diagnostico_raw
+        output_guard: diagnostico_validado
+        retry_on_reject: true
+        max_retries: 3
+        fallthrough_on_error: true
+
+  F2_P1:
+    description: "Priorización de Cursos"
+    stages:
+      - id: specialist
+        agent: specialist_a
+        prompt_id: F2_P1_SPECIALIST
+        inputs:
+          - userInputs
+          - F1_P2.diagnostico_validado
+        output_guard: cursos_raw
+        next: judge
+        
+      - id: judge
+        agent: judge
+        prompt_id: JUEZ_F2_P1
+        inputs:
+          - cursos_raw
+        output_guard: cursos_validados
+        retry_on_reject: true
+        max_retries: 3
+        fallthrough_on_error: true
+
+  F2_P2:
+    description: "Recomendaciones Pedagógicas"
+    stages:
+      - id: specialist
+        agent: specialist_a
+        prompt_id: F2_P2_SPECIALIST
+        inputs:
+          - userInputs
+          - F2_P1.cursos_validados
+        output_guard: pedagogia_raw
+        next: judge
+        
+      - id: judge
+        agent: judge
+        prompt_id: JUEZ_F2_P2
+        inputs:
+          - pedagogia_raw
+        output_guard: pedagogia_validada
+        retry_on_reject: true
+        max_retries: 3
+        fallthrough_on_error: true
+
+  F3:
+    description: "Especificaciones Técnicas"
+    stages:
+      - id: specialist
+        agent: specialist_a
+        prompt_id: F3_SPECIALIST
+        inputs:
+          - userInputs
+          - F2_P1.cursos_validados
+          - F2_P2.pedagogia_validada
+        output_guard: especificaciones_raw
+        next: judge
+        
+      - id: judge
+        agent: judge
+        prompt_id: JUEZ_F3
+        inputs:
+          - especificaciones_raw
+        output_guard: especificaciones_validadas
+        retry_on_reject: true
+        max_retries: 3
+        fallthrough_on_error: true
+
+  F4:
+    description: "Producción (7 Productos)"
+    stages:
+      - id: pac
+        agent: generator
+        prompt_id: F4_P0_PAC
+        inputs:
+          - userInputs
+          - F3.especificaciones_validadas
+        output_guard: producto_pac
+        next: descriptiva
+        
+      - id: descriptiva
+        agent: generator
+        prompt_id: F4_P1_CARTA_DESCRIPTIVA
+        inputs:
+          - userInputs
+          - producto_pac
+        output_guard: producto_carta
+        next: instructor
+        
+      - id: instructor
+        agent: generator
+        prompt_id: F4_P2_MANUAL_INSTRUCTOR
+        inputs:
+          - userInputs
+          - producto_carta
+        output_guard: producto_manual
+        next: instrumentos
+        
+      - id: instrumentos
+        agent: generator
+        prompt_id: F4_P3_INSTRUMENTOS
+        inputs:
+          - userInputs
+          - producto_carta
+        output_guard: producto_instrumentos
+        next: materiales
+
+      - id: materiales
+        agent: generator
+        prompt_id: F4_P4_MATERIALES
+        inputs:
+          - userInputs
+          - producto_carta
+        output_guard: producto_materiales
+        next: dc5
+        
+      - id: dc5
+        agent: generator
+        prompt_id: F4_P5_DC5
+        inputs:
+          - userInputs
+          - producto_carta
+        output_guard: producto_dc5
+        next: reporte_ejecutivo
+        
+      - id: reporte_ejecutivo
+        agent: generator
+        prompt_id: F4_P6_REPORTE
+        inputs:
+          - userInputs
+          - producto_pac
+          - F1_P2.diagnostico_validado
+        output_guard: producto_reporte
+
+  F5:
+    description: "Verificación"
+    stages:
+      - id: specialist
+        agent: specialist_a
+        prompt_id: F5_SPECIALIST
+        inputs:
+          - userInputs
+          - F4.producto_carta
+          - F4.producto_instrumentos
+        output_guard: verificacion_raw
+        next: judge
+        
+      - id: judge
+        agent: judge
+        prompt_id: JUEZ_F5
+        inputs:
+          - verificacion_raw
+        output_guard: verificacion_validada
+        retry_on_reject: true
+        max_retries: 3
+        fallthrough_on_error: true
+
+  F6:
+    description: "Ajustes y Cierre"
+    stages:
+      - id: specialist
+        agent: specialist_a
+        prompt_id: F6_SPECIALIST
+        inputs:
+          - userInputs
+          - F5.verificacion_validada
+        output_guard: cierre_raw
+        next: judge
+        
+      - id: judge
+        agent: judge
+        prompt_id: JUEZ_F6
+        inputs:
+          - cierre_raw
+        output_guard: cierre_validado
+        retry_on_reject: true
+        max_retries: 3
+        fallthrough_on_error: true

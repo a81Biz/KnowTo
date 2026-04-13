@@ -20,6 +20,7 @@ interface MicrositeMetadata {
 // Al añadir un nuevo microsite, agregar su slug aquí. Solo este archivo cambia.
 const MICROSITE_SLUGS = [
   'dcfl',
+  'cce',
   // 'foo',  // ejemplo: añadir 'foo' cuando se cree el microsite foo
 ];
 

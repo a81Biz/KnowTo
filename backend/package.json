@@ -16,7 +16,10 @@
     "@hono/zod-validator": "^0.2.1",
     "@scalar/hono-api-reference": "^0.5.184",
     "@supabase/supabase-js": "^2.39.0",
+    "cheerio": "^1.2.0",
+    "gray-matter": "^4.0.3",
     "hono": "^4.1.0",
+    "yaml": "^2.8.3",
     "zod": "^3.22.4"
   },
   "devDependencies": {

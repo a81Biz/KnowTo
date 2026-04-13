@@ -1,0 +1,85 @@
+<!-- templates/tpl-step8-production.html -->
+<!-- Step 8: Producción (F4) — 7 productos EC0249 en documento unificado -->
+<template id="tpl-step8-production">
+  <div id="step-8-container" class="step-container space-y-6">
+    <div>
+      <h2 class="text-2xl font-bold text-gray-900">Producción de Materiales</h2>
+      <p class="text-gray-500 mt-1">
+        Fase F4: Ejecuta el pipeline para generar y validar individualmente los 7 productos de la fase de producción.
+      </p>
+    </div>
+
+    <form id="form-step8" class="space-y-5" novalidate>
+      <!-- Datos compartidos de producción -->
+      <div id="production-form-container" class="bg-gray-50 rounded-xl border border-gray-100 p-5 space-y-4">
+        <h3 class="font-semibold text-gray-700 text-sm">Datos del programa de intervención</h3>
+        <div class="grid md:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Nombre del programa</label>
+            <input name="programName" type="text" placeholder="Ej: Programa de Desarrollo Organizacional 2026" class="input-field w-full" />
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Duración total</label>
+            <input name="totalDuration" type="text" placeholder="Ej: 40 horas, 3 meses" class="input-field w-full" />
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Nombre del consultor</label>
+            <input name="consultorName" type="text" placeholder="Nombre del consultor" class="input-field w-full" />
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Fecha de inicio</label>
+            <input name="startDate" type="date" class="input-field w-full" />
+          </div>
+        </div>
+      </div>
+
+      <!-- Indicadores de producto -->
+      <div id="product-indicators" class="flex flex-wrap gap-2">
+        <!-- Renderizado dinámicamente -->
+      </div>
+
+      <!-- Estado del producto actual -->
+      <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-6 space-y-4">
+        <div class="flex items-center justify-between">
+          <div>
+            <p id="product-element-label" class="text-xs font-bold text-gray-400 uppercase tracking-widest">Producto</p>
+            <h3 id="product-title" class="font-semibold text-gray-800 text-lg mt-1 flex items-center gap-2">
+              <span>Selecciona un producto</span>
+              <span id="product-status-badge" class="hidden text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded-full border border-green-200">Aprobado</span>
+            </h3>
+          </div>
+          <span id="product-counter" class="text-sm font-medium text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
+            0 / 7
+          </span>
+        </div>
+
+        <!-- Botón submit global de BaseStep oculto (lo manejamos manual) -->
+        <button id="btn-submit" type="submit" class="hidden"></button>
+
+        <!-- Área de generación -->
+        <div id="product-generate-area">
+          <button id="btn-generate-product" type="button" class="btn-primary w-full py-3">
+            ✨ Generar Producto con IA
+          </button>
+        </div>
+
+        <div id="preview-panel" class="hidden space-y-3">
+          <div id="document-preview"
+            class="document-preview bg-gray-50 border border-gray-200 rounded-xl p-5 max-h-[400px] overflow-y-auto text-sm">
+          </div>
+          <div class="flex gap-2 font-medium">
+            <button id="btn-approve-product" type="button" class="bg-green-600 text-white hover:bg-green-700 px-4 py-2 rounded-lg flex-1">✅ Aprobar Producto</button>
+            <button id="btn-copy-doc" type="button" class="btn-secondary flex-1">📋 Copiar</button>
+            <button id="btn-regenerate" type="button" class="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 flex-1">🔄 Regenerar</button>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Botón finalizar Subwizard -->
+      <div class="mt-8 pt-4 border-t border-gray-200 flex justify-end">
+         <button id="btn-finish-production" type="button" class="btn-primary px-8">Completar Fase de Producción →</button>
+      </div>
+
+    </form>
+  </div>
+</template>

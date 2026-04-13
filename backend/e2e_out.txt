@@ -1,0 +1,79 @@
+The CJS build of Vite's Node API is deprecated. See https://vite.dev/guide/troubleshooting.html#vite-cjs-node-api-deprecated for more details.
+
+[7m[1m[36m RUN [39m[22m[27m [36mv1.6.1[39m [90mC:/DevOps/Desarrollos/KnowTo/backend[39m
+
+[90mstdout[2m | src/__tests__/cce/e2e/wizard.e2e.cce.test.ts[2m > [22m[2mCCE E2E ÔÇö Flujo INTAKE ÔåÆ F0 ÔåÆ F0_CLIENT_ANSWERS[2m > [22m[2mcrea proyecto ÔåÆ genera F0 ÔåÆ genera form ÔåÆ guarda respuestas[22m[39m
+<-- POST /cce/wizard/project
+--> POST /cce/wizard/project [32m201[0m 5ms
+<-- POST /cce/wizard/step
+--> POST /cce/wizard/step [32m200[0m 1ms
+<-- POST /cce/wizard/generate
+[CCE/generate] phaseId=F0 promptId=F0 project=11111111-2222-4333-4444-555555555555
+[CCE/generate] OK documentId=33333333-4444-4555-6666-777777777777 contentLen=99
+--> POST /cce/wizard/generate [32m200[0m 1ms
+<-- POST /cce/wizard/generate-form
+--> POST /cce/wizard/generate-form [32m200[0m 1ms
+<-- POST /cce/wizard/step
+--> POST /cce/wizard/step [32m200[0m 1ms
+
+[90mstdout[2m | src/__tests__/cce/e2e/wizard.e2e.cce.test.ts[2m > [22m[2mCCE E2E ÔÇö Flujo F1_1 (Instrumentos de diagn├│stico)[2m > [22m[2mextrae contexto ÔåÆ genera F1_1 ÔåÆ sube instrumento completado[22m[39m
+<-- POST /cce/wizard/extract
+--> POST /cce/wizard/extract [32m200[0m 1ms
+<-- POST /cce/wizard/step
+--> POST /cce/wizard/step [32m200[0m 0ms
+<-- POST /cce/wizard/generate
+[CCE/generate] phaseId=F1_1 promptId=F1_1 project=11111111-2222-4333-4444-555555555555
+[CCE/generate] OK documentId=33333333-4444-4555-6666-777777777777 contentLen=99
+--> POST /cce/wizard/generate [32m200[0m 1ms
+<-- POST /cce/wizard/upload
+--> POST /cce/wizard/upload [32m200[0m 1ms
+
+[90mstdout[2m | src/__tests__/cce/e2e/wizard.e2e.cce.test.ts[2m > [22m[2mCCE E2E ÔÇö Flujo F2 ÔåÆ F2_5[2m > [22m[2mextrae para F2 ÔåÆ genera F2 ÔåÆ extrae para F2_5 ÔåÆ genera F2_5[22m[39m
+<-- POST /cce/wizard/extract
+--> POST /cce/wizard/extract [32m200[0m 0ms
+<-- POST /cce/wizard/generate
+[CCE/generate] phaseId=F2 promptId=F2 project=11111111-2222-4333-4444-555555555555
+[CCE/generate] OK documentId=33333333-4444-4555-6666-777777777777 contentLen=99
+--> POST /cce/wizard/generate [32m200[0m 1ms
+<-- POST /cce/wizard/extract
+--> POST /cce/wizard/extract [32m200[0m 0ms
+<-- POST /cce/wizard/generate
+[CCE/generate] phaseId=F2_5 promptId=F2_5 project=11111111-2222-4333-4444-555555555555
+[CCE/generate] OK documentId=33333333-4444-4555-6666-777777777777 contentLen=99
+--> POST /cce/wizard/generate [32m200[0m 0ms
+
+[90mstdout[2m | src/__tests__/cce/e2e/wizard.e2e.cce.test.ts[2m > [22m[2mCCE E2E ÔÇö Flujo F4 (Producci├│n)[2m > [22m[2mextrae contexto ÔåÆ genera F4 con los 7 productos en un solo documento[22m[39m
+<-- POST /cce/wizard/extract
+--> POST /cce/wizard/extract [32m200[0m 0ms
+<-- POST /cce/wizard/generate
+[CCE/generate] phaseId=F4 promptId=F4 project=11111111-2222-4333-4444-555555555555
+[CCE/generate] OK documentId=33333333-4444-4555-6666-777777777777 contentLen=99
+--> POST /cce/wizard/generate [32m200[0m 0ms
+
+[90mstdout[2m | src/__tests__/cce/e2e/wizard.e2e.cce.test.ts[2m > [22m[2mCCE E2E ÔÇö Flujo F5 ÔåÆ F5_TEST_REPORT[2m > [22m[2mgenera F5 ÔåÆ genera formulario de reporte de pruebas[22m[39m
+<-- POST /cce/wizard/generate
+[CCE/generate] phaseId=F5 promptId=F5 project=11111111-2222-4333-4444-555555555555
+[CCE/generate] OK documentId=33333333-4444-4555-6666-777777777777 contentLen=99
+--> POST /cce/wizard/generate [32m200[0m 0ms
+<-- POST /cce/wizard/generate-form
+--> POST /cce/wizard/generate-form [32m200[0m 0ms
+
+[90mstdout[2m | src/__tests__/cce/e2e/wizard.e2e.cce.test.ts[2m > [22m[2mCCE E2E ÔÇö Gesti├│n de proyectos[2m > [22m[2mlista proyectos del usuario autenticado[22m[39m
+<-- GET /cce/wizard/projects
+--> GET /cce/wizard/projects [32m200[0m 1ms
+
+[90mstdout[2m | src/__tests__/cce/e2e/wizard.e2e.cce.test.ts[2m > [22m[2mCCE E2E ÔÇö Gesti├│n de proyectos[2m > [22m[2mobtiene el contexto completo de un proyecto[22m[39m
+<-- GET /cce/wizard/project/11111111-2222-4333-4444-555555555555
+--> GET /cce/wizard/project/11111111-2222-4333-4444-555555555555 [32m200[0m 1ms
+
+[90mstdout[2m | src/__tests__/cce/e2e/wizard.e2e.cce.test.ts[2m > [22m[2mCCE E2E ÔÇö Gesti├│n de proyectos[2m > [22m[2mdevuelve 400 al obtener proyecto con ID inv├ílido[22m[39m
+<-- GET /cce/wizard/project/not-valid-uuid
+--> GET /cce/wizard/project/not-valid-uuid [33m400[0m 1ms
+
+ [32mÔ£ô[39m src/__tests__/cce/e2e/wizard.e2e.cce.test.ts [2m ([22m[2m8 tests[22m[2m)[22m[90m 33[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m8 passed[39m[22m[90m (8)[39m
+[2m   Start at [22m 01:25:03
+[2m   Duration [22m 1.16s[2m (transform 157ms, setup 0ms, collect 765ms, tests 33ms, environment 0ms, prepare 123ms)[22m
+

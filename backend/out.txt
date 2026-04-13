@@ -1,0 +1,26 @@
+The CJS build of Vite's Node API is deprecated. See https://vite.dev/guide/troubleshooting.html#vite-cjs-node-api-deprecated for more details.
+
+[7m[1m[36m RUN [39m[22m[27m [36mv1.6.1[39m [90mC:/DevOps/Desarrollos/KnowTo/backend[39m
+
+ [33mÔØ»[39m src/__tests__/cce/e2e/f0-pipeline.cce.test.ts [2m ([22m[2m0 test[22m[2m)[22m
+ [33mÔØ»[39m src/__tests__/cce/services/crawler.cce.test.ts [2m ([22m[2m0 test[22m[2m)[22m
+
+ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ» Failed Suites 2 ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»
+
+ FAIL  src/__tests__/cce/e2e/f0-pipeline.cce.test.ts [ src/__tests__/cce/e2e/f0-pipeline.cce.test.ts ]
+Error: Failed to load url ../../../src/cce/services/ai.service (resolved id: ../../../src/cce/services/ai.service) in C:/DevOps/Desarrollos/KnowTo/backend/src/__tests__/cce/e2e/f0-pipeline.cce.test.ts. Does the file exist?
+ ÔØ» loadAndTransform node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:51969:17
+
+ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»[1/2]ÔÄ»
+
+ FAIL  src/__tests__/cce/services/crawler.cce.test.ts [ src/__tests__/cce/services/crawler.cce.test.ts ]
+Error: Failed to load url ../../../src/cce/services/crawler.service (resolved id: ../../../src/cce/services/crawler.service) in C:/DevOps/Desarrollos/KnowTo/backend/src/__tests__/cce/services/crawler.cce.test.ts. Does the file exist?
+ ÔØ» loadAndTransform node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:51969:17
+
+ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»[2/2]ÔÄ»
+
+[2m Test Files [22m [1m[31m2 failed[39m[22m[90m (2)[39m
+[2m      Tests [22m [2mno tests[22m
+[2m   Start at [22m 23:26:11
+[2m   Duration [22m 429ms[2m (transform 73ms, setup 0ms, collect 0ms, tests 0ms, environment 0ms, prepare 239ms)[22m
+

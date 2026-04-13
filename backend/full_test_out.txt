@@ -1,0 +1,385 @@
+The CJS build of Vite's Node API is deprecated. See https://vite.dev/guide/troubleshooting.html#vite-cjs-node-api-deprecated for more details.
+
+[7m[1m[36m RUN [39m[22m[27m [36mv1.6.1[39m [90mC:/DevOps/Desarrollos/KnowTo/backend[39m
+
+ [32mÔ£ô[39m src/__tests__/cce/services/upload.cce.test.ts [2m ([22m[2m7 tests[22m[2m)[22m[90m 8[2mms[22m[39m
+ [32mÔ£ô[39m src/__tests__/cce/prompts/flow-map.cce.test.ts [2m ([22m[2m12 tests[22m[2m)[22m[90m 9[2mms[22m[39m
+ [32mÔ£ô[39m src/__tests__/cce/e2e/f0-pipeline.cce.test.ts [2m ([22m[2m1 test[22m[2m)[22m[90m 24[2mms[22m[39m
+ [32mÔ£ô[39m src/__tests__/cce/prompts/prompt-registry.cce.test.ts [2m ([22m[2m1 test[22m[2m)[22m[90m 26[2mms[22m[39m
+ [32mÔ£ô[39m src/__tests__/cce/services/supabase.cce.test.ts [2m ([22m[2m8 tests[22m[2m)[22m[90m 9[2mms[22m[39m
+ [32mÔ£ô[39m src/__tests__/cce/services/ai.cce.test.ts [2m ([22m[2m4 tests[22m[2m)[22m[90m 19[2mms[22m[39m
+ [32mÔ£ô[39m src/__tests__/cce/services/crawler.cce.test.ts [2m ([22m[2m4 tests[22m[2m)[22m[90m 19[2mms[22m[39m
+ [33mÔØ»[39m src/__tests__/cce/routes/health.cce.test.ts [2m ([22m[2m0 test[22m[2m)[22m
+ [32mÔ£ô[39m src/__tests__/cce/e2e/wizard.e2e.cce.test.ts [2m ([22m[2m8 tests[22m[2m)[22m[90m 31[2mms[22m[39m
+[90mstdout[2m | src/__tests__/cce/e2e/wizard.e2e.cce.test.ts[2m > [22m[2mCCE E2E ÔÇö Flujo INTAKE ÔåÆ F0 ÔåÆ F0_CLIENT_ANSWERS[2m > [22m[2mcrea proyecto ÔåÆ genera F0 ÔåÆ genera form ÔåÆ guarda respuestas[22m[39m
+<-- POST /cce/wizard/project
+--> POST /cce/wizard/project [32m201[0m 5ms
+<-- POST /cce/wizard/step
+--> POST /cce/wizard/step [32m200[0m 1ms
+<-- POST /cce/wizard/generate
+[CCE/generate] phaseId=F0 promptId=F0 project=11111111-2222-4333-4444-555555555555
+[CCE/generate] OK documentId=33333333-4444-4555-6666-777777777777 contentLen=99
+--> POST /cce/wizard/generate [32m200[0m 1ms
+<-- POST /cce/wizard/generate-form
+--> POST /cce/wizard/generate-form [32m200[0m 1ms
+<-- POST /cce/wizard/step
+--> POST /cce/wizard/step [32m200[0m 0ms
+
+[90mstdout[2m | src/__tests__/cce/e2e/wizard.e2e.cce.test.ts[2m > [22m[2mCCE E2E ÔÇö Flujo F1_1 (Instrumentos de diagn├│stico)[2m > [22m[2mextrae contexto ÔåÆ genera F1_1 ÔåÆ sube instrumento completado[22m[39m
+<-- POST /cce/wizard/extract
+--> POST /cce/wizard/extract [32m200[0m 0ms
+<-- POST /cce/wizard/step
+--> POST /cce/wizard/step [32m200[0m 1ms
+<-- POST /cce/wizard/generate
+[CCE/generate] phaseId=F1_1 promptId=F1_1 project=11111111-2222-4333-4444-555555555555
+[CCE/generate] OK documentId=33333333-4444-4555-6666-777777777777 contentLen=99
+--> POST /cce/wizard/generate [32m200[0m 0ms
+<-- POST /cce/wizard/upload
+--> POST /cce/wizard/upload [32m200[0m 0ms
+
+[90mstdout[2m | src/__tests__/cce/e2e/wizard.e2e.cce.test.ts[2m > [22m[2mCCE E2E ÔÇö Flujo F2 ÔåÆ F2_5[2m > [22m[2mextrae para F2 ÔåÆ genera F2 ÔåÆ extrae para F2_5 ÔåÆ genera F2_5[22m[39m
+<-- POST /cce/wizard/extract
+--> POST /cce/wizard/extract [32m200[0m 1ms
+<-- POST /cce/wizard/generate
+[CCE/generate] phaseId=F2 promptId=F2 project=11111111-2222-4333-4444-555555555555
+[CCE/generate] OK documentId=33333333-4444-4555-6666-777777777777 contentLen=99
+--> POST /cce/wizard/generate [32m200[0m 0ms
+<-- POST /cce/wizard/extract
+--> POST /cce/wizard/extract [32m200[0m 0ms
+<-- POST /cce/wizard/generate
+[CCE/generate] phaseId=F2_5 promptId=F2_5 project=11111111-2222-4333-4444-555555555555
+[CCE/generate] OK documentId=33333333-4444-4555-6666-777777777777 contentLen=99
+--> POST /cce/wizard/generate [32m200[0m 1ms
+
+[90mstdout[2m | src/__tests__/cce/e2e/wizard.e2e.cce.test.ts[2m > [22m[2mCCE E2E ÔÇö Flujo F4 (Producci├│n)[2m > [22m[2mextrae contexto ÔåÆ genera F4 con los 7 productos en un solo documento[22m[39m
+<-- POST /cce/wizard/extract
+--> POST /cce/wizard/extract [32m200[0m 1ms
+<-- POST /cce/wizard/generate
+[CCE/generate] phaseId=F4 promptId=F4 project=11111111-2222-4333-4444-555555555555
+[CCE/generate] OK documentId=33333333-4444-4555-6666-777777777777 contentLen=99
+--> POST /cce/wizard/generate [32m200[0m 0ms
+
+[90mstdout[2m | src/__tests__/cce/e2e/wizard.e2e.cce.test.ts[2m > [22m[2mCCE E2E ÔÇö Flujo F5 ÔåÆ F5_TEST_REPORT[2m > [22m[2mgenera F5 ÔåÆ genera formulario de reporte de pruebas[22m[39m
+<-- POST /cce/wizard/generate
+[CCE/generate] phaseId=F5 promptId=F5 project=11111111-2222-4333-4444-555555555555
+[CCE/generate] OK documentId=33333333-4444-4555-6666-777777777777 contentLen=99
+--> POST /cce/wizard/generate [32m200[0m 0ms
+<-- POST /cce/wizard/generate-form
+--> POST /cce/wizard/generate-form [32m200[0m 0ms
+
+[90mstdout[2m | src/__tests__/cce/e2e/wizard.e2e.cce.test.ts[2m > [22m[2mCCE E2E ÔÇö Gesti├│n de proyectos[2m > [22m[2mlista proyectos del usuario autenticado[22m[39m
+<-- GET /cce/wizard/projects
+--> GET /cce/wizard/projects [32m200[0m 0ms
+
+[90mstdout[2m | src/__tests__/cce/e2e/wizard.e2e.cce.test.ts[2m > [22m[2mCCE E2E ÔÇö Gesti├│n de proyectos[2m > [22m[2mobtiene el contexto completo de un proyecto[22m[39m
+<-- GET /cce/wizard/project/11111111-2222-4333-4444-555555555555
+--> GET /cce/wizard/project/11111111-2222-4333-4444-555555555555 [32m200[0m 1ms
+
+[90mstdout[2m | src/__tests__/cce/e2e/wizard.e2e.cce.test.ts[2m > [22m[2mCCE E2E ÔÇö Gesti├│n de proyectos[2m > [22m[2mdevuelve 400 al obtener proyecto con ID inv├ílido[22m[39m
+<-- GET /cce/wizard/project/not-valid-uuid
+--> GET /cce/wizard/project/not-valid-uuid [33m400[0m 1ms
+
+ [33mÔØ»[39m src/__tests__/cce/routes/wizard.cce.test.ts [2m ([22m[2m55 tests[22m [2m|[22m [31m1 failed[39m[2m)[22m[90m 58[2mms[22m[39m
+[31m   [33mÔØ»[31m src/__tests__/cce/routes/wizard.cce.test.ts[2m > [22mPOST /cce/wizard/generate[2m > [22macepta phaseId F1_2_FIELDWORK (espec├¡fico CCE)[39m
+[31m     ÔåÆ expected 400 to be 200 // Object.is equality[39m
+[90mstdout[2m | src/__tests__/cce/routes/wizard.cce.test.ts[2m > [22m[2mCCE ÔÇö Autenticaci├│n[2m > [22m[2mtodos los endpoints devuelven 401 sin token[22m[39m
+<-- GET /cce/wizard/projects
+--> GET /cce/wizard/projects [33m401[0m 2ms
+<-- GET /cce/wizard/project/not-checked
+--> GET /cce/wizard/project/not-checked [33m401[0m 1ms
+<-- POST /cce/wizard/project
+--> POST /cce/wizard/project [33m401[0m 1ms
+<-- POST /cce/wizard/step
+--> POST /cce/wizard/step [33m401[0m 0ms
+<-- POST /cce/wizard/generate
+--> POST /cce/wizard/generate [33m401[0m 0ms
+<-- POST /cce/wizard/extract
+--> POST /cce/wizard/extract [33m401[0m 0ms
+<-- POST /cce/wizard/generate-form
+--> POST /cce/wizard/generate-form [33m401[0m 0ms
+<-- POST /cce/wizard/upload
+--> POST /cce/wizard/upload [33m401[0m 1ms
+
+[90mstdout[2m | src/__tests__/cce/routes/wizard.cce.test.ts[2m > [22m[2mPOST /cce/wizard/project[2m > [22m[2mcrea un proyecto y devuelve 201 con projectId UUID[22m[39m
+<-- POST /cce/wizard/project
+--> POST /cce/wizard/project [32m201[0m 3ms
+
+[90mstdout[2m | src/__tests__/cce/routes/wizard.cce.test.ts[2m > [22m[2mPOST /cce/wizard/project[2m > [22m[2mcrea proyecto sin campos opcionales (sector/email)[22m[39m
+<-- POST /cce/wizard/project
+--> POST /cce/wizard/project [32m201[0m 0ms
+
+[90mstdout[2m | src/__tests__/cce/routes/wizard.cce.test.ts[2m > [22m[2mPOST /cce/wizard/project[2m > [22m[2mcrea proyecto sin companyName (campo opcional)[22m[39m
+<-- POST /cce/wizard/project
+--> POST /cce/wizard/project [32m201[0m 1ms
+
+[90mstdout[2m | src/__tests__/cce/routes/wizard.cce.test.ts[2m > [22m[2mPOST /cce/wizard/project[2m > [22m[2mdevuelve 400 si name tiene menos de 3 caracteres[22m[39m
+<-- POST /cce/wizard/project
+--> POST /cce/wizard/project [33m400[0m 1ms
+
+[90mstdout[2m | src/__tests__/cce/routes/wizard.cce.test.ts[2m > [22m[2mPOST /cce/wizard/project[2m > [22m[2mdevuelve 400 si clientName falta[22m[39m
+<-- POST /cce/wizard/project
+--> POST /cce/wizard/project [33m400[0m 1ms
+
+[90mstdout[2m | src/__tests__/cce/routes/wizard.cce.test.ts[2m > [22m[2mPOST /cce/wizard/project[2m > [22m[2mdevuelve 400 si email no tiene formato v├ílido[22m[39m
+<-- POST /cce/wizard/project
+--> POST /cce/wizard/project [33m400[0m 0ms
+
+[90mstdout[2m | src/__tests__/cce/routes/wizard.cce.test.ts[2m > [22m[2mPOST /cce/wizard/project[2m > [22m[2mdevuelve 400 si el body est├í vac├¡o[22m[39m
+<-- POST /cce/wizard/project
+--> POST /cce/wizard/project [33m400[0m 1ms
+
+[90mstdout[2m | src/__tests__/cce/routes/wizard.cce.test.ts[2m > [22m[2mGET /cce/wizard/projects[2m > [22m[2mdevuelve 200 con lista vac├¡a[22m[39m
+<-- GET /cce/wizard/projects
+--> GET /cce/wizard/projects [32m200[0m 0ms
+
+[90mstdout[2m | src/__tests__/cce/routes/wizard.cce.test.ts[2m > [22m[2mGET /cce/wizard/projects[2m > [22m[2mdevuelve 200 con proyectos cuando los hay[22m[39m
+<-- GET /cce/wizard/projects
+--> GET /cce/wizard/projects [32m200[0m 0ms
+
+[90mstdout[2m | src/__tests__/cce/routes/wizard.cce.test.ts[2m > [22m[2mGET /cce/wizard/project/:projectId[2m > [22m[2mdevuelve 200 con el contexto del proyecto[22m[39m
+<-- GET /cce/wizard/project/aaaaaaaa-bbbb-4ccc-dddd-eeeeeeeeeeee
+--> GET /cce/wizard/project/aaaaaaaa-bbbb-4ccc-dddd-eeeeeeeeeeee [32m200[0m 1ms
+
+[90mstdout[2m | src/__tests__/cce/routes/wizard.cce.test.ts[2m > [22m[2mGET /cce/wizard/project/:projectId[2m > [22m[2mdevuelve 400 si projectId no es UUID[22m[39m
+<-- GET /cce/wizard/project/not-a-uuid
+--> GET /cce/wizard/project/not-a-uuid [33m400[0m 0ms
+
+[90mstdout[2m | src/__tests__/cce/routes/wizard.cce.test.ts[2m > [22m[2mPOST /cce/wizard/step[2m > [22m[2mguarda el paso y devuelve stepId[22m[39m
+<-- POST /cce/wizard/step
+--> POST /cce/wizard/step [32m200[0m 1ms
+
+[90mstdout[2m | src/__tests__/cce/routes/wizard.cce.test.ts[2m > [22m[2mPOST /cce/wizard/step[2m > [22m[2macepta stepNumber hasta 9 (m├íximo CCE)[22m[39m
+<-- POST /cce/wizard/step
+--> POST /cce/wizard/step [32m200[0m 0ms
+
+[90mstdout[2m | src/__tests__/cce/routes/wizard.cce.test.ts[2m > [22m[2mPOST /cce/wizard/step[2m > [22m[2mdevuelve 400 si stepNumber es 10 (fuera de rango CCE)[22m[39m
+<-- POST /cce/wizard/step
+--> POST /cce/wizard/step [33m400[0m 0ms
+
+[90mstdout[2m | src/__tests__/cce/routes/wizard.cce.test.ts[2m > [22m[2mPOST /cce/wizard/step[2m > [22m[2mdevuelve 400 si projectId no es UUID[22m[39m
+<-- POST /cce/wizard/step
+--> POST /cce/wizard/step [33m400[0m 0ms
+
+[90mstdout[2m | src/__tests__/cce/routes/wizard.cce.test.ts[2m > [22m[2mPOST /cce/wizard/generate[2m > [22m[2mgenera documento y devuelve documentId + content[22m[39m
+<-- POST /cce/wizard/generate
+[CCE/generate] phaseId=F0 promptId=F0 project=aaaaaaaa-bbbb-4ccc-dddd-eeeeeeeeeeee
+[CCE/generate] OK documentId=cccccccc-dddd-4eee-ffff-000000000000 contentLen=45
+--> POST /cce/wizard/generate [32m200[0m 0ms
+
+[90mstdout[2m | src/__tests__/cce/routes/wizard.cce.test.ts[2m > [22m[2mPOST /cce/wizard/generate[2m > [22m[2macepta phaseId F0_CLIENT_ANSWERS (espec├¡fico CCE)[22m[39m
+<-- POST /cce/wizard/generate
+[CCE/generate] phaseId=F0_CLIENT_ANSWERS promptId=F0 project=aaaaaaaa-bbbb-4ccc-dddd-eeeeeeeeeeee
+[CCE/generate] OK documentId=cccccccc-dddd-4eee-ffff-000000000000 contentLen=45
+--> POST /cce/wizard/generate [32m200[0m 1ms
+
+[90mstdout[2m | src/__tests__/cce/routes/wizard.cce.test.ts[2m > [22m[2mPOST /cce/wizard/generate[2m > [22m[2macepta phaseId F1_2_FIELDWORK (espec├¡fico CCE)[22m[39m
+<-- POST /cce/wizard/generate
+--> POST /cce/wizard/generate [33m400[0m 0ms
+
+[90mstdout[2m | src/__tests__/cce/routes/wizard.cce.test.ts[2m > [22m[2mPOST /cce/wizard/generate[2m > [22m[2macepta phaseId F5_TEST_REPORT (espec├¡fico CCE)[22m[39m
+<-- POST /cce/wizard/generate
+[CCE/generate] phaseId=F5_TEST_REPORT promptId=F5 project=aaaaaaaa-bbbb-4ccc-dddd-eeeeeeeeeeee
+[CCE/generate] OK documentId=cccccccc-dddd-4eee-ffff-000000000000 contentLen=45
+--> POST /cce/wizard/generate [32m200[0m 1ms
+
+[90mstdout[2m | src/__tests__/cce/routes/wizard.cce.test.ts[2m > [22m[2mPOST /cce/wizard/generate[2m > [22m[2macepta promptId F2_5 (espec├¡fico CCE)[22m[39m
+<-- POST /cce/wizard/generate
+[CCE/generate] phaseId=F2_5 promptId=F2_5 project=aaaaaaaa-bbbb-4ccc-dddd-eeeeeeeeeeee
+[CCE/generate] OK documentId=cccccccc-dddd-4eee-ffff-000000000000 contentLen=45
+--> POST /cce/wizard/generate [32m200[0m 0ms
+
+[90mstdout[2m | src/__tests__/cce/routes/wizard.cce.test.ts[2m > [22m[2mPOST /cce/wizard/generate[2m > [22m[2mpasa el contexto correcto al AIService[22m[39m
+<-- POST /cce/wizard/generate
+[CCE/generate] phaseId=F0 promptId=F0 project=aaaaaaaa-bbbb-4ccc-dddd-eeeeeeeeeeee
+[CCE/generate] OK documentId=cccccccc-dddd-4eee-ffff-000000000000 contentLen=45
+--> POST /cce/wizard/generate [32m200[0m 0ms
+
+[90mstdout[2m | src/__tests__/cce/routes/wizard.cce.test.ts[2m > [22m[2mPOST /cce/wizard/generate[2m > [22m[2macepta contexto enriquecido con todos los campos del formulario (8 secciones)[22m[39m
+<-- POST /cce/wizard/generate
+[CCE/generate] phaseId=F0 promptId=F0 project=aaaaaaaa-bbbb-4ccc-dddd-eeeeeeeeeeee
+[CCE/generate] OK documentId=cccccccc-dddd-4eee-ffff-000000000000 contentLen=45
+--> POST /cce/wizard/generate [32m200[0m 1ms
+
+[90mstdout[2m | src/__tests__/cce/routes/wizard.cce.test.ts[2m > [22m[2mPOST /cce/wizard/generate[2m > [22m[2mpasa todos los campos del contexto enriquecido al AIService sin truncar[22m[39m
+<-- POST /cce/wizard/generate
+[CCE/generate] phaseId=F0 promptId=F0 project=aaaaaaaa-bbbb-4ccc-dddd-eeeeeeeeeeee
+[CCE/generate] OK documentId=cccccccc-dddd-4eee-ffff-000000000000 contentLen=45
+--> POST /cce/wizard/generate [32m200[0m 0ms
+
+[90mstdout[2m | src/__tests__/cce/routes/wizard.cce.test.ts[2m > [22m[2mPOST /cce/wizard/generate[2m > [22m[2mpasa campos de presencia digital (secci├│n 9) al AIService cuando se proporcionan URLs[22m[39m
+<-- POST /cce/wizard/generate
+[CCE/generate] phaseId=F0 promptId=F0 project=aaaaaaaa-bbbb-4ccc-dddd-eeeeeeeeeeee
+[CCE/generate] OK documentId=cccccccc-dddd-4eee-ffff-000000000000 contentLen=45
+--> POST /cce/wizard/generate [32m200[0m 2ms
+
+[90mstdout[2m | src/__tests__/cce/routes/wizard.cce.test.ts[2m > [22m[2mPOST /cce/wizard/generate[2m > [22m[2macepta contexto sin secci├│n 9 (presencia digital omitida)[22m[39m
+<-- POST /cce/wizard/generate
+[CCE/generate] phaseId=F0 promptId=F0 project=aaaaaaaa-bbbb-4ccc-dddd-eeeeeeeeeeee
+[CCE/generate] OK documentId=cccccccc-dddd-4eee-ffff-000000000000 contentLen=45
+--> POST /cce/wizard/generate [32m200[0m 0ms
+
+[90mstdout[2m | src/__tests__/cce/routes/wizard.cce.test.ts[2m > [22m[2mPOST /cce/wizard/generate[2m > [22m[2macepta contexto enriquecido en generate-form (F0_CLIENT_QUESTIONS_FORM)[22m[39m
+<-- POST /cce/wizard/generate-form
+--> POST /cce/wizard/generate-form [32m200[0m 1ms
+
+[90mstdout[2m | src/__tests__/cce/routes/wizard.cce.test.ts[2m > [22m[2mPOST /cce/wizard/generate[2m > [22m[2mdevuelve 400 si phaseId es inv├ílido[22m[39m
+<-- POST /cce/wizard/generate
+--> POST /cce/wizard/generate [33m400[0m 1ms
+
+[90mstdout[2m | src/__tests__/cce/routes/wizard.cce.test.ts[2m > [22m[2mPOST /cce/wizard/generate[2m > [22m[2mdevuelve 400 si promptId es inv├ílido[22m[39m
+<-- POST /cce/wizard/generate
+--> POST /cce/wizard/generate [33m400[0m 0ms
+
+[90mstdout[2m | src/__tests__/cce/routes/wizard.cce.test.ts[2m > [22m[2mPOST /cce/wizard/generate[2m > [22m[2mdevuelve 400 si projectId no es UUID[22m[39m
+<-- POST /cce/wizard/generate
+--> POST /cce/wizard/generate [33m400[0m 1ms
+
+[90mstdout[2m | src/__tests__/cce/routes/wizard.cce.test.ts[2m > [22m[2mPOST /cce/wizard/generate[2m > [22m[2mdevuelve 500 si AIService lanza un error[22m[39m
+<-- POST /cce/wizard/generate
+[CCE/generate] phaseId=F0 promptId=F0 project=aaaaaaaa-bbbb-4ccc-dddd-eeeeeeeeeeee
+--> POST /cce/wizard/generate [31m500[0m 0ms
+
+stderr | src/__tests__/cce/routes/wizard.cce.test.ts > POST /cce/wizard/generate > devuelve 500 si AIService lanza un error
+[CCE/generate] AI error: Workers AI timeout
+
+[90mstdout[2m | src/__tests__/cce/routes/wizard.cce.test.ts[2m > [22m[2mPOST /cce/wizard/generate[2m > [22m[2mno persiste datos cuando AI falla (saveDocument no se llama)[22m[39m
+<-- POST /cce/wizard/generate
+[CCE/generate] phaseId=F0 promptId=F0 project=aaaaaaaa-bbbb-4ccc-dddd-eeeeeeeeeeee
+--> POST /cce/wizard/generate [31m500[0m 0ms
+
+stderr | src/__tests__/cce/routes/wizard.cce.test.ts > POST /cce/wizard/generate > no persiste datos cuando AI falla (saveDocument no se llama)
+[CCE/generate] AI error: AI error
+
+[90mstdout[2m | src/__tests__/cce/routes/wizard.cce.test.ts[2m > [22m[2mPOST /cce/wizard/extract[2m > [22m[2mextrae contexto y devuelve 200 con content + parserUsed[22m[39m
+<-- POST /cce/wizard/extract
+--> POST /cce/wizard/extract [32m200[0m 0ms
+
+[90mstdout[2m | src/__tests__/cce/routes/wizard.cce.test.ts[2m > [22m[2mPOST /cce/wizard/extract[2m > [22m[2mllama a saveExtractedContext con los par├ímetros correctos[22m[39m
+<-- POST /cce/wizard/extract
+--> POST /cce/wizard/extract [32m200[0m 0ms
+
+[90mstdout[2m | src/__tests__/cce/routes/wizard.cce.test.ts[2m > [22m[2mPOST /cce/wizard/extract[2m > [22m[2mdevuelve 400 si projectId no es UUID[22m[39m
+<-- POST /cce/wizard/extract
+--> POST /cce/wizard/extract [33m400[0m 0ms
+
+[90mstdout[2m | src/__tests__/cce/routes/wizard.cce.test.ts[2m > [22m[2mPOST /cce/wizard/extract[2m > [22m[2mdevuelve 400 si extractorId falta[22m[39m
+<-- POST /cce/wizard/extract
+--> POST /cce/wizard/extract [33m400[0m 1ms
+
+[90mstdout[2m | src/__tests__/cce/routes/wizard.cce.test.ts[2m > [22m[2mPOST /cce/wizard/extract[2m > [22m[2mdevuelve 400 si sourceDocuments falta[22m[39m
+<-- POST /cce/wizard/extract
+--> POST /cce/wizard/extract [33m400[0m 0ms
+
+[90mstdout[2m | src/__tests__/cce/routes/wizard.cce.test.ts[2m > [22m[2mPOST /cce/wizard/extract[2m > [22m[2mdevuelve 500 si el extractor lanza un error[22m[39m
+<-- POST /cce/wizard/extract
+--> POST /cce/wizard/extract [31m500[0m 1ms
+
+stderr | src/__tests__/cce/routes/wizard.cce.test.ts > POST /cce/wizard/extract > devuelve 500 si el extractor lanza un error
+[CCE WIZARD ERROR] Extractor node not found: EXTRACTOR_F1_1
+
+[90mstdout[2m | src/__tests__/cce/routes/wizard.cce.test.ts[2m > [22m[2mPOST /cce/wizard/generate-form[2m > [22m[2mgenera esquema de formulario y devuelve 200 con formSchema (F0_CLIENT_QUESTIONS_FORM)[22m[39m
+<-- POST /cce/wizard/generate-form
+--> POST /cce/wizard/generate-form [32m200[0m 0ms
+
+[90mstdout[2m | src/__tests__/cce/routes/wizard.cce.test.ts[2m > [22m[2mPOST /cce/wizard/generate-form[2m > [22m[2mgenera esquema de formulario con promptId F5_TEST_REPORT_FORM[22m[39m
+<-- POST /cce/wizard/generate-form
+--> POST /cce/wizard/generate-form [32m200[0m 1ms
+
+[90mstdout[2m | src/__tests__/cce/routes/wizard.cce.test.ts[2m > [22m[2mPOST /cce/wizard/generate-form[2m > [22m[2mdevuelve 400 si promptId es F6_FORM (no v├ílido en CCE)[22m[39m
+<-- POST /cce/wizard/generate-form
+--> POST /cce/wizard/generate-form [33m400[0m 0ms
+
+[90mstdout[2m | src/__tests__/cce/routes/wizard.cce.test.ts[2m > [22m[2mPOST /cce/wizard/generate-form[2m > [22m[2mdevuelve 400 si promptId es F0 (no es form prompt)[22m[39m
+<-- POST /cce/wizard/generate-form
+--> POST /cce/wizard/generate-form [33m400[0m 0ms
+
+[90mstdout[2m | src/__tests__/cce/routes/wizard.cce.test.ts[2m > [22m[2mPOST /cce/wizard/generate-form[2m > [22m[2mdevuelve 400 si projectId no es UUID[22m[39m
+<-- POST /cce/wizard/generate-form
+--> POST /cce/wizard/generate-form [33m400[0m 0ms
+
+[90mstdout[2m | src/__tests__/cce/routes/wizard.cce.test.ts[2m > [22m[2mPOST /cce/wizard/generate-form[2m > [22m[2mdevuelve 400 si context falta[22m[39m
+<-- POST /cce/wizard/generate-form
+--> POST /cce/wizard/generate-form [33m400[0m 0ms
+
+[90mstdout[2m | src/__tests__/cce/routes/wizard.cce.test.ts[2m > [22m[2mPOST /cce/wizard/generate-form[2m > [22m[2mdevuelve formSchema de fallback si la IA no retorna JSON v├ílido[22m[39m
+<-- POST /cce/wizard/generate-form
+--> POST /cce/wizard/generate-form [32m200[0m 0ms
+
+[90mstdout[2m | src/__tests__/cce/routes/wizard.cce.test.ts[2m > [22m[2mPOST /cce/wizard/generate-form[2m > [22m[2mparsea correctamente JSON envuelto en bloque ```json```[22m[39m
+<-- POST /cce/wizard/generate-form
+--> POST /cce/wizard/generate-form [32m200[0m 0ms
+
+[90mstdout[2m | src/__tests__/cce/routes/wizard.cce.test.ts[2m > [22m[2mPOST /cce/wizard/upload[2m > [22m[2malmacena el archivo y devuelve 200 con fileId[22m[39m
+<-- POST /cce/wizard/upload
+--> POST /cce/wizard/upload [32m200[0m 1ms
+
+[90mstdout[2m | src/__tests__/cce/routes/wizard.cce.test.ts[2m > [22m[2mPOST /cce/wizard/upload[2m > [22m[2macepta mimeType image/jpeg[22m[39m
+<-- POST /cce/wizard/upload
+--> POST /cce/wizard/upload [32m200[0m 0ms
+
+[90mstdout[2m | src/__tests__/cce/routes/wizard.cce.test.ts[2m > [22m[2mPOST /cce/wizard/upload[2m > [22m[2macepta mimeType image/png[22m[39m
+<-- POST /cce/wizard/upload
+--> POST /cce/wizard/upload [32m200[0m 0ms
+
+[90mstdout[2m | src/__tests__/cce/routes/wizard.cce.test.ts[2m > [22m[2mPOST /cce/wizard/upload[2m > [22m[2mdevuelve 400 si mimeType no es pdf/jpeg/png[22m[39m
+<-- POST /cce/wizard/upload
+--> POST /cce/wizard/upload [33m400[0m 0ms
+
+[90mstdout[2m | src/__tests__/cce/routes/wizard.cce.test.ts[2m > [22m[2mPOST /cce/wizard/upload[2m > [22m[2mdevuelve 400 si projectId no es UUID[22m[39m
+<-- POST /cce/wizard/upload
+--> POST /cce/wizard/upload [33m400[0m 0ms
+
+[90mstdout[2m | src/__tests__/cce/routes/wizard.cce.test.ts[2m > [22m[2mPOST /cce/wizard/upload[2m > [22m[2mdevuelve 400 si instrumentId falta[22m[39m
+<-- POST /cce/wizard/upload
+--> POST /cce/wizard/upload [33m400[0m 1ms
+
+[90mstdout[2m | src/__tests__/cce/routes/wizard.cce.test.ts[2m > [22m[2mPOST /cce/wizard/upload[2m > [22m[2mdevuelve 400 si base64Content falta[22m[39m
+<-- POST /cce/wizard/upload
+--> POST /cce/wizard/upload [33m400[0m 0ms
+
+[90mstdout[2m | src/__tests__/cce/routes/wizard.cce.test.ts[2m > [22m[2mPOST /cce/wizard/upload[2m > [22m[2mdevuelve 400 si fileName falta[22m[39m
+<-- POST /cce/wizard/upload
+--> POST /cce/wizard/upload [33m400[0m 0ms
+
+[90mstdout[2m | src/__tests__/cce/routes/wizard.cce.test.ts[2m > [22m[2mPOST /cce/wizard/upload[2m > [22m[2mdevuelve 500 si UploadService lanza un error[22m[39m
+<-- POST /cce/wizard/upload
+--> POST /cce/wizard/upload [31m500[0m 0ms
+
+stderr | src/__tests__/cce/routes/wizard.cce.test.ts > POST /cce/wizard/upload > devuelve 500 si UploadService lanza un error
+[CCE WIZARD ERROR] Storage bucket not found
+
+
+ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ» Failed Suites 1 ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»
+
+ FAIL  src/__tests__/cce/routes/health.cce.test.ts [ src/__tests__/cce/routes/health.cce.test.ts ]
+Error: Failed to load url ./templates/F4-produccion.md (resolved id: ./templates/F4-produccion.md) in C:/DevOps/Desarrollos/KnowTo/backend/src/cce/prompts/index.ts. Does the file exist?
+ ÔØ» loadAndTransform node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:51969:17
+
+ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»[1/2]ÔÄ»
+
+ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ» Failed Tests 1 ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»
+
+ FAIL  src/__tests__/cce/routes/wizard.cce.test.ts > POST /cce/wizard/generate > acepta phaseId F1_2_FIELDWORK (espec├¡fico CCE)
+AssertionError: expected 400 to be 200 // Object.is equality
+
+- Expected
++ Received
+
+- 200
++ 400
+
+ ÔØ» src/__tests__/cce/routes/wizard.cce.test.ts:338:24
+    336|   it('acepta phaseId F1_2_FIELDWORK (espec├¡fico CCE)', async () => {
+    337|     const res = await post('/cce/wizard/generate', { ...VALID_BODY, phÔÇª
+    338|     expect(res.status).toBe(200);
+       |                        ^
+    339|   });
+    340| 
+
+ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»[2/2]ÔÄ»
+
+[2m Test Files [22m [1m[31m2 failed[39m[22m[2m | [22m[1m[32m8 passed[39m[22m[90m (10)[39m
+[2m      Tests [22m [1m[31m1 failed[39m[22m[2m | [22m[1m[32m99 passed[39m[22m[90m (100)[39m
+[2m   Start at [22m 01:25:33
+[2m   Duration [22m 1.45s[2m (transform 1.14s, setup 1ms, collect 3.79s, tests 203ms, environment 4ms, prepare 2.11s)[22m
+

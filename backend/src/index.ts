@@ -16,6 +16,7 @@ import { cors } from 'hono/cors';
 import { logger } from 'hono/logger';
 import { errorMiddleware } from './core/middleware/error.middleware';
 import { createDcflRouter } from './dcfl/router';
+import { createCceRouter } from './cce/router';
 import type { Env } from './core/types/env';
 
 const app = new OpenAPIHono<{ Bindings: Env }>();
@@ -96,6 +97,9 @@ app.get('/health', (c) =>
 // ─── DCFL (EC0366) ─────────────────────────────────────────────────────────
 app.route('/dcfl', createDcflRouter());
 
+// ─── CCE (EC0249) ──────────────────────────────────────────────────────────
+app.route('/cce', createCceRouter());
+
 // Para añadir un nuevo microsite:
 //   import { createFooRouter } from './foo/router';
 //   app.route('/foo', createFooRouter());
@@ -120,6 +124,7 @@ app.doc('/openapi.json', (c) => ({
   })(),
   tags: [
     { name: 'dcfl', description: 'Microsite EC0366 — Certificación de Diseño de Cursos de Formación' },
+    { name: 'cce', description: 'Microsite EC0249 — Consultoría Empresarial' },
     // Para añadir un nuevo microsite, agregar su tag aquí:
     // { name: 'foo', description: 'Microsite Foo — descripción' },
   ],

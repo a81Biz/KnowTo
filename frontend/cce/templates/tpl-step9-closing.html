@@ -1,0 +1,161 @@
+<!-- templates/tpl-step9-closing.html -->
+<!-- Step 9: Verificación + Reporte de pruebas + Ajustes + Cierre (F5, F5_TEST_REPORT, F6, CLOSE) -->
+<template id="tpl-step9-closing">
+  <div id="step-9-container" class="step-container space-y-6">
+    <div>
+      <h2 class="text-2xl font-bold text-gray-900">Verificación y Cierre</h2>
+      <p class="text-gray-500 mt-1">
+        Genera el plan de verificación, el formulario de reporte de pruebas funcionales,
+        los ajustes finales y el informe de cierre de la consultoría.
+      </p>
+    </div>
+
+    <!-- Sub-tabs -->
+    <div class="flex flex-wrap gap-1 border-b border-gray-200">
+      <button data-subtab="verification"
+        class="subtab-btn px-3 py-2 text-sm font-medium text-green-900 border-b-2 border-green-900">
+        Verificación (F5)
+      </button>
+      <button data-subtab="test-report"
+        class="subtab-btn px-3 py-2 text-sm font-medium text-gray-500 border-b-2 border-transparent hover:text-gray-700">
+        Reporte de Pruebas
+      </button>
+      <button data-subtab="adjustments"
+        class="subtab-btn px-3 py-2 text-sm font-medium text-gray-500 border-b-2 border-transparent hover:text-gray-700">
+        Ajustes (F6)
+      </button>
+      <button data-subtab="close"
+        class="subtab-btn px-3 py-2 text-sm font-medium text-gray-500 border-b-2 border-transparent hover:text-gray-700">
+        Cierre
+      </button>
+    </div>
+
+    <!-- Panel: Verificación (F5) -->
+    <div id="panel-verification" class="space-y-5">
+      <form id="form-step9" novalidate class="space-y-4">
+        <div>
+          <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">
+            Criterios de éxito del programa
+          </label>
+          <textarea name="successCriteria" rows="3"
+            placeholder="Ej: Mejora del 20% en indicadores de ventas, reducción del 30% en rotación..."
+            class="input-field w-full"></textarea>
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">
+            Instrumentos de medición a aplicar
+          </label>
+          <input name="measurementTools" type="text"
+            placeholder="Ej: Encuesta de satisfacción, evaluación de desempeño, KPIs"
+            class="input-field w-full" />
+        </div>
+        <button id="btn-submit" type="submit" class="btn-primary w-full py-4 text-lg">
+          ✨ Generar Plan de Verificación con IA
+        </button>
+      </form>
+      <div id="preview-panel" class="hidden">
+        <h3 class="font-semibold text-gray-700 mb-3">📄 Plan de Verificación (F5):</h3>
+        <div id="document-preview"
+          class="document-preview bg-gray-50 border border-gray-200 rounded-xl p-6 max-h-[400px] overflow-y-auto text-sm">
+        </div>
+        <div class="mt-3 flex gap-2">
+          <button id="btn-copy-doc" class="btn-secondary">📋 Copiar</button>
+          <button id="btn-regenerate" class="btn-green">🔄 Regenerar</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Panel: Reporte de pruebas (F5_TEST_REPORT) -->
+    <div id="panel-test-report" class="hidden space-y-5">
+      <div id="test-form-generating" class="text-center py-12 text-gray-400">
+        <div class="w-10 h-10 border-4 border-green-900 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+        <p>Generando formulario de reporte de pruebas...</p>
+      </div>
+      <div id="test-form-ready" class="hidden space-y-4">
+        <div id="test-form-container" class="space-y-6">
+          <!-- Formulario dinámico renderizado por el controller -->
+        </div>
+        <div class="flex gap-3">
+          <button id="btn-regenerate-test-form" class="btn-green flex-1">🔄 Regenerar formulario</button>
+          <button id="btn-save-test-report" class="btn-primary flex-1">💾 Guardar reporte</button>
+        </div>
+      </div>
+      <div id="test-form-error" class="hidden">
+        <div class="bg-red-50 border border-red-200 rounded-xl p-6 text-center">
+          <p class="text-red-700 font-medium">No se pudo generar el formulario.</p>
+          <button id="btn-retry-test-form" class="mt-3 btn-green">Reintentar</button>
+        </div>
+      </div>
+      <div id="test-report-saved" class="hidden">
+        <div class="bg-green-50 border border-green-200 rounded-xl p-4 text-center">
+          <p class="text-green-800 font-semibold">✅ Reporte de pruebas guardado</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Panel: Ajustes (F6) -->
+    <div id="panel-adjustments" class="hidden space-y-5">
+      <form id="form-step9-adjustments" novalidate class="space-y-4">
+        <div>
+          <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">
+            Observaciones y ajustes identificados
+          </label>
+          <textarea name="adjustmentObservations" rows="4"
+            placeholder="Describe los ajustes, correcciones o mejoras identificados durante la verificación..."
+            class="input-field w-full"></textarea>
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">
+            Responsables de implementar ajustes
+          </label>
+          <input name="adjustmentResponsibles" type="text"
+            placeholder="Ej: Director de RH, Coordinador de capacitación"
+            class="input-field w-full" />
+        </div>
+        <button id="btn-submit-adjustments" type="submit" class="btn-primary w-full py-4 text-lg">
+          ✨ Generar Reporte de Ajustes con IA
+        </button>
+      </form>
+      <div id="preview-panel-adjustments" class="hidden">
+        <h3 class="font-semibold text-gray-700 mb-3">📄 Reporte de Ajustes (F6):</h3>
+        <div id="document-preview-adjustments"
+          class="document-preview bg-gray-50 border border-gray-200 rounded-xl p-6 max-h-[400px] overflow-y-auto text-sm">
+        </div>
+        <div class="mt-3 flex gap-2">
+          <button id="btn-copy-adjustments" class="btn-secondary">📋 Copiar</button>
+          <button id="btn-regenerate-adjustments" class="btn-green">🔄 Regenerar</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Panel: Cierre -->
+    <div id="panel-close" class="hidden space-y-5">
+      <div class="bg-green-50 border border-green-200 rounded-xl p-8 text-center space-y-4">
+        <p class="text-5xl">🎉</p>
+        <h3 class="text-xl font-bold text-green-900">¡Consultoría completada!</h3>
+        <p class="text-green-700">
+          Todos los documentos han sido generados y la consultoría EC0249 está lista para entrega.
+        </p>
+        <div>
+          <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">
+            Notas de cierre
+          </label>
+          <textarea id="closing-notes" rows="3"
+            placeholder="Observaciones finales, próximos pasos, acuerdos de seguimiento..."
+            class="input-field w-full text-left"></textarea>
+        </div>
+        <button id="btn-save-closing" class="btn-primary px-8 py-3">
+          💾 Finalizar y guardar consultoría
+        </button>
+      </div>
+
+      <!-- Resumen de documentos -->
+      <div class="bg-white rounded-xl border border-gray-100 shadow-sm p-6 space-y-3">
+        <h3 class="font-semibold text-gray-800">📁 Documentos generados en esta consultoría</h3>
+        <div id="documents-summary" class="space-y-2 text-sm text-gray-600">
+          <!-- Renderizado dinámicamente -->
+        </div>
+      </div>
+    </div>
+  </div>
+</template>

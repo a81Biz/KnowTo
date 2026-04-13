@@ -1,0 +1,533 @@
+<!-- templates/tpl-step0-intake.html -->
+<!-- Step 0: Formato de entrada del cliente para el consultor -->
+<!-- Secciones: 1-Identificación, 2-Ubicación, 3-Tamaño, 4-Síntomas, -->
+<!--            5-Obligaciones, 6-Recursos, 7-Expectativas, 8-Contacto  -->
+<template id="tpl-step0-intake">
+  <div id="step-0-container" class="step-container space-y-8">
+
+    <div>
+      <h2 class="text-2xl font-bold text-gray-900">Datos del Cliente</h2>
+      <p class="text-gray-500 mt-1">
+        Completa los 8 secciones del formato. La IA usará esta información como base para todo el proceso de consultoría EC0249.
+      </p>
+    </div>
+
+    <form id="form-step0" class="space-y-8" novalidate>
+
+      <!-- ─── ENCABEZADO DEL PROYECTO ──────────────────────────────────────── -->
+      <div class="bg-green-50 border border-green-200 rounded-xl p-5 space-y-4">
+        <h3 class="font-bold text-green-900 text-sm uppercase tracking-widest">Encabezado del Proyecto</h3>
+        <div class="grid md:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">
+              Nombre del proyecto *
+            </label>
+            <input name="projectName" type="text" required
+              placeholder="Ej: Consultoría TECHIC 2026"
+              class="input-field w-full" />
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">
+              Fecha de captura *
+            </label>
+            <input name="captureDate" type="date" required
+              class="input-field w-full" />
+          </div>
+        </div>
+      </div>
+
+      <!-- ─── SECCIÓN 1: IDENTIFICACIÓN DE LA EMPRESA ──────────────────────── -->
+      <fieldset class="space-y-4">
+        <legend class="font-bold text-gray-800 text-base border-b border-gray-200 pb-2 w-full">
+          1. Identificación de la Empresa
+        </legend>
+        <div class="grid md:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">
+              Nombre de la empresa (razón social)
+            </label>
+            <input name="companyName" type="text"
+              placeholder="Ej: TECHIC Agencia Creativa S.A. de C.V."
+              class="input-field w-full" />
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">
+              Nombre comercial (si aplica)
+            </label>
+            <input name="tradeName" type="text"
+              placeholder="Ej: TECHIC"
+              class="input-field w-full" />
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">
+              Giro o actividad principal
+            </label>
+            <input name="mainActivity" type="text"
+              placeholder="Ej: Producción creativa y dirección visual"
+              class="input-field w-full" />
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">
+              Sector económico
+            </label>
+            <input name="sector" type="text"
+              placeholder="Ej: Servicios profesionales / Marketing"
+              class="input-field w-full" />
+          </div>
+          <div class="md:col-span-2">
+            <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">
+              Subsector (si se conoce)
+            </label>
+            <input name="subsector" type="text"
+              placeholder="Ej: Agencia de publicidad y producción audiovisual"
+              class="input-field w-full" />
+          </div>
+        </div>
+      </fieldset>
+
+      <!-- ─── SECCIÓN 2: UBICACIÓN Y OPERACIONES ───────────────────────────── -->
+      <fieldset class="space-y-4">
+        <legend class="font-bold text-gray-800 text-base border-b border-gray-200 pb-2 w-full">
+          2. Ubicación y Operaciones
+        </legend>
+        <div class="grid md:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Ciudad</label>
+            <input name="city" type="text" placeholder="Ej: Ciudad de México" class="input-field w-full" />
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Estado</label>
+            <input name="stateRegion" type="text" placeholder="Ej: CDMX" class="input-field w-full" />
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">
+              ¿Tiene múltiples centros de trabajo?
+            </label>
+            <select name="hasMultipleSites" class="input-field w-full">
+              <option value="">— Seleccionar —</option>
+              <option value="Sí">Sí</option>
+              <option value="No">No</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">
+              Años de operación en México
+            </label>
+            <input name="yearsInOperation" type="text" placeholder="Ej: 8 años" class="input-field w-full" />
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">
+              ¿La empresa es parte de una corporación?
+            </label>
+            <select name="isPartOfCorporation" class="input-field w-full">
+              <option value="">— Seleccionar —</option>
+              <option value="Sí">Sí</option>
+              <option value="No">No</option>
+            </select>
+          </div>
+        </div>
+      </fieldset>
+
+      <!-- ─── SECCIÓN 3: TAMAÑO Y ESTRUCTURA ──────────────────────────────── -->
+      <fieldset class="space-y-4">
+        <legend class="font-bold text-gray-800 text-base border-b border-gray-200 pb-2 w-full">
+          3. Tamaño y Estructura
+        </legend>
+        <div class="grid md:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">
+              Número total de trabajadores
+            </label>
+            <input name="totalWorkers" type="text" placeholder="Ej: 45" class="input-field w-full" />
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">
+              Número de trabajadores sindicalizados
+            </label>
+            <input name="unionizedWorkers" type="text" placeholder="Ej: 0" class="input-field w-full" />
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">
+              Principales áreas o departamentos
+            </label>
+            <input name="mainDepartments" type="text"
+              placeholder="Ej: Producción, Estrategia, Administración"
+              class="input-field w-full" />
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">
+              Número de trabajadores por área
+            </label>
+            <input name="workersByArea" type="text"
+              placeholder="Ej: Producción: 25, Cuentas: 12, Admin: 8"
+              class="input-field w-full" />
+          </div>
+        </div>
+      </fieldset>
+
+      <!-- ─── SECCIÓN 4: SÍNTOMAS O PROBLEMAS CONOCIDOS ─────────────────────── -->
+      <fieldset class="space-y-4">
+        <legend class="font-bold text-gray-800 text-base border-b border-gray-200 pb-2 w-full">
+          4. Síntomas o Problemas Conocidos
+        </legend>
+        <div class="space-y-4">
+          <div>
+            <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">
+              ¿Cuál es el problema principal que el cliente quiere resolver? *
+            </label>
+            <textarea name="mainProblem" rows="2" required
+              placeholder="Ej: Entregas fuera de tiempo y errores en postproducción"
+              class="input-field w-full"></textarea>
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">
+              ¿Qué síntomas observables hay? (mínimo 2-3)
+            </label>
+            <textarea name="symptoms" rows="2"
+              placeholder="Ej: 40% entregas fuera de tiempo, 6 renuncias en el último año, quejas de clientes"
+              class="input-field w-full"></textarea>
+          </div>
+          <div class="grid md:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">
+                ¿Desde cuándo ocurre?
+              </label>
+              <input name="problemStart" type="text"
+                placeholder="Ej: Últimos 6-8 meses"
+                class="input-field w-full" />
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">
+                ¿Hay datos cuantitativos?
+              </label>
+              <input name="quantitativeData" type="text"
+                placeholder="Ej: 40% entregas fuera de tiempo, 35% más horas extra"
+                class="input-field w-full" />
+            </div>
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">
+              ¿El cliente ha intentado algo para resolverlo?
+            </label>
+            <input name="previousAttempts" type="text"
+              placeholder="Ej: Contrataron más personal, no funcionó"
+              class="input-field w-full" />
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">
+              Contexto adicional / Situación actual
+            </label>
+            <textarea name="currentSituation" rows="2"
+              placeholder="Cualquier información adicional relevante sobre la empresa..."
+              class="input-field w-full"></textarea>
+          </div>
+        </div>
+      </fieldset>
+
+      <!-- ─── SECCIÓN 5: OBLIGACIONES Y CAPACITACIÓN PREVIA ────────────────── -->
+      <fieldset class="space-y-4">
+        <legend class="font-bold text-gray-800 text-base border-b border-gray-200 pb-2 w-full">
+          5. Obligaciones y Capacitación Previa
+        </legend>
+        <div class="grid md:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">
+              ¿Tiene registro patronal ante el IMSS?
+            </label>
+            <select name="hasIMSS" class="input-field w-full">
+              <option value="">— Seleccionar —</option>
+              <option value="Sí">Sí</option>
+              <option value="No">No</option>
+              <option value="No sé">No sé</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">
+              ¿Ha presentado Programas Anuales de Capacitación (DC-2)?
+            </label>
+            <select name="hasDC2" class="input-field w-full">
+              <option value="">— Seleccionar —</option>
+              <option value="Sí">Sí</option>
+              <option value="No">No</option>
+              <option value="No sé">No sé</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">
+              ¿Tiene Comisión Mixta de Capacitación? (obligatoria si &gt;50 trabajadores)
+            </label>
+            <select name="hasMixedCommission" class="input-field w-full">
+              <option value="">— Seleccionar —</option>
+              <option value="Sí">Sí</option>
+              <option value="No">No</option>
+              <option value="No aplica">No aplica</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">
+              ¿Ha recibido inspecciones de la STPS?
+            </label>
+            <select name="hasSTPS" class="input-field w-full">
+              <option value="">— Seleccionar —</option>
+              <option value="Sí">Sí</option>
+              <option value="No">No</option>
+              <option value="No sé">No sé</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">
+              ¿Han dado capacitación en los últimos 2 años?
+            </label>
+            <select name="recentTraining" class="input-field w-full">
+              <option value="">— Seleccionar —</option>
+              <option value="Sí">Sí</option>
+              <option value="No">No</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">
+              ¿Tienen constancias DC-3 de esas capacitaciones?
+            </label>
+            <select name="hasDC3" class="input-field w-full">
+              <option value="">— Seleccionar —</option>
+              <option value="Sí">Sí</option>
+              <option value="No">No</option>
+              <option value="No sé">No sé</option>
+            </select>
+          </div>
+        </div>
+      </fieldset>
+
+      <!-- ─── SECCIÓN 6: RECURSOS DISPONIBLES PARA CAPACITACIÓN ────────────── -->
+      <fieldset class="space-y-4">
+        <legend class="font-bold text-gray-800 text-base border-b border-gray-200 pb-2 w-full">
+          6. Recursos Disponibles para Capacitación
+        </legend>
+        <div class="grid md:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">
+              ¿Hay presupuesto asignado para capacitación?
+            </label>
+            <select name="hasTrainingBudget" class="input-field w-full">
+              <option value="">— Seleccionar —</option>
+              <option value="Sí">Sí</option>
+              <option value="No">No</option>
+              <option value="No sé">No sé</option>
+              <option value="No definido">No definido</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">
+              ¿Cuentan con instalaciones para capacitación presencial?
+            </label>
+            <select name="hasTrainingFacilities" class="input-field w-full">
+              <option value="">— Seleccionar —</option>
+              <option value="Sí">Sí</option>
+              <option value="No">No</option>
+              <option value="Parcial">Parcial</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">
+              ¿Cuentan con LMS o plataforma de aprendizaje?
+            </label>
+            <select name="hasLMS" class="input-field w-full">
+              <option value="">— Seleccionar —</option>
+              <option value="Sí">Sí</option>
+              <option value="No">No</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">
+              ¿Hay personal interno que pueda fungir como instructor?
+            </label>
+            <select name="hasInternalInstructor" class="input-field w-full">
+              <option value="">— Seleccionar —</option>
+              <option value="Sí">Sí</option>
+              <option value="No">No</option>
+              <option value="Parcial">Parcial (líderes de área)</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">
+              ¿Hay disponibilidad horaria para capacitarse?
+            </label>
+            <select name="trainingAvailability" class="input-field w-full">
+              <option value="">— Seleccionar —</option>
+              <option value="Alta">Alta</option>
+              <option value="Media">Media</option>
+              <option value="Baja">Baja</option>
+              <option value="No sé">No sé</option>
+            </select>
+          </div>
+        </div>
+      </fieldset>
+
+      <!-- ─── SECCIÓN 7: EXPECTATIVAS DEL CLIENTE ──────────────────────────── -->
+      <fieldset class="space-y-4">
+        <legend class="font-bold text-gray-800 text-base border-b border-gray-200 pb-2 w-full">
+          7. Expectativas del Cliente
+        </legend>
+        <div class="space-y-4">
+          <div>
+            <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">
+              ¿Qué espera lograr con este proceso de consultoría? *
+            </label>
+            <textarea name="mainObjective" rows="2" required
+              placeholder="Ej: Reducir entregas fuera de tiempo y estandarizar procesos"
+              class="input-field w-full"></textarea>
+          </div>
+          <div class="grid md:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">
+                ¿Hay algún resultado específico que quiera medir?
+              </label>
+              <input name="measurableResult" type="text"
+                placeholder="Ej: Reducir reprocesos en un 50% en 3 meses"
+                class="input-field w-full" />
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">
+                ¿En qué plazo espera ver resultados?
+              </label>
+              <input name="timeframe" type="text"
+                placeholder="Ej: 3-6 meses"
+                class="input-field w-full" />
+            </div>
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">
+              ¿Hay restricciones o condiciones especiales?
+            </label>
+            <input name="restrictions" type="text"
+              placeholder="Ej: Capacitación en horario laboral, máximo 4 horas/semana"
+              class="input-field w-full" />
+          </div>
+        </div>
+      </fieldset>
+
+      <!-- ─── SECCIÓN 8: DATOS DE CONTACTO ─────────────────────────────────── -->
+      <fieldset class="space-y-4">
+        <legend class="font-bold text-gray-800 text-base border-b border-gray-200 pb-2 w-full">
+          8. Datos de Contacto
+        </legend>
+        <div class="grid md:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">
+              Nombre del contacto principal *
+            </label>
+            <input name="clientName" type="text" required
+              placeholder="Ej: Laura González"
+              class="input-field w-full" />
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">
+              Cargo
+            </label>
+            <input name="contactPosition" type="text"
+              placeholder="Ej: Directora General"
+              class="input-field w-full" />
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">
+              Correo electrónico
+            </label>
+            <input name="email" type="email"
+              placeholder="contacto@empresa.com"
+              class="input-field w-full" />
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">
+              Teléfono
+            </label>
+            <input name="phone" type="tel"
+              placeholder="Ej: 55 1234 5678"
+              class="input-field w-full" />
+          </div>
+          <div class="md:col-span-2">
+            <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">
+              Horario disponible para entrevistas
+            </label>
+            <input name="availableSchedule" type="text"
+              placeholder="Ej: Lunes a viernes 10am-1pm"
+              class="input-field w-full" />
+          </div>
+        </div>
+      </fieldset>
+
+      <!-- ─── SECCIÓN 9: PRESENCIA DIGITAL (opcional) ─────────────────────── -->
+      <fieldset class="space-y-4">
+        <legend class="font-bold text-gray-800 text-base border-b border-gray-200 pb-2 w-full">
+          9. Presencia Digital del Cliente
+          <span class="ml-2 text-xs font-normal text-green-700 bg-green-50 px-2 py-0.5 rounded-full">
+            opcional — recomendado
+          </span>
+        </legend>
+        <p class="text-xs text-gray-400">
+          Si el cliente tiene sitio web o redes sociales, la IA incluirá un análisis de su presencia digital como parte del Marco de Referencia (F0).
+        </p>
+        <div class="space-y-4">
+          <div>
+            <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">
+              Sitio web (URL)
+            </label>
+            <input name="websiteUrl" type="url"
+              placeholder="Ej: https://techic.agency"
+              class="input-field w-full" />
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">
+              Redes sociales (URLs, una por línea)
+            </label>
+            <textarea name="socialMediaUrls" rows="3"
+              placeholder="Ej:&#10;https://instagram.com/techic&#10;https://linkedin.com/company/techic&#10;https://facebook.com/techic"
+              class="input-field w-full"></textarea>
+          </div>
+          <div class="grid md:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">
+                ¿Qué redes son las más activas?
+              </label>
+              <input name="mostActiveNetworks" type="text"
+                placeholder="Ej: Instagram y LinkedIn"
+                class="input-field w-full" />
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">
+                ¿Hay perfiles de reseñas? (Google, Trustpilot, etc.)
+              </label>
+              <input name="reviewProfiles" type="text"
+                placeholder="Ej: Google Maps, Trustpilot"
+                class="input-field w-full" />
+            </div>
+          </div>
+        </div>
+      </fieldset>
+
+      <!-- ─── INDICADOR CRAWLER ─────────────────────────────────────────────── -->
+      <div id="crawler-status" class="hidden mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg flex items-center gap-3">
+        <div class="w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+        <p class="text-blue-800 text-sm font-medium">Analizando sitio web con CrawlerIA. Por favor espera unos segundos...</p>
+      </div>
+
+      <!-- ─── BOTÓN DE ENVÍO ────────────────────────────────────────────────── -->
+      <button id="btn-submit" type="submit" class="btn-primary w-full py-4 text-lg">
+        ✨ Generar Marco de Referencia con IA
+      </button>
+
+    </form>
+
+    <!-- ─── PREVIEW PANEL ─────────────────────────────────────────────────── -->
+    <div id="preview-panel" class="hidden">
+      <h3 class="font-semibold text-gray-700 mb-3">Marco de referencia generado:</h3>
+      <div id="document-preview"
+        class="document-preview bg-gray-50 border border-gray-200 rounded-xl p-6 max-h-96 overflow-y-auto text-sm">
+      </div>
+      <div class="mt-3 flex gap-2">
+        <button id="btn-copy-doc" class="btn-secondary">Copiar</button>
+        <button id="btn-regenerate" class="btn-green">Regenerar</button>
+      </div>
+    </div>
+
+  </div>
+</template>

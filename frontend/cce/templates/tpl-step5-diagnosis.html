@@ -1,0 +1,67 @@
+<!-- templates/tpl-step5-diagnosis.html -->
+<!-- Step 3 (renumbered): Diagnóstico Organizacional (F1_2) -->
+<!-- Los campos se pre-llenan automáticamente desde el resumen del trabajo de campo -->
+<template id="tpl-step5-diagnosis">
+  <div id="step-3-container" class="step-container space-y-6">
+    <div>
+      <h2 class="text-2xl font-bold text-gray-900">Diagnóstico Organizacional</h2>
+      <p class="text-gray-500 mt-1">
+        La IA analiza los hallazgos del trabajo de campo y genera el diagnóstico integral
+        con causa raíz (5 porqués), brechas por área y necesidades de capacitación.
+      </p>
+    </div>
+
+    <!-- Banner: sin hallazgos del campo -->
+    <div id="no-fieldwork-notice" class="hidden bg-amber-50 border border-amber-200 rounded-xl p-4">
+      <p class="text-amber-700 text-sm font-medium">
+        ⚠️ No se encontraron hallazgos del trabajo de campo.
+        Puedes continuar describiendo manualmente los hallazgos, o regresa al paso anterior para registrarlos.
+      </p>
+    </div>
+
+    <form id="form-step3" class="space-y-5" novalidate>
+      <div>
+        <div class="flex items-center justify-between mb-2">
+          <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest">
+            Síntesis de hallazgos del trabajo de campo
+          </label>
+          <span id="fieldwork-loaded-badge" class="hidden text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded">
+            ✓ Cargado del paso anterior
+          </span>
+        </div>
+        <textarea name="fieldSummary" id="field-summary" rows="6"
+          placeholder="Cargando hallazgos del trabajo de campo..."
+          class="input-field w-full"></textarea>
+        <p class="text-xs text-gray-400 mt-1">Puedes editar o complementar antes de generar el diagnóstico.</p>
+      </div>
+
+      <div>
+        <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">
+          Áreas con mayor problemática identificada
+        </label>
+        <input name="criticalAreas" id="critical-areas" type="text"
+          placeholder="Cargando áreas críticas..."
+          class="input-field w-full" />
+        <p class="text-xs text-gray-400 mt-1">Separadas por coma. Puedes ajustar según tu criterio profesional.</p>
+      </div>
+
+      <button id="btn-submit" type="submit" class="btn-primary w-full py-4 text-lg">
+        ✨ Generar Diagnóstico con IA
+      </button>
+    </form>
+
+    <!-- Preview panel -->
+    <div id="preview-panel" class="hidden space-y-4">
+      <div class="flex items-center justify-between">
+        <h3 class="font-semibold text-gray-700">📄 Diagnóstico Organizacional (F1_2):</h3>
+        <div class="flex gap-2">
+          <button id="btn-copy-doc" class="btn-secondary text-xs">📋 Copiar</button>
+          <button id="btn-regenerate" class="btn-green text-xs">🔄 Regenerar</button>
+        </div>
+      </div>
+      <div id="document-preview"
+        class="document-preview bg-gray-50 border border-gray-200 rounded-xl p-6 max-h-[600px] overflow-y-auto text-sm">
+      </div>
+    </div>
+  </div>
+</template>

@@ -12,6 +12,7 @@ version: '3.9'
 # Prerequisito (una sola vez en cada máquina):
 #   Añadir al archivo hosts del sistema operativo:
 #     127.0.0.1  dcfl.localhost
+#     127.0.0.1  cce.localhost
 #     127.0.0.1  api.localhost
 #
 #   Windows: C:\Windows\System32\drivers\etc\hosts  (requiere admin)
@@ -40,6 +41,7 @@ services:
     depends_on:
       - backend
       - frontend-dcfl
+      - frontend-cce
       - frontend-root
     networks:
       - knowto-network
@@ -106,6 +108,31 @@ services:
     restart: unless-stopped
 
   # ---------------------------------------------------------------------------
+  # FRONTEND CCE — Microsite EC0249 Consultoría (Vite dev server)
+  # Sin puerto expuesto al host — accesible vía nginx en cce.localhost
+  # ---------------------------------------------------------------------------
+  frontend-cce:
+    image: node:20-alpine
+    container_name: knowto-frontend-cce
+    working_dir: /frontend/cce
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0 --port 5175"
+    expose:
+      - "5175"
+    volumes:
+      - ./frontend:/frontend
+      - frontend_cce_node_modules:/frontend/cce/node_modules
+    environment:
+      NODE_ENV: development
+      VITE_SUPABASE_URL: ${VITE_SUPABASE_URL:-http://localhost:54321}
+      VITE_SUPABASE_ANON_KEY: ${VITE_SUPABASE_ANON_KEY:-dummy-key}
+    depends_on:
+      - backend
+    networks:
+      knowto-network:
+        ipv4_address: 172.20.0.61
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
   # FRONTEND ROOT — Sitio raíz / directorio de microsites
   # Sin puerto expuesto — accesible vía nginx en localhost
   # ---------------------------------------------------------------------------
@@ -168,6 +195,7 @@ services:
         ollama serve &
         sleep 5
         ollama pull llama3.2:3b
+        ollama pull llava:7b
         wait
     networks:
       knowto-network:
@@ -194,4 +222,5 @@ volumes:
   ollama_data:
   backend_node_modules:
   frontend_dcfl_node_modules:
+  frontend_cce_node_modules:
   frontend_root_node_modules:

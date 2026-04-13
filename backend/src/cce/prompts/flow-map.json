@@ -1,0 +1,633 @@
+{
+  "_version": "1.0.0",
+  "_description": "Mapa de flujo del wizard CCE (EC0249 Consultoría). Cada nodo 'fase' produce documentos; cada nodo 'extractor' extrae secciones específicas para la siguiente fase sin saturar el contexto.",
+
+  "INTAKE": {
+    "tipo": "fase-intake",
+    "step": 0,
+    "label": "Datos de la Empresa",
+    "promptId": null,
+    "nota": "Los nombres de campo coinciden exactamente con los atributos 'name' del formulario HTML tpl-step0-intake.html",
+    "entrada": {
+      "form": {
+        "_encabezado": {
+          "projectName": "Nombre del proyecto (requerido)",
+          "captureDate": "Fecha de captura (requerido)"
+        },
+        "_seccion1_identificacion": {
+          "companyName": "Razón social / nombre de la empresa (opcional)",
+          "tradeName": "Nombre comercial (opcional)",
+          "mainActivity": "Giro o actividad principal (opcional)",
+          "sector": "Sector económico (opcional)",
+          "subsector": "Subsector (opcional)"
+        },
+        "_seccion2_ubicacion": {
+          "city": "Ciudad (opcional)",
+          "stateRegion": "Estado (opcional)",
+          "hasMultipleSites": "¿Múltiples centros de trabajo? Sí/No (opcional)",
+          "yearsInOperation": "Años de operación en México (opcional)",
+          "isPartOfCorporation": "¿Parte de corporación? Sí/No (opcional)"
+        },
+        "_seccion3_tamano": {
+          "totalWorkers": "Número total de trabajadores (opcional)",
+          "unionizedWorkers": "Trabajadores sindicalizados (opcional)",
+          "mainDepartments": "Principales áreas o departamentos (opcional)",
+          "workersByArea": "Número de trabajadores por área (opcional)"
+        },
+        "_seccion4_sintomas": {
+          "mainProblem": "Problema principal que quiere resolver (requerido)",
+          "symptoms": "Síntomas observables (mínimo 2-3) (opcional)",
+          "problemStart": "¿Desde cuándo ocurre? (opcional)",
+          "quantitativeData": "Datos cuantitativos (opcional)",
+          "previousAttempts": "¿Qué han intentado? (opcional)",
+          "currentSituation": "Contexto adicional / situación actual (opcional)"
+        },
+        "_seccion5_obligaciones": {
+          "hasIMSS": "¿Registro patronal IMSS? Sí/No/No sé (opcional)",
+          "hasDC2": "¿Ha presentado DC-2? Sí/No/No sé (opcional)",
+          "hasMixedCommission": "¿Tiene Comisión Mixta? Sí/No/No aplica (opcional)",
+          "hasSTPS": "¿Ha recibido inspecciones STPS? Sí/No/No sé (opcional)",
+          "recentTraining": "¿Capacitación últimos 2 años? Sí/No (opcional)",
+          "hasDC3": "¿Tienen constancias DC-3? Sí/No/No sé (opcional)"
+        },
+        "_seccion6_recursos": {
+          "hasTrainingBudget": "¿Presupuesto para capacitación? Sí/No/No sé (opcional)",
+          "hasTrainingFacilities": "¿Instalaciones presenciales? Sí/No/Parcial (opcional)",
+          "hasLMS": "¿Cuentan con LMS? Sí/No (opcional)",
+          "hasInternalInstructor": "¿Personal instructor interno? Sí/No/Parcial (opcional)",
+          "trainingAvailability": "Disponibilidad horaria: Alta/Media/Baja/No sé (opcional)"
+        },
+        "_seccion7_expectativas": {
+          "mainObjective": "¿Qué espera lograr con la consultoría? (requerido)",
+          "measurableResult": "¿Resultado medible esperado? (opcional)",
+          "timeframe": "Plazo esperado para ver resultados (opcional)",
+          "restrictions": "Restricciones o condiciones especiales (opcional)"
+        },
+        "_seccion8_contacto": {
+          "clientName": "Nombre del contacto principal (requerido)",
+          "contactPosition": "Cargo del contacto (opcional)",
+          "email": "Correo electrónico (opcional)",
+          "phone": "Teléfono (opcional)",
+          "availableSchedule": "Horario disponible para entrevistas (opcional)"
+        },
+        "_seccion9_presencia_digital": {
+          "nota": "Sección opcional. Si se proporcionan URLs, la IA genera la Sección 0 del Marco de Referencia (análisis digital).",
+          "websiteUrl": "URL del sitio web (opcional)",
+          "socialMediaUrls": "URLs de redes sociales, una por línea (opcional)",
+          "mostActiveNetworks": "Redes más activas (opcional)",
+          "reviewProfiles": "Perfiles de reseñas: Google Maps, Trustpilot, etc. (opcional)"
+        }
+      },
+      "contexto": null
+    },
+    "salida": {},
+    "next": "F0"
+  },
+
+  "F0": {
+    "tipo": "fase",
+    "step": 1,
+    "label": "Marco de Referencia",
+    "promptId": "F0",
+    "entrada": {
+      "form": {},
+      "contexto": "INTAKE (datos básicos de la empresa)"
+    },
+    "salida": {
+      "analisis_digital": {
+        "header": "## 0. ANÁLISIS DE PRESENCIA DIGITAL",
+        "patron": "##\\s+0\\.\\s+AN[ÁA]LISIS DE PRESENCIA DIGITAL",
+        "nota": "Solo presente si el consultor proporcionó URLs"
+      },
+      "analisis_sector": {
+        "header": "## 1. ANÁLISIS DEL SECTOR/INDUSTRIA",
+        "patron": "##\\s+1\\.\\s+AN[ÁA]LISIS DEL SECTOR"
+      },
+      "noms_aplicables": {
+        "header": "## 2. NOMs APLICABLES AL SECTOR",
+        "patron": "##\\s+2\\.\\s+NO[Mm]S APLICABLES"
+      },
+      "estandares_ec": {
+        "header": "## 3. ESTÁNDARES EC OBLIGATORIOS O RECOMENDADOS",
+        "patron": "##\\s+3\\.\\s+EST[ÁA]NDARES EC"
+      },
+      "benchmarking": {
+        "header": "## 4. BENCHMARKING Y MEJORES PRÁCTICAS",
+        "patron": "##\\s+4\\.\\s+BENCHMARKING"
+      },
+      "gaps_iniciales": {
+        "header": "## 5. ANÁLISIS DE GAPS INICIALES",
+        "patron": "##\\s+5\\.\\s+AN[ÁA]LISIS DE GAPS"
+      },
+      "obligaciones_stps": {
+        "header": "## 6. ESTADO DE OBLIGACIONES STPS",
+        "patron": "##\\s+6\\.\\s+ESTADO DE OBLIGACIONES"
+      },
+      "recomendaciones_iniciales": {
+        "header": "## 7. RECOMENDACIONES INICIALES",
+        "patron": "##\\s+7\\.\\s+RECOMENDACIONES INICIALES"
+      },
+      "preguntas_cliente": {
+        "header": "## 8. PREGUNTAS PARA EL CLIENTE",
+        "patron": "##\\s+8\\.\\s+PREGUNTAS PARA EL CLIENTE"
+      }
+    },
+    "next": "F0_CLIENT_ANSWERS"
+  },
+
+  "F0_CLIENT_ANSWERS": {
+    "tipo": "fase-form-dinamico",
+    "step": 2,
+    "label": "Respuestas del Cliente",
+    "promptId": null,
+    "promptIdForm": null,
+    "descripcion": "Formulario construido en el frontend parseando §8 'PREGUNTAS PARA EL CLIENTE' del documento F0 ya generado. NO requiere llamada a IA adicional. El consultor registra las respuestas del cliente pregunta por pregunta.",
+    "implementacion": "frontend/step2.clientanswers.ts → _parseF0Questions() extrae las preguntas con regex de §8 del documento F0 del store",
+    "entrada": {
+      "form": "PARSEADO — extraído de F0.preguntas_cliente (§8 del documento generado)",
+      "contexto": "F0.preguntas_cliente"
+    },
+    "salida": {
+      "clientAnswers": "Objeto { answers: Record<string,string>, formSchema: DynamicFormSchema } guardado en wizardStore slot 2"
+    },
+    "next": "EXTRACTOR_F1_1"
+  },
+
+  "EXTRACTOR_F1_1": {
+    "tipo": "extractor",
+    "label": "Extractor de contexto para F1.1",
+    "fuentes": [
+      {
+        "fase": "F0",
+        "campos": [
+          "analisis_sector",
+          "noms_aplicables",
+          "estandares_ec",
+          "benchmarking",
+          "gaps_iniciales",
+          "obligaciones_stps",
+          "recomendaciones_iniciales"
+        ]
+      }
+    ],
+    "next": "F1_1"
+  },
+
+  "F1_1": {
+    "tipo": "fase",
+    "step": 3,
+    "label": "Instrumentos de Diagnóstico",
+    "promptId": "F1_1",
+    "entrada": {
+      "form": {
+        "clientAnswers": "Respuestas del cliente a las preguntas de F0"
+      },
+      "contexto": "EXTRACTOR_F1_1.salida"
+    },
+    "salida": {
+      "entrevista_director": {
+        "header": "## INSTRUMENTO 1: ENTREVISTA AL DIRECTOR/DUEÑO",
+        "patron": "##\\s+INSTRUMENTO\\s+1"
+      },
+      "entrevista_jefes": {
+        "header": "## INSTRUMENTO 2: ENTREVISTA A JEFES DE ÁREA",
+        "patron": "##\\s+INSTRUMENTO\\s+2"
+      },
+      "entrevista_colaboradores": {
+        "header": "## INSTRUMENTO 3: ENTREVISTA A COLABORADORES",
+        "patron": "##\\s+INSTRUMENTO\\s+3"
+      },
+      "cuestionario_anonimo": {
+        "header": "## INSTRUMENTO 4: CUESTIONARIO ANÓNIMO",
+        "patron": "##\\s+INSTRUMENTO\\s+4"
+      },
+      "guia_observacion": {
+        "header": "## INSTRUMENTO 5: GUÍA DE OBSERVACIÓN DE CAMPO",
+        "patron": "##\\s+INSTRUMENTO\\s+5"
+      },
+      "checklist_documentos": {
+        "header": "## INSTRUMENTO 6: CHECKLIST DE DOCUMENTOS A SOLICITAR",
+        "patron": "##\\s+INSTRUMENTO\\s+6"
+      }
+    },
+    "next": "F1_2_FIELDWORK"
+  },
+
+  "F1_2_FIELDWORK": {
+    "tipo": "fase-fieldwork",
+    "step": 4,
+    "label": "Hallazgos de Campo",
+    "promptId": null,
+    "descripcion": "El consultor aplica los 6 instrumentos en la empresa real y registra los hallazgos (digital o archivo adjunto).",
+    "entrada": {
+      "form": "6 formularios de hallazgos (uno por instrumento) con opción de carga de archivos",
+      "contexto": null
+    },
+    "salida": {},
+    "next": "EXTRACTOR_F1_2"
+  },
+
+  "EXTRACTOR_F1_2": {
+    "tipo": "extractor",
+    "label": "Extractor de contexto para F1.2",
+    "fuentes": [
+      {
+        "fase": "F0",
+        "campos": [
+          "analisis_sector",
+          "gaps_iniciales",
+          "estandares_ec"
+        ]
+      },
+      {
+        "fase": "F1_1",
+        "campos": [
+          "entrevista_director",
+          "entrevista_jefes",
+          "entrevista_colaboradores",
+          "cuestionario_anonimo",
+          "guia_observacion",
+          "checklist_documentos"
+        ]
+      }
+    ],
+    "next": "F1_2"
+  },
+
+  "F1_2": {
+    "tipo": "fase",
+    "step": 5,
+    "label": "Diagnóstico (5 Porqués)",
+    "promptId": "F1_2",
+    "entrada": {
+      "form": {
+        "fieldworkFindings": "Hallazgos registrados en campo (texto libre o referencia a archivos)"
+      },
+      "contexto": "EXTRACTOR_F1_2.salida"
+    },
+    "salida": {
+      "sintesis_contexto": {
+        "header": "## 1. SÍNTESIS DEL CONTEXTO",
+        "patron": "##\\s+1\\.\\s+S[ÍI]NTESIS DEL CONTEXTO"
+      },
+      "cinco_porques": {
+        "header": "## 2. TÉCNICA DE LOS 5 PORQUÉS",
+        "patron": "##\\s+2\\.\\s+T[ÉE]CNICA DE LOS 5"
+      },
+      "causa_raiz": {
+        "header": "## 3. CAUSA RAÍZ IDENTIFICADA",
+        "patron": "##\\s+3\\.\\s+CAUSA RA[ÍI]Z"
+      },
+      "brechas_dominio": {
+        "header": "## 4. BRECHAS POR ÁREA DE DOMINIO",
+        "patron": "##\\s+4\\.\\s+BRECHAS POR [ÁA]REA"
+      },
+      "necesidad_capacitacion": {
+        "header": "## 5. NECESIDAD DE CAPACITACIÓN DERIVADA",
+        "patron": "##\\s+5\\.\\s+NECESIDAD DE CAPACITACI[ÓO]N"
+      }
+    },
+    "next": "EXTRACTOR_F2"
+  },
+
+  "EXTRACTOR_F2": {
+    "tipo": "extractor",
+    "label": "Extractor de contexto para F2",
+    "fuentes": [
+      {
+        "fase": "F0",
+        "campos": ["analisis_sector", "estandares_ec", "noms_aplicables"]
+      },
+      {
+        "fase": "F1_2",
+        "campos": ["causa_raiz", "brechas_dominio", "necesidad_capacitacion"]
+      }
+    ],
+    "next": "F2"
+  },
+
+  "F2": {
+    "tipo": "fase",
+    "step": 6,
+    "label": "Priorización de Cursos",
+    "promptId": "F2",
+    "entrada": {
+      "form": {
+        "additionalNotes": "Observaciones adicionales (opcional)"
+      },
+      "contexto": "EXTRACTOR_F2.salida"
+    },
+    "salida": {
+      "cursos_urgentes": {
+        "header": "## 1. CURSOS URGENTES (1–3 meses)",
+        "patron": "##\\s+1\\.\\s+CURSOS URGENTES"
+      },
+      "cursos_necesarios": {
+        "header": "## 2. CURSOS NECESARIOS (4–6 meses)",
+        "patron": "##\\s+2\\.\\s+CURSOS NECESARIOS"
+      },
+      "cursos_criticos": {
+        "header": "## 3. CURSOS CRÍTICOS (7–12 meses)",
+        "patron": "##\\s+3\\.\\s+CURSOS CR[ÍI]TICOS"
+      },
+      "modalidad_por_curso": {
+        "header": "## 4. MODALIDAD POR CURSO",
+        "patron": "##\\s+4\\.\\s+MODALIDAD POR CURSO"
+      },
+      "perfil_ingreso": {
+        "header": "## 5. PERFIL DE INGRESO",
+        "patron": "##\\s+5\\.\\s+PERFIL DE INGRESO"
+      },
+      "estructura_tematica": {
+        "header": "## 6. ESTRUCTURA TEMÁTICA PRELIMINAR",
+        "patron": "##\\s+6\\.\\s+ESTRUCTURA TEM[ÁA]TICA"
+      }
+    },
+    "next": "EXTRACTOR_F2_5"
+  },
+
+  "EXTRACTOR_F2_5": {
+    "tipo": "extractor",
+    "label": "Extractor de contexto para F2.5",
+    "fuentes": [
+      {
+        "fase": "F2",
+        "campos": ["modalidad_por_curso", "perfil_ingreso", "estructura_tematica"]
+      },
+      {
+        "fase": "F1_2",
+        "campos": ["brechas_dominio", "necesidad_capacitacion"]
+      }
+    ],
+    "next": "F2_5"
+  },
+
+  "F2_5": {
+    "tipo": "fase",
+    "step": 7,
+    "label": "Recomendaciones Pedagógicas",
+    "promptId": "F2_5",
+    "entrada": {
+      "form": {
+        "additionalNotes": "Preferencias pedagógicas adicionales (opcional)"
+      },
+      "contexto": "EXTRACTOR_F2_5.salida"
+    },
+    "salida": {
+      "tecnicas_instruccionales": {
+        "header": "## 1. TÉCNICAS INSTRUCCIONALES RECOMENDADAS",
+        "patron": "##\\s+1\\.\\s+T[ÉE]CNICAS INSTRUCCIONALES"
+      },
+      "bibliografia": {
+        "header": "## 2. BIBLIOGRAFÍA Y FUNDAMENTOS TEÓRICOS",
+        "patron": "##\\s+2\\.\\s+BIBLIOGRAF[ÍI]A"
+      },
+      "estrategia_evaluacion": {
+        "header": "## 3. ESTRATEGIA DE EVALUACIÓN",
+        "patron": "##\\s+3\\.\\s+ESTRATEGIA DE EVALUACI[ÓO]N"
+      }
+    },
+    "next": "EXTRACTOR_F3"
+  },
+
+  "EXTRACTOR_F3": {
+    "tipo": "extractor",
+    "label": "Extractor de contexto para F3",
+    "fuentes": [
+      {
+        "fase": "F2",
+        "campos": ["cursos_urgentes", "modalidad_por_curso", "perfil_ingreso", "estructura_tematica"]
+      },
+      {
+        "fase": "F2_5",
+        "campos": ["tecnicas_instruccionales", "estrategia_evaluacion"]
+      }
+    ],
+    "next": "F3"
+  },
+
+  "F3": {
+    "tipo": "fase",
+    "step": 7,
+    "label": "Especificaciones Técnicas",
+    "promptId": "F3",
+    "entrada": {
+      "form": {
+        "startDate": "Fecha de inicio estimada (opcional)",
+        "lmsAvailable": "¿Cuenta con LMS? (opcional)",
+        "internalInstructors": "¿Hay instructores internos? (opcional)",
+        "physicalSpace": "Espacio físico disponible (opcional)",
+        "hoursPerWeek": "Horas disponibles por semana (opcional)",
+        "additionalNotes": "Observaciones técnicas adicionales (opcional)"
+      },
+      "contexto": "EXTRACTOR_F3.salida"
+    },
+    "salida": {
+      "duracion_calculada": {
+        "header": "## 1. DURACIÓN CALCULADA POR CURSO",
+        "patron": "##\\s+1\\.\\s+DURACI[ÓO]N CALCULADA"
+      },
+      "recursos_necesarios": {
+        "header": "## 2. RECURSOS NECESARIOS",
+        "patron": "##\\s+2\\.\\s+RECURSOS NECESARIOS"
+      },
+      "recomendacion_lms": {
+        "header": "## 3. RECOMENDACIÓN DE LMS/MODALIDAD",
+        "patron": "##\\s+3\\.\\s+RECOMENDACI[ÓO]N DE LMS"
+      },
+      "calendario_pac": {
+        "header": "## 4. CALENDARIO TRIMESTRAL (PAC)",
+        "patron": "##\\s+4\\.\\s+CALENDARIO TRIMESTRAL"
+      }
+    },
+    "next": "EXTRACTOR_F4"
+  },
+
+  "EXTRACTOR_F4": {
+    "tipo": "extractor",
+    "label": "Extractor de contexto para F4",
+    "fuentes": [
+      {
+        "fase": "F1_2",
+        "campos": ["causa_raiz", "brechas_dominio", "necesidad_capacitacion"]
+      },
+      {
+        "fase": "F2",
+        "campos": ["cursos_urgentes", "cursos_necesarios", "estructura_tematica", "perfil_ingreso"]
+      },
+      {
+        "fase": "F2_5",
+        "campos": ["tecnicas_instruccionales", "bibliografia"]
+      },
+      {
+        "fase": "F3",
+        "campos": ["duracion_calculada", "recursos_necesarios", "calendario_pac"]
+      }
+    ],
+    "next": "F4"
+  },
+
+  "F4": {
+    "tipo": "fase",
+    "step": 8,
+    "label": "Producción (7 Productos)",
+    "promptId": "F4",
+    "entrada": {
+      "form": {
+        "instructorName": "Nombre del instructor/consultor (requerido)",
+        "reviewerName": "Nombre del revisor (opcional)",
+        "startDate": "Fecha de inicio del cronograma (requerido)",
+        "additionalNotes": "Indicaciones adicionales (opcional)"
+      },
+      "contexto": "EXTRACTOR_F4.salida"
+    },
+    "salida": {
+      "pac_dc2": {
+        "header": "## PRODUCTO 1: PLAN ANUAL DE CAPACITACIÓN (PAC / DC-2)",
+        "patron": "##\\s+PRODUCTO\\s+1"
+      },
+      "carta_descriptiva": {
+        "header": "## PRODUCTO 2: CARTA DESCRIPTIVA",
+        "patron": "##\\s+PRODUCTO\\s+2"
+      },
+      "manual_participante": {
+        "header": "## PRODUCTO 3: MANUAL DEL PARTICIPANTE",
+        "patron": "##\\s+PRODUCTO\\s+3"
+      },
+      "instrumentos_evaluacion": {
+        "header": "## PRODUCTO 4: INSTRUMENTOS DE EVALUACIÓN",
+        "patron": "##\\s+PRODUCTO\\s+4"
+      },
+      "materiales_apoyo": {
+        "header": "## PRODUCTO 5: MATERIALES DE APOYO",
+        "patron": "##\\s+PRODUCTO\\s+5"
+      },
+      "dc5_constancia": {
+        "header": "## PRODUCTO 6: DC-5 / CONSTANCIA DE HABILIDADES",
+        "patron": "##\\s+PRODUCTO\\s+6"
+      },
+      "informe_ejecutivo": {
+        "header": "## PRODUCTO 7: INFORME EJECUTIVO DE CONSULTORÍA",
+        "patron": "##\\s+PRODUCTO\\s+7"
+      }
+    },
+    "next": "EXTRACTOR_F5"
+  },
+
+  "EXTRACTOR_F5": {
+    "tipo": "extractor",
+    "label": "Extractor de contexto para F5",
+    "fuentes": [
+      {
+        "fase": "F4",
+        "campos": [
+          "pac_dc2",
+          "carta_descriptiva",
+          "instrumentos_evaluacion",
+          "dc5_constancia",
+          "informe_ejecutivo"
+        ]
+      }
+    ],
+    "next": "F5"
+  },
+
+  "F5": {
+    "tipo": "fase",
+    "step": 9,
+    "label": "Verificación",
+    "promptId": "F5",
+    "entrada": {
+      "form": {
+        "testDate": "Fecha de verificación (opcional)",
+        "technicalObservations": "Observaciones técnicas (opcional)",
+        "pedagogicalObservations": "Observaciones pedagógicas (opcional)"
+      },
+      "contexto": "EXTRACTOR_F5.salida"
+    },
+    "salida": {
+      "checklist_tecnico": {
+        "header": "## 1. CHECKLIST DE VERIFICACIÓN TÉCNICA",
+        "patron": "##\\s+1\\.\\s+CHECKLIST DE VERIFICACI[ÓO]N T[ÉE]CNICA"
+      },
+      "checklist_pedagogico": {
+        "header": "## 2. CHECKLIST DE VERIFICACIÓN PEDAGÓGICA",
+        "patron": "##\\s+2\\.\\s+CHECKLIST DE VERIFICACI[ÓO]N PEDAG"
+      },
+      "plantilla_reporte": {
+        "header": "## 3. PLANTILLA DE REPORTE DE PRUEBAS",
+        "patron": "##\\s+3\\.\\s+PLANTILLA DE REPORTE"
+      }
+    },
+    "next": "F5_TEST_REPORT"
+  },
+
+  "F5_TEST_REPORT": {
+    "tipo": "fase-form-dinamico",
+    "step": 9,
+    "label": "Reporte de Pruebas",
+    "promptId": null,
+    "promptIdForm": "F5_TEST_REPORT_FORM",
+    "descripcion": "Genera un formulario digital basado en la plantilla de reporte de F5, para que el consultor registre los resultados de las pruebas funcionales.",
+    "entrada": {
+      "form": "DINÁMICO — generado por F5_TEST_REPORT_FORM",
+      "contexto": "F5.plantilla_reporte"
+    },
+    "salida": {},
+    "next": "EXTRACTOR_F6"
+  },
+
+  "EXTRACTOR_F6": {
+    "tipo": "extractor",
+    "label": "Extractor de contexto para F6",
+    "fuentes": [
+      {
+        "fase": "F5",
+        "campos": [
+          "checklist_tecnico",
+          "checklist_pedagogico",
+          "plantilla_reporte"
+        ]
+      }
+    ],
+    "next": "F6"
+  },
+
+  "F6": {
+    "tipo": "fase",
+    "step": 9,
+    "label": "Ajustes y Cierre",
+    "promptId": "F6",
+    "entrada": {
+      "form": {
+        "testReportData": "Reporte de pruebas completado (datos del formulario dinámico)"
+      },
+      "contexto": "EXTRACTOR_F6.salida"
+    },
+    "salida": {
+      "clasificacion_ajustes": {
+        "header": "## 1. CLASIFICACIÓN DE AJUSTES",
+        "patron": "##\\s+1\\.\\s+CLASIFICACI[ÓO]N DE AJUSTES"
+      },
+      "control_versiones": {
+        "header": "## 2. CONTROL DE VERSIONES",
+        "patron": "##\\s+2\\.\\s+CONTROL DE VERSIONES"
+      },
+      "inventario_firmas": {
+        "header": "## 3. INVENTARIO Y FIRMAS",
+        "patron": "##\\s+3\\.\\s+INVENTARIO Y FIRMAS"
+      }
+    },
+    "next": "CLOSE"
+  },
+
+  "CLOSE": {
+    "tipo": "cierre",
+    "step": 9,
+    "label": "Expediente completo — listo para certificación EC0249",
+    "promptId": null,
+    "entrada": { "form": {}, "contexto": null },
+    "salida": {},
+    "next": null
+  }
+}
