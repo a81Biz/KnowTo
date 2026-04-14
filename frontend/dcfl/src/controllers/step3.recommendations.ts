@@ -12,5 +12,8 @@ export const Step3Recommendations = createStep({
   templateId: 'tpl-step3-recommendations',
   phaseId: 'F2.5',
   promptId: 'F2_5',
-  uiConfig: { loadingText: 'Generando Recomendaciones Pedagógicas (F2.5)...' },
+  uiConfig: {
+    loadingText: 'Generando Recomendaciones Pedagógicas (F2.5)...',
+    helpText: 'La IA propone la estrategia pedagógica óptima: número de videos, duración, tipos de actividades y frecuencia de reportes. Estas recomendaciones alimentan directamente las Especificaciones Técnicas (siguiente paso).',
+  },
 });

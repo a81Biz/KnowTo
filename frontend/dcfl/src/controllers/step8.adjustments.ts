@@ -1,4 +1,4 @@
-// src/controllers/step7.adjustments.ts
+// src/controllers/step8.adjustments.ts
 // HTML en: /templates/tpl-step7-adjustments.html
 //
 // Controlador para F6: formulario dinámico + generación del documento de ajustes.
@@ -29,7 +29,10 @@ class Step8AdjustmentsController extends BaseStep {
       templateId: 'tpl-step7-adjustments',
       phaseId: 'F6.1',
       promptId: 'F6',
-      uiConfig: { loadingText: 'Generando Documento de Ajustes (F6.1)...' },
+      uiConfig: {
+        loadingText: 'Generando Documento de Ajustes (F6.1)...',
+        helpText: 'La IA analiza el checklist de verificación y genera un formulario personalizado con los ajustes requeridos. Llena el formulario generado y luego produce el documento de ajustes para el expediente.',
+      },
     });
   }
 
@@ -129,10 +132,10 @@ class Step8AdjustmentsController extends BaseStep {
       void this._loadDynamicForm();
     });
 
-    // El submit usa _generateDocument de BaseStep con los datos del formulario dinámico
+    // El submit usa _generateDocumentAsync de BaseStep con los datos del formulario dinámico
     this._dom.form?.addEventListener('submit', (e) => {
       e.preventDefault();
-      void this._generateDocument();
+      void this._generateDocumentAsync();
     });
 
     this._dom.btnCopy?.addEventListener('click', () => {
@@ -145,7 +148,7 @@ class Step8AdjustmentsController extends BaseStep {
     });
 
     this._dom.btnRegenerate?.addEventListener('click', () => {
-      void this._generateDocument();
+      void this._generateDocumentAsync();
     });
   }
 

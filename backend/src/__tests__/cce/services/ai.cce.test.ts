@@ -1,6 +1,6 @@
 // src/__tests__/cce/services/crawler.cce.test.ts
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { CrawlerService } from '../../../cce/services/crawler.service';
+import { CrawlerService } from '../../../core/services/crawler.service';
 
 function mockFetchHTML(html: string, ok = true, status = 200) {
   return vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
@@ -55,7 +55,8 @@ describe('CCE CrawlerService', () => {
 
   it('devuelve error de URL inválida si no empieza con http', async () => {
     const result = await CrawlerService.scrape('www.techic.agency');
-    expect(result).toContain('https://www.spanishdict.com/translate/inv%C3%A1lida');
+    expect(result).toContain('[ERROR DE CRAWLER]: URL inválida');
+    expect(result).toContain('www.techic.agency');
   });
 
   it('devuelve error si la petición HTTP falla (ej. 404)', async () => {

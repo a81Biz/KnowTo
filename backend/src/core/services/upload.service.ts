@@ -1,10 +1,11 @@
-// src/cce/services/upload.service.ts
-// Gestión de archivos adjuntos (instrumentos de diagnóstico completados en papel).
+// src/core/services/upload.service.ts
+// Gestión de archivos adjuntos (instrumentos completados en papel).
+// (Movido desde cce/services/upload.service.ts — sin cambios de comportamiento)
 //
-// Dev: almacenamiento en memoria (mock). No persiste entre reinicios.
-// Prod: Supabase Storage (bucket cce-instruments).
+// Dev:  almacenamiento en memoria (mock). No persiste entre reinicios.
+// Prod: Supabase Storage (bucket configurable, por defecto 'site-instruments').
 
-import type { Env } from '../../core/types/env';
+import type { Env } from '../types/env';
 
 interface StoredFile {
   fileId: string;
@@ -16,13 +17,20 @@ interface StoredFile {
   uploadedAt: string;
 }
 
-// Mock store para desarrollo
+// Mock store para desarrollo (módulo-level, persiste dentro de una sesión)
 const _devStore = new Map<string, StoredFile>();
 
 export class UploadService {
   private isDev: boolean;
 
-  constructor(private readonly env: Env) {
+  /**
+   * @param env        Workers bindings
+   * @param bucketName Nombre del bucket de Supabase Storage (por defecto 'cce-instruments')
+   */
+  constructor(
+    private readonly env: Env,
+    private readonly bucketName: string = 'cce-instruments'
+  ) {
     this.isDev = env.ENVIRONMENT !== 'production';
   }
 
@@ -38,29 +46,27 @@ export class UploadService {
     if (this.isDev) {
       _devStore.set(fileId, {
         fileId,
-        fileName: params.fileName,
-        mimeType: params.mimeType,
+        fileName:      params.fileName,
+        mimeType:      params.mimeType,
         base64Content: params.base64Content,
-        instrumentId: params.instrumentId,
-        projectId: params.projectId,
-        uploadedAt: new Date().toISOString(),
+        instrumentId:  params.instrumentId,
+        projectId:     params.projectId,
+        uploadedAt:    new Date().toISOString(),
       });
       return { fileId, fileName: params.fileName, instrumentId: params.instrumentId };
     }
 
-    // Prod: upload to Supabase Storage
-    // The Supabase client must be initialised with service role for storage access
     const { createClient } = await import('@supabase/supabase-js');
     const client = createClient(this.env.SUPABASE_URL, this.env.SUPABASE_SERVICE_ROLE_KEY, {
       auth: { autoRefreshToken: false, persistSession: false },
     });
 
     const buffer = Buffer.from(params.base64Content, 'base64');
-    const path = `${params.projectId}/${params.instrumentId}/${fileId}_${params.fileName}`;
+    const storagePath = `${params.projectId}/${params.instrumentId}/${fileId}_${params.fileName}`;
 
     const { error } = await client.storage
-      .from('cce-instruments')
-      .upload(path, buffer, { contentType: params.mimeType, upsert: false });
+      .from(this.bucketName)
+      .upload(storagePath, buffer, { contentType: params.mimeType, upsert: false });
 
     if (error) throw new Error(`Storage upload failed: ${error.message}`);
 
@@ -68,18 +74,12 @@ export class UploadService {
   }
 
   async getFile(fileId: string): Promise<StoredFile | null> {
-    if (this.isDev) {
-      return _devStore.get(fileId) ?? null;
-    }
-    // Prod: would query storage metadata — omitted for scope
-    return null;
+    if (this.isDev) return _devStore.get(fileId) ?? null;
+    return null; // Prod: query storage metadata — out of scope
   }
 
   async deleteFile(fileId: string): Promise<void> {
-    if (this.isDev) {
-      _devStore.delete(fileId);
-      return;
-    }
-    // Prod: would remove from storage — omitted for scope
+    if (this.isDev) { _devStore.delete(fileId); return; }
+    // Prod: remove from storage — out of scope
   }
 }

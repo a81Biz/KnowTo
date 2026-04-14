@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { CrawlerService } from '../../../cce/services/crawler.service';
+import { CrawlerService } from '../../../core/services/crawler.service';
 
 describe('CrawlerService', () => {
   beforeEach(() => {
@@ -73,7 +73,7 @@ describe('CrawlerService', () => {
 
   it('devuelve error si la URL no comienza con http(s)', async () => {
     const result = await CrawlerService.scrape('ftp://example.com');
-    // Coincide con la implementación descrita: URL inválida
-    expect(result).toBe('https://www.spanishdict.com/translate/inv%C3%A1lida: ftp://example.com');
+    expect(result).toContain('[ERROR DE CRAWLER]: URL inválida');
+    expect(result).toContain('ftp://example.com');
   });
 });

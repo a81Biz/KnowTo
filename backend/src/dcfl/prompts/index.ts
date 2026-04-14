@@ -1,10 +1,13 @@
 // src/dcfl/prompts/index.ts
-// Prompt Registry: carga y gestión de prompts externalizados desde archivos .md
+// Prompt Registry para DCFL (EC0366).
+// Delega al PromptRegistry unificado de core inyectando el mapa local de .md.
+// Mantiene las exportaciones originales para compatibilidad con imports existentes.
 
+import type { IPromptRegistry, PromptEntry, PromptMetadata } from '../../core/types/pipeline.types';
+import { PromptRegistry as CorePromptRegistry } from '../../core/prompts/registry';
 import type { PromptId } from '../types/wizard.types';
 
 // Importar todos los prompts como texto estático (compatible con Workers)
-// En Workers, usamos importaciones estáticas ya que no hay acceso a fs
 import F0     from './templates/F0-marco-referencia.md';
 import F1     from './templates/F1-informe-necesidades.md';
 import F2     from './templates/F2-especificaciones-analisis.md';
@@ -26,19 +29,24 @@ import F6_2a  from './templates/F6_2a-inventario-firmas.md';
 import F6_2b  from './templates/F6_2b-resumen-declaracion.md';
 import EXTRACTOR from './templates/EXTRACTOR.md';
 
-interface PromptMetadata {
-  id: string;
-  name: string;
-  version: string;
-  tags: string[];
-}
+// Sub-prompts del pipeline 5-etapas (specialist_a, specialist_b, synthesizer)
+import DCFL_F0_SPECIALIST_A   from './templates/DCFL-F0-specialist-a.md';
+import DCFL_F0_SPECIALIST_B   from './templates/DCFL-F0-specialist-b.md';
+import DCFL_F0_SYNTHESIZER    from './templates/DCFL-F0-synthesizer.md';
+import DCFL_F1_SPECIALIST_A   from './templates/DCFL-F1-specialist-a.md';
+import DCFL_F1_SPECIALIST_B   from './templates/DCFL-F1-specialist-b.md';
+import DCFL_F1_SYNTHESIZER    from './templates/DCFL-F1-synthesizer.md';
+import DCFL_F2_SPECIALIST_A   from './templates/DCFL-F2-specialist-a.md';
+import DCFL_F2_SPECIALIST_B   from './templates/DCFL-F2-specialist-b.md';
+import DCFL_F2_SYNTHESIZER    from './templates/DCFL-F2-synthesizer.md';
+import DCFL_F3_SPECIALIST_A   from './templates/DCFL-F3-specialist-a.md';
+import DCFL_F3_SPECIALIST_B   from './templates/DCFL-F3-specialist-b.md';
+import DCFL_F3_SYNTHESIZER    from './templates/DCFL-F3-synthesizer.md';
+import DCFL_F4_P0_SPECIALIST_A from './templates/DCFL-F4_P0-specialist-a.md';
+import DCFL_F4_P0_SPECIALIST_B from './templates/DCFL-F4_P0-specialist-b.md';
+import DCFL_F4_P0_SYNTHESIZER  from './templates/DCFL-F4_P0-synthesizer.md';
 
-interface PromptEntry {
-  metadata: PromptMetadata;
-  content: string;
-}
-
-const PROMPT_MAP: Record<PromptId, string> = {
+export const DCFL_PROMPT_MAP: Record<PromptId, string> = {
   F0,
   F1,
   F2,
@@ -59,65 +67,30 @@ const PROMPT_MAP: Record<PromptId, string> = {
   F6_2a,
   F6_2b,
   EXTRACTOR,
+  DCFL_F0_SPECIALIST_A,
+  DCFL_F0_SPECIALIST_B,
+  DCFL_F0_SYNTHESIZER,
+  DCFL_F1_SPECIALIST_A,
+  DCFL_F1_SPECIALIST_B,
+  DCFL_F1_SYNTHESIZER,
+  DCFL_F2_SPECIALIST_A,
+  DCFL_F2_SPECIALIST_B,
+  DCFL_F2_SYNTHESIZER,
+  DCFL_F3_SPECIALIST_A,
+  DCFL_F3_SPECIALIST_B,
+  DCFL_F3_SYNTHESIZER,
+  DCFL_F4_P0_SPECIALIST_A,
+  DCFL_F4_P0_SPECIALIST_B,
+  DCFL_F4_P0_SYNTHESIZER,
 };
 
-class PromptRegistry {
-  private cache: Map<PromptId, PromptEntry> = new Map();
+// Singleton que usa el PromptRegistry unificado de core
+const coreRegistry = new CorePromptRegistry({
+  siteId:   'dcfl',
+  localMap: DCFL_PROMPT_MAP,
+});
 
-  private parse(raw: string): PromptEntry {
-    const frontmatterMatch = raw.match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/);
-    if (!frontmatterMatch) {
-      return {
-        metadata: { id: 'unknown', name: 'Unknown', version: '1.0.0', tags: [] },
-        content: raw,
-      };
-    }
-    const frontmatter = frontmatterMatch[1] ?? '';
-    const content = frontmatterMatch[2] ?? '';
-    const metadata: PromptMetadata = { id: 'unknown', name: '', version: '1.0.0', tags: [] };
+export const getPromptRegistry = (): CorePromptRegistry => coreRegistry;
 
-    for (const line of frontmatter.split('\n')) {
-      const [key, ...rest] = line.split(':');
-      const value = rest.join(':').trim();
-      if (key === 'id') metadata.id = value;
-      if (key === 'name') metadata.name = value;
-      if (key === 'version') metadata.version = value;
-      if (key === 'tags') {
-        metadata.tags = value
-          .replace(/[\[\]]/g, '')
-          .split(',')
-          .map((t) => t.trim());
-      }
-    }
-
-    return { metadata, content: content.trim() };
-
-  }
-
-  get(id: PromptId): PromptEntry {
-    if (this.cache.has(id)) return this.cache.get(id)!;
-
-    const raw = PROMPT_MAP[id];
-    if (!raw) throw new Error(`Prompt not found: ${id}`);
-
-    const entry = this.parse(raw);
-    this.cache.set(id, entry);
-    return entry;
-  }
-
-  render(id: PromptId, variables: Record<string, string>): string {
-    const entry = this.get(id);
-    let rendered = entry.content;
-
-    for (const [key, value] of Object.entries(variables)) {
-      rendered = rendered.replaceAll(`{{${key}}}`, value);
-    }
-
-    return rendered;
-  }
-}
-
-// Singleton
-const registry = new PromptRegistry();
-export const getPromptRegistry = () => registry;
-export type { PromptEntry };
+// Re-exportar tipos para compatibilidad
+export type { PromptEntry, PromptMetadata, IPromptRegistry };

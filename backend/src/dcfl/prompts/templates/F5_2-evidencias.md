@@ -25,9 +25,9 @@ Este documento genera PLANTILLAS para ser llenadas por el candidato. NO inventes
 ## FORMATO DE SALIDA OBLIGATORIO
 
 # ANEXO DE EVIDENCIAS — EC0366
-**Proyecto:** [nombre del proyecto del contexto]
-**Candidato:** [clientName del contexto]
-**Fecha de elaboración:** [fecha actual]
+**Proyecto:** {{projectName}}
+**Candidato:** {{clientName}}
+**Fecha de elaboración:** {{fechaActual}}
 
 > **Instrucciones generales:** Este documento es una plantilla oficial para el expediente de certificación EC0366. Cada sección indica qué evidencia recopilar, cómo hacerlo y qué formato usar. Complete cada campo antes de entregar el expediente al organismo certificador.
 

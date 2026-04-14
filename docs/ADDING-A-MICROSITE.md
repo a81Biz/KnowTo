@@ -464,6 +464,152 @@ Configura en la plataforma de hosting:
 
 ---
 
+---
+
+## 11. Backend unificado — servicios core (v2.0+)
+
+> Desde la unificación FASE 0–7 (abril 2026), todos los servicios de IA, extracción de contexto,
+> crawling, uploads y el orquestador de pipelines residen en `backend/src/core/`.
+> **Nunca los dupliques en tu microsite.**
+
+### 11.1 Estructura backend de un microsite (post-unificación)
+
+```
+backend/src/<site>/
+├── prompts/
+│   ├── templates/          # .md con YAML frontmatter
+│   ├── flow-map.yaml       # Definición de pipelines multi-agente
+│   └── index.ts            # PromptRegistry + PROMPT_MAP
+├── routes/
+│   └── wizard.route.ts     # Handlers (usan servicios de core)
+├── services/
+│   └── supabase.service.ts # Extiende BaseSupabaseService
+├── types/
+│   └── wizard.types.ts     # PromptId union, tipos site-específicos
+└── router.ts               # Hono router + export SiteConfig
+```
+
+### 11.2 PromptRegistry
+
+```typescript
+// src/<site>/prompts/index.ts
+import { PromptRegistry as CorePromptRegistry } from '../../core/prompts/registry';
+import type { PromptId } from '../types/wizard.types';
+import F0 from './templates/F0-*.md';
+
+export const SITE_PROMPT_MAP: Record<PromptId, string> = { F0 /*, ...*/ };
+
+const coreRegistry = new CorePromptRegistry({ siteId: '<site>', localMap: SITE_PROMPT_MAP });
+export const getPromptRegistry = (): CorePromptRegistry => coreRegistry;
+```
+
+Cada `.md` debe llevar frontmatter YAML:
+
+```markdown
+---
+id: F0
+agent_type: specialist
+model: claude-sonnet-4-6
+---
+Tu prompt aquí. Usa {{variable}} para interpolación.
+```
+
+### 11.3 SiteConfig y flow-map
+
+```typescript
+// src/<site>/router.ts
+import { readFileSync } from 'fs';
+import { resolve } from 'path';
+import yaml from 'js-yaml';
+import type { SiteConfig } from '../core/types/pipeline.types';
+
+const flowMapRaw = readFileSync(resolve(__dirname, 'prompts/flow-map.yaml'), 'utf-8');
+
+export const siteSiteConfig: SiteConfig = {
+  site_id: '<site>',
+  flow_map: yaml.load(flowMapRaw) as SiteConfig['flow_map'],
+};
+```
+
+El `flow-map.yaml` define las etapas multi-agente (extractor → specialist → judge):
+
+```yaml
+version: "2.0.0"
+pipelines:
+  F0:
+    description: "Marco de referencia"
+    stages:
+      - id: extractor_web
+        agent: extractor
+        prompt_id: EXTRACTOR
+        inputs: [crawlerData]
+        output_guard: sector_raw
+        next: specialist
+      - id: specialist
+        agent: specialist
+        prompt_id: F0
+        inputs: [sector_raw]
+        output_guard: resultado
+        next: judge
+      - id: judge
+        agent: judge
+        prompt_id: JUDGE_F0
+        inputs: [resultado]
+        output_guard: resultado_final
+        max_retries: 2
+        fallthrough_on_error: true
+```
+
+### 11.4 Extender BaseSupabaseService
+
+```typescript
+// src/<site>/services/supabase.service.ts
+import { BaseSupabaseService } from '../../core/services/supabase.service';
+
+export class SupabaseService extends BaseSupabaseService {
+  protected override readonly SP_CREATE_PROJECT = 'sp_<site>_create_project';
+  protected override readonly SP_SAVE_STEP      = 'sp_<site>_save_step';
+  protected override readonly SP_SAVE_DOCUMENT  = 'sp_<site>_save_document';
+  protected override readonly SP_GET_CONTEXT    = 'sp_<site>_get_project_context';
+  protected override readonly SP_LIST_PROJECTS  = 'sp_<site>_list_user_projects';
+
+  async createProject(params: { userId: string; name: string }) {
+    return this.client.rpc(this.SP_CREATE_PROJECT, params);
+  }
+}
+```
+
+### 11.5 Handlers con servicios de core
+
+```typescript
+// src/<site>/routes/wizard.route.ts
+import { AIService }               from '../../core/services/ai.service';
+import { ContextExtractorService } from '../../core/services/context-extractor.service';
+import { getPromptRegistry }       from '../prompts';
+import { siteSiteConfig }          from '../router';
+
+const SYSTEM_PROMPT = `Eres un experto en <dominio>...`;
+
+// Dentro de un handler:
+const ai      = new AIService(c.env, getPromptRegistry(), SYSTEM_PROMPT);
+const extract = new ContextExtractorService(c.env, siteSiteConfig.flow_map as Record<string, unknown>);
+```
+
+### 11.6 Servicios core disponibles — no duplicar
+
+| Necesidad | Importar desde |
+|:---|:---|
+| Generación IA / runAgent | `core/services/ai.service` → `AIService` |
+| Extracción de contexto | `core/services/context-extractor.service` → `ContextExtractorService` |
+| Scraping web | `core/services/crawler.service` → `CrawlerService` |
+| Upload de archivos | `core/services/upload.service` → `UploadService` |
+| Orquestador de pipeline | `core/services/pipeline-orchestrator.service` → `PipelineOrchestratorService` |
+| Prompt registry | `core/prompts/registry` → `PromptRegistry` |
+| Base DB | `core/services/supabase.service` → `BaseSupabaseService` |
+| Tipos compartidos | `core/types/pipeline.types`, `core/types/env` |
+
+---
+
 ## Resumen de archivos modificados y creados
 
 | Acción | Archivo |

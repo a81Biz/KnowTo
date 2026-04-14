@@ -54,10 +54,11 @@ vi.mock('../../../cce/services/supabase.service', () => ({
   })),
 }));
 
-vi.mock('../../../cce/services/ai.service', () => ({
+vi.mock('../../../core/services/ai.service', () => ({
   AIService: vi.fn().mockImplementation(() => ({
     generate: mockAiGenerate,
-    executePipeline: vi.fn().mockImplementation(async ({ pipelineId, context }) => {
+    extractTextFromImage: vi.fn().mockResolvedValue('Texto OCR extraído'),
+    executePipeline: vi.fn().mockImplementation(async ({ pipelineId }: { pipelineId: string }) => {
       if (pipelineId === 'F0') {
         return { success: true, output: '# MARCO DE REFERENCIA VALIDADO\n## 1. ANÁLISIS DEL SECTOR\nContenido generado.' };
       }
@@ -66,13 +67,13 @@ vi.mock('../../../cce/services/ai.service', () => ({
   })),
 }));
 
-vi.mock('../../../cce/services/context-extractor.service', () => ({
+vi.mock('../../../core/services/context-extractor.service', () => ({
   ContextExtractorService: vi.fn().mockImplementation(() => ({
     extract: mockExtract,
   })),
 }));
 
-vi.mock('../../../cce/services/upload.service', () => ({
+vi.mock('../../../core/services/upload.service', () => ({
   UploadService: vi.fn().mockImplementation(() => ({
     storeFile: mockStoreFile,
   })),

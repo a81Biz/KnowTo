@@ -21,10 +21,10 @@ Extrae del contexto: nombre del curso (F1), industria/sector (F0), duración tot
 ## FORMATO DE SALIDA OBLIGATORIO
 
 # RESUMEN EJECUTIVO Y DECLARACIÓN FINAL — EC0366
-**Proyecto:** [nombre del proyecto]
-**Candidato:** [clientName]
+**Proyecto:** {{projectName}}
+**Candidato:** {{clientName}}
 **Folio de expediente:** [mismo folio generado en F6_2a — si disponible en contexto, usar el mismo]
-**Fecha de cierre:** [fecha actual]
+**Fecha de cierre:** {{fechaActual}}
 
 ---
 

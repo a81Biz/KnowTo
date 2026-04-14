@@ -22,9 +22,9 @@ Usa: estructura temática de F2 (módulos y duración), actividades definidas en
 
 # PRODUCTO 3: CALENDARIO GENERAL DE ACTIVIDADES
 **Elemento EC0366:** E1220 — Producto #2
-**Proyecto:** [nombre del proyecto]
-**Candidato:** [clientName]
-**Fecha de elaboración:** [fecha actual]
+**Proyecto:** {{projectName}}
+**Candidato:** {{clientName}}
+**Fecha de elaboración:** {{fechaActual}}
 
 ---
 

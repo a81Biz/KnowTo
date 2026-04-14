@@ -64,19 +64,34 @@ function isAllowedOrigin(origin: string, requestUrl: string, isProd: boolean): b
 // ============================================================================
 // MIDDLEWARE GLOBAL
 // ============================================================================
-app.use('*', logger());
+
+// CORS debe ir PRIMERO — antes que logger y errorMiddleware para que los
+// preflight OPTIONS reciban los headers correctos aunque fallen otras capas.
+//
+// Notas críticas:
+//   1. credentials: true  → obligatorio para peticiones con Authorization header
+//      (credentialed requests). Sin esto el navegador bloquea la respuesta.
+//   2. origin devuelve null (no '') para orígenes no permitidos — hono/cors
+//      omite el header cuando recibe null; con '' lo pondría en blanco y el
+//      navegador lo rechaza de todos modos, pero con un error diferente.
+//   3. c.env puede ser undefined en entornos de test → acceso seguro con ?.
 app.use(
   '*',
   cors({
     origin: (origin, c) => {
-      const isProd = (c.env as Env).ENVIRONMENT === 'production';
-      return isAllowedOrigin(origin, c.req.url, isProd) ? origin : '';
+      if (!origin) return null; // sin Origin = petición no-browser, dejar pasar
+      const isProd = (c.env as Env | undefined)?.ENVIRONMENT === 'production';
+      const allowed = isAllowedOrigin(origin, c.req.url, isProd);
+      if (!allowed) console.warn(`[CORS] bloqueado: ${origin}`);
+      return allowed ? origin : null;
     },
     allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowHeaders: ['Content-Type', 'Authorization'],
+    credentials: true,
     maxAge: 86400,
   })
 );
+app.use('*', logger());
 app.use('*', errorMiddleware);
 
 // ============================================================================

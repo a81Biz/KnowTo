@@ -37,13 +37,13 @@ vi.mock('../../dcfl/services/supabase.service', () => ({
   })),
 }));
 
-vi.mock('../../dcfl/services/ai.service', () => ({
+vi.mock('../../core/services/ai.service', () => ({
   AIService: vi.fn().mockImplementation(() => ({
     generate: mockAiGenerate,
   })),
 }));
 
-vi.mock('../../dcfl/services/context-extractor.service', () => ({
+vi.mock('../../core/services/context-extractor.service', () => ({
   ContextExtractorService: vi.fn().mockImplementation(() => ({
     extract: mockExtract,
   })),

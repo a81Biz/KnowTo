@@ -22,9 +22,9 @@ Desarrolla contenido educativo para los temas principales del curso (de la estru
 
 # PRODUCTO 4: DOCUMENTOS DE TEXTO
 **Elemento EC0366:** E1220 — Producto #3
-**Proyecto:** [nombre del proyecto]
-**Candidato:** [clientName]
-**Fecha:** [fecha actual]
+**Proyecto:** {{projectName}}
+**Candidato:** {{clientName}}
+**Fecha:** {{fechaActual}}
 
 ---
 

@@ -45,10 +45,12 @@ export const ENDPOINTS = {
     createProject: '/wizard/project',
     saveStep:      '/wizard/step',
     generate:      '/wizard/generate',
+    generateAsync: '/wizard/generate-async',
     generateForm:  '/wizard/generate-form',
     extract:       '/wizard/extract',
     getProject:    (projectId: string) => `/wizard/project/${projectId}`,
     listProjects:  '/wizard/projects',
+    job:           (jobId: string) => `/wizard/job/${jobId}`,
   },
   health: '/health',
 } as const;

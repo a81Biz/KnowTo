@@ -3,9 +3,11 @@
 // Implementa las 7 secciones obligatorias del FRONTEND ARCHITECTURE DOCUMENT
 
 import { TemplateLoader } from '@core/template.loader';
-import { postData } from '@core/http.client';
+import { postData, getData } from '@core/http.client';
 import { ENDPOINTS, buildEndpoint } from './endpoints';
 import { showLoading, hideLoading, showError, showSuccess, renderMarkdown, printDocument } from '@core/ui';
+import { subscribeToJob, type JobResult } from './supabase.realtime';
+import { logger } from './logger';
 import { wizardStore } from '../stores/wizard.store';
 import type { PhaseId, PromptId } from '../types/wizard.types';
 
@@ -30,16 +32,23 @@ export interface StepUiConfig {
   loadingText?: string;
   submitText?: string;
   submittingText?: string;
+  /** Texto de ayuda contextual mostrado en la burbuja azul del paso. */
+  helpText?: string;
+  /** Función que recibe los datos del formulario y retorna el texto del resumen del paso. */
+  summaryTemplate?: (data: Record<string, unknown>) => string;
 }
 
 export interface StepConfig {
   stepNumber: number;
   templateId: string;
   phaseId: PhaseId;
-  promptId: PromptId;
+  /** null para pasos sin generación IA (solo guardan datos y avanzan). */
+  promptId: PromptId | null;
   uiConfig?: StepUiConfig;
   /** Step 0 only: crear el proyecto antes de generar el documento */
   createProjectFirst?: boolean;
+  /** Muestra un textarea de notas manuales al final del paso. */
+  allowManualOverride?: boolean;
 }
 
 // ============================================================================
@@ -60,7 +69,7 @@ export class BaseStep {
     btnPrint?: HTMLButtonElement;
   } = {};
 
-  protected _uiConfig = {
+  protected _uiConfig: Required<Pick<StepUiConfig, 'loadingText' | 'submitText' | 'submittingText'>> & StepUiConfig = {
     loadingText: 'Generando documento con IA...',
     submitText: '✨ Generar documento',
     submittingText: '⏳ Generando con IA...',
@@ -82,6 +91,74 @@ export class BaseStep {
   }
 
   // 4. LÓGICA DE VISTA
+
+  /** Inyecta la burbuja de ayuda justo antes del formulario del paso. */
+  private _injectHelpBubble(): void {
+    if (!this._uiConfig.helpText) return;
+    if (this._container.querySelector('#help-bubble')) return;
+    const bubble = document.createElement('div');
+    bubble.id = 'help-bubble';
+    bubble.className = 'bg-blue-50 border border-blue-200 rounded-xl p-4 flex gap-3 items-start';
+    bubble.innerHTML = `
+      <span class="text-2xl flex-shrink-0">📘</span>
+      <div>
+        <h3 class="font-semibold text-blue-900 text-sm">Acerca de este paso</h3>
+        <p class="text-blue-800 text-sm mt-1">${this._uiConfig.helpText}</p>
+      </div>`;
+    const form = this._dom.form;
+    if (form?.parentElement) {
+      form.parentElement.insertBefore(bubble, form);
+    } else {
+      this._container.prepend(bubble);
+    }
+  }
+
+  /** Inyecta el div de resumen dinámico justo antes del formulario. */
+  private _injectSummaryDiv(): void {
+    if (!this._uiConfig.summaryTemplate) return;
+    if (this._container.querySelector('#step-summary')) return;
+    const summary = document.createElement('div');
+    summary.id = 'step-summary';
+    summary.className = 'bg-gray-50 border border-gray-200 rounded-xl p-4 text-sm';
+    summary.innerHTML = `<span class="font-semibold text-gray-600">📊 Resumen: </span><span id="summary-content" class="text-gray-500">Completa el formulario para ver el resumen.</span>`;
+    const form = this._dom.form;
+    // Insert after help-bubble (if present) or before the form
+    const helpBubble = this._container.querySelector('#help-bubble');
+    const insertAfter = helpBubble ?? null;
+    if (insertAfter?.nextElementSibling) {
+      insertAfter.parentElement!.insertBefore(summary, insertAfter.nextElementSibling);
+    } else if (form?.parentElement) {
+      form.parentElement.insertBefore(summary, form);
+    } else {
+      this._container.appendChild(summary);
+    }
+  }
+
+  /** Actualiza el texto del resumen con los datos del formulario. */
+  protected _updateSummary(data?: Record<string, unknown>): void {
+    if (!this._uiConfig.summaryTemplate) return;
+    const el = this._container.querySelector<HTMLElement>('#summary-content');
+    if (!el) return;
+    el.textContent = this._uiConfig.summaryTemplate(data ?? this._collectFormData());
+  }
+
+  /** Inyecta el campo de notas manuales al final del contenedor del paso. */
+  private _injectManualOverride(): void {
+    if (!this._config.allowManualOverride) return;
+    if (this._container.querySelector('#manual-override')) return;
+    const div = document.createElement('div');
+    div.id = 'manual-override';
+    div.className = 'mt-4 space-y-2';
+    div.innerHTML = `
+      <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest">
+        Notas o ajustes manuales (opcional)
+      </label>
+      <textarea name="manualNotes" rows="3"
+        class="input-field w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 text-sm"
+        placeholder="Si deseas agregar notas antes de continuar, escríbelas aquí..."></textarea>`;
+    this._container.appendChild(div);
+  }
+
   protected _renderPreview(markdown: string): void {
     if (!this._dom.previewPanel || !this._dom.documentPreview) return;
     this._dom.documentPreview.innerHTML = renderMarkdown(markdown);
@@ -92,9 +169,9 @@ export class BaseStep {
   /** Inyecta el botón de impresión la primera vez que se muestra el preview. */
   private _ensurePrintButton(markdown: string): void {
     if (!this._dom.previewPanel) return;
+    const title = this._pdfTitle();
     if (this._dom.btnPrint) {
-      this._dom.btnPrint.onclick = () => printDocument(markdown,
-        wizardStore.getState().clientData.projectName || 'Documento KnowTo');
+      this._dom.btnPrint.onclick = () => printDocument(markdown, title);
       return;
     }
     const btnContainer = this._dom.previewPanel.querySelector<HTMLElement>('.flex.gap-2');
@@ -105,11 +182,17 @@ export class BaseStep {
     btn.textContent = '🖨️ Imprimir / PDF';
     btn.className =
       'px-4 py-2 border border-green-300 text-green-700 rounded-lg text-sm hover:bg-green-50';
-    btn.onclick = () => printDocument(markdown,
-      wizardStore.getState().clientData.projectName || 'Documento KnowTo');
+    btn.onclick = () => printDocument(markdown, title);
 
     btnContainer.appendChild(btn);
     this._dom.btnPrint = btn;
+  }
+
+  /** Nombre sugerido para el PDF: "{N}_{Etiqueta del paso}". */
+  private _pdfTitle(): string {
+    const step = wizardStore.getState().steps[this._config.stepNumber];
+    const label = step?.label ?? 'Documento';
+    return `${this._config.stepNumber}_${label}`;
   }
 
   protected _setLoading(loading: boolean): void {
@@ -130,6 +213,14 @@ export class BaseStep {
 
   protected async _generateDocument(extraData?: Record<string, unknown>): Promise<void> {
     const formData = { ...this._collectFormData(), ...extraData };
+
+    // Pasos sin IA: guardar datos y marcar como completado
+    if (!this._config.promptId) {
+      wizardStore.setStepInputData(this._config.stepNumber, formData);
+      wizardStore.setStepStatus(this._config.stepNumber, 'completed');
+      return;
+    }
+
     let state = wizardStore.getState();
 
     // Step 0: crear el proyecto con los datos del formulario antes de generar
@@ -232,11 +323,225 @@ export class BaseStep {
     }
   }
 
+  /**
+   * Versión asíncrona de _generateDocument.
+   * Encola el job en el backend y espera la notificación reactiva:
+   *   - Desarrollo: WebSocket (ws://api.localhost/ws)
+   *   - Producción: Supabase Realtime (suscripción directa al frontend)
+   *
+   * Los pasos que necesiten pipelines lentos (>30 s) deben usar este método.
+   */
+  protected async _generateDocumentAsync(extraData?: Record<string, unknown>): Promise<void> {
+    if (!this._config.promptId) {
+      // Paso sin IA — delegar al flujo síncrono
+      return this._generateDocument(extraData);
+    }
+
+    const timerLabel = `step${this._config.stepNumber}:${this._config.promptId}`;
+    logger.time(timerLabel);
+    logger.info(`[step${this._config.stepNumber}] Iniciando generación async`, { promptId: this._config.promptId });
+
+    const formData = { ...this._collectFormData(), ...extraData };
+    let state      = wizardStore.getState();
+
+    // Step 0: crear el proyecto con los datos del formulario antes de generar
+    if (this._config.createProjectFirst && !state.projectId) {
+      logger.info(`[step${this._config.stepNumber}] Creando proyecto...`);
+      try {
+        showLoading('Creando proyecto...');
+        const emailVal = (formData['email'] as string) || undefined;
+        const res = await postData<{ projectId: string }>(
+          buildEndpoint(ENDPOINTS.wizard.createProject),
+          {
+            name: formData['projectName'] as string,
+            clientName: formData['clientName'] as string,
+            industry: (formData['industry'] as string) || undefined,
+            email: emailVal,
+          }
+        );
+        if (res.data?.projectId) {
+          wizardStore.setProjectId(res.data.projectId);
+          wizardStore.setClientData({
+            projectName: formData['projectName'] as string,
+            clientName: formData['clientName'] as string,
+            industry: formData['industry'] as string ?? '',
+            email: formData['email'] as string ?? '',
+          });
+          state = wizardStore.getState();
+          logger.info(`[step${this._config.stepNumber}] Proyecto creado`, { projectId: res.data.projectId });
+        }
+      } catch (err) {
+        logger.error(`[step${this._config.stepNumber}] Error al crear proyecto`, err);
+        hideLoading();
+        showError(err instanceof Error ? err.message : 'Error al crear el proyecto');
+        return;
+      }
+    }
+
+    if (!state.projectId) {
+      logger.error(`[step${this._config.stepNumber}] Sin projectId`);
+      showError('No hay proyecto activo. Regresa al inicio.');
+      return;
+    }
+
+    // Registrar step si no tiene ID
+    let stepId = state.steps[this._config.stepNumber]?.stepId;
+    if (!stepId) {
+      logger.info(`[step${this._config.stepNumber}] Registrando step...`);
+      try {
+        const res = await postData<{ stepId: string }>(
+          buildEndpoint(ENDPOINTS.wizard.saveStep),
+          { projectId: state.projectId, stepNumber: this._config.stepNumber, inputData: formData }
+        );
+        if (res.data?.stepId) {
+          stepId = res.data.stepId;
+          wizardStore.setStepId(this._config.stepNumber, stepId);
+          logger.info(`[step${this._config.stepNumber}] Step registrado`, { stepId });
+        }
+      } catch (err) {
+        logger.warn(`[step${this._config.stepNumber}] No se pudo registrar el step`, err);
+      }
+    }
+
+    if (!stepId) {
+      logger.error(`[step${this._config.stepNumber}] Sin stepId`);
+      showError('No se pudo registrar el paso. Intenta de nuevo.');
+      return;
+    }
+
+    this._setLoading(true);
+    showLoading('Procesando… recibirás una notificación cuando termine.');
+    wizardStore.setStepInputData(this._config.stepNumber, formData);
+
+    const context = wizardStore.buildContext(this._config.stepNumber) as {
+      projectName: string;
+      clientName:  string;
+      industry?:   string;
+      email?:      string;
+      previousData?: Record<string, unknown>;
+    };
+
+    let jobId: string;
+    try {
+      logger.info(`[step${this._config.stepNumber}] Encolando job...`, { projectId: state.projectId, stepId, phaseId: this._config.phaseId });
+      const res = await postData<{ jobId: string; status: string }>(
+        buildEndpoint(ENDPOINTS.wizard.generateAsync),
+        {
+          projectId:  state.projectId,
+          stepId,
+          phaseId:    this._config.phaseId,
+          promptId:   this._config.promptId,
+          context,
+          userInputs: formData,
+        }
+      );
+      jobId = res.data!.jobId;
+      logger.info(`[step${this._config.stepNumber}] Job encolado`, { jobId });
+    } catch (err) {
+      logger.error(`[step${this._config.stepNumber}] Error al encolar job`, err);
+      this._setLoading(false);
+      hideLoading();
+      showError(err instanceof Error ? err.message : 'Error al iniciar la generación');
+      return;
+    }
+
+    const isProduction =
+      (import.meta.env.PROD as boolean) ||
+      (import.meta.env['VITE_ENVIRONMENT'] as string) === 'production';
+
+    const onComplete = (result: JobResult) => {
+      logger.timeEnd(timerLabel);
+      logger.info(`[step${this._config.stepNumber}] Job completado`, { documentId: result.documentId });
+      wizardStore.setStepDocument(this._config.stepNumber, result.content, result.documentId);
+      this._renderPreview(result.content);
+      this._setLoading(false);
+      hideLoading();
+    };
+
+    const onError = (error: string) => {
+      logger.timeEnd(timerLabel);
+      logger.error(`[step${this._config.stepNumber}] Job fallido`, error);
+      showError(error);
+      wizardStore.setStepStatus(this._config.stepNumber, 'error');
+      this._setLoading(false);
+      hideLoading();
+    };
+
+    const TIMEOUT_MS = 20 * 60 * 1000; // 20 minutos
+
+    if (isProduction) {
+      logger.info(`[step${this._config.stepNumber}] Esperando via Supabase Realtime...`);
+      // Producción: Supabase Realtime
+      const channel = subscribeToJob(jobId, onComplete, onError);
+      setTimeout(() => {
+        channel.unsubscribe();
+        onError('Timeout: el pipeline tardó más de 20 minutos');
+      }, TIMEOUT_MS);
+    } else {
+      logger.info(`[step${this._config.stepNumber}] Iniciando polling (cada 2s, max 20min)...`);
+      // Desarrollo: polling a GET /job/:jobId
+      void this._pollJob(jobId, onComplete, onError, TIMEOUT_MS);
+    }
+  }
+
+  /**
+   * Polling para desarrollo: consulta GET /job/:jobId cada 2 s hasta que
+   * el job complete, falle o se agote el timeout.
+   */
+  private async _pollJob(
+    jobId: string,
+    onComplete: (result: JobResult) => void,
+    onError: (error: string) => void,
+    timeoutMs: number,
+  ): Promise<void> {
+    const INTERVAL = 2000;
+    const maxAttempts = Math.floor(timeoutMs / INTERVAL);
+
+    for (let i = 0; i < maxAttempts; i++) {
+      await new Promise<void>((resolve) => setTimeout(resolve, INTERVAL));
+
+      logger.debug(`[poll] job=${jobId} intento=${i + 1}/${maxAttempts}`);
+
+      try {
+        const res = await getData<{
+          jobId: string;
+          status: string;
+          result?: Record<string, unknown>;
+          error?: string;
+        }>(buildEndpoint(ENDPOINTS.wizard.job(jobId)));
+
+        const status = res.data?.status;
+        logger.debug(`[poll] job=${jobId} status=${status ?? 'unknown'}`);
+
+        if (status === 'completed' && res.data?.result) {
+          onComplete(res.data.result as unknown as JobResult);
+          return;
+        }
+        if (status === 'failed') {
+          onError(res.data?.error ?? 'Error en el pipeline');
+          return;
+        }
+        // status === 'pending' | 'running' → seguir esperando
+      } catch (err) {
+        logger.warn(`[poll] job=${jobId} error de red en intento ${i + 1}`, err);
+      }
+    }
+
+    onError('Timeout: el pipeline tardó más de 10 minutos');
+  }
+
   // 6. EVENTOS
   protected _bindEvents(): void {
+    // Auto-guardar y actualizar resumen al editar cualquier campo
+    this._dom.form?.addEventListener('input', () => {
+      const data = this._collectFormData();
+      wizardStore.setStepInputData(this._config.stepNumber, data);
+      this._updateSummary(data);
+    });
+
     this._dom.form?.addEventListener('submit', (e) => {
       e.preventDefault();
-      void this._generateDocument();
+      void this._generateDocumentAsync();
     });
 
     this._dom.btnCopy?.addEventListener('click', () => {
@@ -249,7 +554,7 @@ export class BaseStep {
     });
 
     this._dom.btnRegenerate?.addEventListener('click', () => {
-      void this._generateDocument();
+      void this._generateDocumentAsync();
     });
   }
 
@@ -307,14 +612,20 @@ export class BaseStep {
 
     this._cacheDOM();
 
+    // Inyectar burbuja de ayuda y resumen dinámico si están configurados
+    this._injectHelpBubble();
+    this._injectSummaryDiv();
+    this._injectManualOverride();
+
     await this._ensureExtractedContext();
 
     const step = wizardStore.getState().steps[this._config.stepNumber];
     if (step?.documentContent) {
       this._renderPreview(step.documentContent);
     }
-    if (step?.inputData) {
+    if (step?.inputData && Object.keys(step.inputData).length > 0) {
       this._restoreFormData(step.inputData);
+      this._updateSummary(step.inputData);
     }
 
     this._bindEvents();

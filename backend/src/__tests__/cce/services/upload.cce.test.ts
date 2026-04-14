@@ -1,6 +1,6 @@
 // src/__tests__/cce/services/upload.cce.test.ts
 import { describe, it, expect } from 'vitest';
-import { UploadService } from '../../../cce/services/upload.service';
+import { UploadService } from '../../../core/services/upload.service';
 import type { Env } from '../../../core/types/env';
 
 const DEV_ENV: Env = { ENVIRONMENT: 'development' } as Env;

@@ -22,8 +22,8 @@ Actúa como un evaluador del estándar EC0366 del CONOCER realizando la verifica
 ## FORMATO DE SALIDA OBLIGATORIO
 
 # VERIFICACIÓN Y EVALUACIÓN DEL CURSO (E1221)
-**Proyecto:** [nombre]
-**Fecha de verificación:** [fecha actual]
+**Proyecto:** {{projectName}}
+**Fecha de verificación:** {{fechaActual}}
 
 ---
 

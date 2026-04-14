@@ -15,7 +15,10 @@ class Step2AnalysisController extends BaseStep {
       templateId: 'tpl-step2-analysis',
       phaseId: 'F2',
       promptId: 'F2',
-      uiConfig: { loadingText: 'Generando Especificaciones de Análisis (F2)...' },
+      uiConfig: {
+        loadingText: 'Generando Especificaciones de Análisis (F2)...',
+        helpText: 'La IA diseña la modalidad, estructura temática, estrategias instruccionales y arquitectura de evaluación del curso. Requiere que F0 y F1 estén completados para generar especificaciones coherentes.',
+      },
     });
   }
 

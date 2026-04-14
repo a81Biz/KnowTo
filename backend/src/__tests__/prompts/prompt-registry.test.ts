@@ -43,7 +43,7 @@ describe('PromptRegistry', () => {
   });
 
   it('debe renderizar variables correctamente', () => {
-    const rendered = registry.render('F0', {
+    const rendered = registry.renderById('F0', {
       context: '{"projectName":"Test","clientName":"Juan"}',
       userInputs: '{}',
     });

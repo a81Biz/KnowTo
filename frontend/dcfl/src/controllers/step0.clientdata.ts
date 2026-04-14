@@ -8,5 +8,10 @@ export const Step0ClientData = createStep({
   phaseId: 'F0',
   promptId: 'F0',
   createProjectFirst: true,
-  uiConfig: { loadingText: 'Generando Marco de Referencia (F0)...' },
+  uiConfig: {
+    loadingText: 'Generando Marco de Referencia (F0)...',
+    helpText: 'La IA investigará el sector, la competencia y las mejores prácticas para tu proyecto. Cuanto más detallado sea el contexto que proporciones, más relevante será el análisis de mercado generado.',
+    summaryTemplate: (d) =>
+      `Proyecto: ${d['projectName'] || '—'} · Sector: ${d['industry'] || '—'} · Candidato: ${d['clientName'] || '—'}`,
+  },
 });

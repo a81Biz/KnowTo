@@ -1,8 +1,18 @@
 ---
 id: F2_5
 name: Recomendaciones Pedagógicas de Producción
-version: 1.0.0
+version: 1.1.0
 tags: [EC0366, pedagogia, videos, reporteo, bibliografia, produccion]
+defaults:
+  videosCount: 5
+  videoDuration: 7
+  reportFrequency: "Semanal"
+  reportingActivities: "Progreso por módulo, calificaciones, tiempo invertido"
+bibliography:
+  - "Mayer, R. E. (2009). Multimedia Learning (2nd ed.). Cambridge University Press."
+  - "Sweller, J. (1988). Cognitive load during problem solving. Cognitive Science, 12(2), 257–285."
+  - "Guo, P. J., Kim, J., & Rubin, R. (2014). How video production affects student engagement. ACM L@S 2014."
+  - "Clark, R. C., & Mayer, R. E. (2016). E-Learning and the Science of Instruction (4th ed.). Wiley."
 ---
 
 Actúa como un investigador en tecnología educativa y diseño instruccional certificado en EC0366. Tu función es analizar el contexto del curso y generar recomendaciones basadas en evidencia empírica sobre la producción de contenidos e-learning.
@@ -32,9 +42,9 @@ Con base en el tema del curso, la audiencia objetivo, la modalidad seleccionada 
 ## FORMATO DE SALIDA OBLIGATORIO
 
 # RECOMENDACIONES PEDAGÓGICAS DE PRODUCCIÓN
-**Proyecto:** [nombre del proyecto del contexto]
-**Fase:** F2.5
-**Fecha:** [fecha actual]
+**Proyecto:** {{projectName}}
+**Fase:** Recomendaciones Pedagógicas de Producción
+**Fecha:** {{fechaActual}}
 
 ---
 
@@ -126,4 +136,10 @@ Basado en las recomendaciones anteriores y la estructura temática de [N módulo
 - Las referencias bibliográficas DEBEN ser reales. Usa investigadores reconocidos como: Mayer (multimedia learning), Sweller (cognitive load), Guo et al. (video engagement), Clark & Mayer (e-learning), Siemens (connectivism).
 - Si no tienes certeza de un dato bibliográfico específico, cita el marco teórico general (ej: "Según la Teoría de la Carga Cognitiva de Sweller (1988)...").
 - Adapta TODO al contexto específico del curso: tema, audiencia, modalidad.
+- **VALORES CONCRETOS OBLIGATORIOS** — El resumen ejecutivo (sección 3.3) DEBE terminar con valores numéricos concretos, no rangos. Si el contexto no permite calcularlos con precisión, usa estos valores por defecto basados en bibliografía (Guo et al., 2014; Mayer, 2009):
+  - Total de videos: 5 (ajusta ±2 según número de módulos en F2)
+  - Duración promedio por video: 7 minutos (umbral de atención sostenida, Guo et al., 2014)
+  - Frecuencia de reportes: Semanal
+  - Actividades a reportear: Progreso por módulo, calificaciones, tiempo invertido
+- **NO dejes placeholders `[N]`, `[X]`, `[Autor]`, `[Diaria / Semanal / Por módulo]` en el documento final.** Elige el valor más adecuado para el contexto y escríbelo directamente.
 - Responde SOLO en español.

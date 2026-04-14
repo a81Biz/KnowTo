@@ -2,10 +2,19 @@
 import { OpenAPIHono, createRoute, z } from '@hono/zod-openapi';
 import { authMiddleware } from '../../core/middleware/auth.middleware';
 import { SupabaseService } from '../services/supabase.service';
-import { AIService } from '../services/ai.service';
-import { ContextExtractorService } from '../services/context-extractor.service';
-import { UploadService } from '../services/upload.service';
-import { CrawlerService } from '../services/crawler.service';
+import { AIService } from '../../core/services/ai.service';
+import { getPromptRegistry } from '../prompts';
+
+const CCE_SYSTEM_PROMPT =
+  'Eres un consultor empresarial experto en servicios de consultoría general, certificado en el estándar EC0249 del CONOCER.\n' +
+  'Genera documentos profesionales SOLO en español.\n' +
+  'Usa formato Markdown estricto con tablas y listas cuando aplique.\n' +
+  'No inventes datos. Si no tienes información, indícalo explícitamente.\n' +
+  'Responde únicamente con el documento solicitado, sin preámbulos ni explicaciones adicionales.';
+import { ContextExtractorService } from '../../core/services/context-extractor.service';
+import cceFlowMap from '../prompts/flow-map.json';
+import { UploadService } from '../../core/services/upload.service';
+import { CrawlerService } from '../../core/services/crawler.service';
 import type { Env } from '../../core/types/env';
 import type { PromptId } from '../types/wizard.types';
 
@@ -353,7 +362,7 @@ wizard.openapi(routeSaveStep, async (c) => {
 
 wizard.openapi(routeExtract, async (c) => {
   const { projectId, extractorId, sourceDocuments } = c.req.valid('json');
-  const extractor = new ContextExtractorService(c.env);
+  const extractor = new ContextExtractorService(c.env, cceFlowMap as Record<string, unknown>);
   const supabase = new SupabaseService(c.env);
 
   const result = await extractor.extract({ projectId, extractorId, sourceDocuments });
@@ -372,7 +381,7 @@ wizard.openapi(routeExtract, async (c) => {
 wizard.openapi(routeGenerate, async (c) => {
   const body = c.req.valid('json');
   const supabase = new SupabaseService(c.env);
-  const ai = new AIService(c.env);
+  const ai = new AIService(c.env, getPromptRegistry(), CCE_SYSTEM_PROMPT);
 
   console.log(`[CCE/generate] phaseId=${body.phaseId} promptId=${body.promptId} project=${body.projectId}`);
 
@@ -423,7 +432,7 @@ wizard.openapi(routeGenerate, async (c) => {
 
 wizard.openapi(routeGenerateForm, async (c) => {
   const { promptId, context } = c.req.valid('json');
-  const ai = new AIService(c.env);
+  const ai = new AIService(c.env, getPromptRegistry(), CCE_SYSTEM_PROMPT);
 
   const rawJson = await ai.generate({
     promptId: promptId as PromptId,
@@ -470,7 +479,7 @@ wizard.openapi(routeUpload, async (c) => {
 
 wizard.openapi(routeOcr, async (c) => {
   const { base64Content, mimeType } = c.req.valid('json');
-  const ai = new AIService(c.env);
+  const ai = new AIService(c.env, getPromptRegistry(), CCE_SYSTEM_PROMPT);
   const extractedText = await ai.extractTextFromImage({ base64Content, mimeType });
   return c.json({ success: true as const, data: { extractedText }, timestamp: new Date().toISOString() });
 });

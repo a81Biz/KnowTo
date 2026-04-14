@@ -22,9 +22,9 @@ Genera la estructura de diapositivas para cada módulo del curso (de la estructu
 
 # PRODUCTO 5: PRESENTACIÓN ELECTRÓNICA
 **Elemento EC0366:** E1220 — Producto #4
-**Proyecto:** [nombre del proyecto]
-**Candidato:** [clientName]
-**Fecha:** [fecha actual]
+**Proyecto:** {{projectName}}
+**Candidato:** {{clientName}}
+**Fecha:** {{fechaActual}}
 
 ---
 

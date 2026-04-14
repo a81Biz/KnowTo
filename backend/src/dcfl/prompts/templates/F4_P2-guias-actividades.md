@@ -22,9 +22,9 @@ Toma la estructura temática de F2 (módulos con nombre y objetivo). Para cada m
 
 # PRODUCTO 2: GUÍAS DE ACTIVIDADES POR MÓDULO
 **Elemento EC0366:** E1220 — Producto #1
-**Proyecto:** [nombre del proyecto]
-**Candidato:** [clientName]
-**Fecha:** [fecha actual]
+**Proyecto:** {{projectName}}
+**Candidato:** {{clientName}}
+**Fecha:** {{fechaActual}}
 
 ---
 

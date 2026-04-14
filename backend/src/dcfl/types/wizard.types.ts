@@ -6,7 +6,13 @@ export type PromptId =
   | 'F4_P0' | 'F4_P1' | 'F4_P2' | 'F4_P3' | 'F4_P4' | 'F4_P5' | 'F4_P6' | 'F4_P7'
   | 'F5' | 'F5_2'
   | 'F6' | 'F6_FORM' | 'F6_2a' | 'F6_2b'
-  | 'EXTRACTOR';
+  | 'EXTRACTOR'
+  // Sub-prompts del pipeline 5-etapas (specialist_a, specialist_b, synthesizer por fase)
+  | 'DCFL_F0_SPECIALIST_A' | 'DCFL_F0_SPECIALIST_B' | 'DCFL_F0_SYNTHESIZER'
+  | 'DCFL_F1_SPECIALIST_A' | 'DCFL_F1_SPECIALIST_B' | 'DCFL_F1_SYNTHESIZER'
+  | 'DCFL_F2_SPECIALIST_A' | 'DCFL_F2_SPECIALIST_B' | 'DCFL_F2_SYNTHESIZER'
+  | 'DCFL_F3_SPECIALIST_A' | 'DCFL_F3_SPECIALIST_B' | 'DCFL_F3_SYNTHESIZER'
+  | 'DCFL_F4_P0_SPECIALIST_A' | 'DCFL_F4_P0_SPECIALIST_B' | 'DCFL_F4_P0_SYNTHESIZER';
 
 export interface ProjectContext {
   projectName: string;

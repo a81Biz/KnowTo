@@ -11,10 +11,20 @@
 // no se incluye en el bundle de Cloudflare Workers.
 
 import { serve } from '@hono/node-server';
+import { createNodeWebSocket } from '@hono/node-ws';
 import app from './index';
 import type { Env } from './core/types/env';
+import { registerWebSocketRoute, createWsNotifier } from './core/websocket/manager';
+import { setGlobalNotifier } from './core/services/pipeline-jobs.service';
 
 const port = parseInt(process.env['PORT'] ?? '8787', 10);
+
+// ── WebSocket (solo desarrollo) ───────────────────────────────────────────────
+// createNodeWebSocket debe llamarse ANTES de serve() y con la misma instancia
+// de app para que el handler de upgrade quede registrado correctamente.
+const { injectWebSocket, upgradeWebSocket } = createNodeWebSocket({ app });
+registerWebSocketRoute(app, upgradeWebSocket);
+setGlobalNotifier(createWsNotifier());
 
 // Env mock que reemplaza los bindings de Cloudflare Workers.
 // env.AI.run nunca se llama en dev (AIService usa Ollama directamente).
@@ -31,7 +41,7 @@ const devEnv: Env = {
   } as unknown as Ai,
 };
 
-serve(
+const server = serve(
   {
     fetch: (req: Request) => app.fetch(req, devEnv),
     port,
@@ -41,6 +51,10 @@ serve(
     console.log(`[knowto-dev] Backend corriendo en http://0.0.0.0:${port}`);
     console.log(`[knowto-dev] OLLAMA_URL  : ${devEnv.OLLAMA_URL}`);
     console.log(`[knowto-dev] OLLAMA_MODEL: ${devEnv.OLLAMA_MODEL}`);
+    console.log(`[knowto-dev] WebSocket   : ws://api.localhost/ws?token=dev-local-bypass`);
     console.log(`[knowto-dev] Docs        : http://api.localhost/docs  (o http://localhost:${port}/docs en nativo)`);
   }
 );
+
+// Inyectar el servidor HTTP en el handler de WebSocket de @hono/node-server
+injectWebSocket(server);

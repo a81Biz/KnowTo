@@ -1,8 +1,26 @@
 ---
 id: F2
 name: Especificaciones de Análisis y Diseño
-version: 1.1.0
+version: 2.0.0
 tags: [EC0366, analisis, modalidad, interactividad, perfil-ingreso]
+pipeline_steps:
+  - agent: extractor
+    task: "Extrae de F0 y F1: sector, objetivos SMART, perfil del participante, brechas capacitables y resultados esperados."
+  - agent: specialist_a
+    model: "@cf/meta/llama-3.1-8b-instruct"
+    task: "Redacta modalidad/formato, estructura temática (módulos con horas), perfil de ingreso y estrategias instruccionales alineadas con los niveles Bloom de F1."
+  - agent: specialist_b
+    model: "@cf/qwen/qwen2.5-7b-instruct"
+    task: "Redacta arquitectura de evaluación (diagnóstica/formativa/sumativa), criterios de acreditación, recursos y materiales requeridos, accesibilidad e indicadores de calidad EC0366."
+  - agent: synthesizer
+    model: "@cf/mistral/mistral-7b-instruct-v0.2"
+    task: "Combina A y B en el documento completo de Especificaciones de Análisis y Diseño. Verifica coherencia entre estructura temática y evaluación."
+  - agent: judge
+    rules:
+      - "Verifica que modalidad, estructura temática, perfil de ingreso, evaluación y accesibilidad están presentes."
+      - "Confirma que los instrumentos de evaluación corresponden a los niveles Bloom de F1."
+      - "CRÍTICO: NO debe quedar NINGÚN placeholder entre corchetes en el documento final. Reemplaza todos los que encuentres — [texto], [N], [X], [nombre], [razón], [Asincrónico/Sincrónico/Mixto/Autodirigido], [LMS recomendado], [% sincrónico / % asincrónico], [1/2/3/4], [Pasivo/Limitado/Moderado/Robusto], [Sí/No], [lista], [especificaciones], [velocidad mínima], [X horas/semana], [Nombre], [descripción], [módulo N], [nivel], [Supuesto derivado del análisis], [Restricción del cliente/sector] — con el valor real derivado del contexto, o con el valor estándar más apropiado si no hay información disponible."
+      - "Devuelve el documento completo en Markdown válido."
 ---
 
 Actúa como un diseñador instruccional certificable en el estándar EC0366 "Desarrollo de cursos de formación en línea".
@@ -45,9 +63,9 @@ Antes de generar cualquier sección, extrae y usa la información de:
 ## FORMATO DE SALIDA OBLIGATORIO
 
 # ESPECIFICACIONES DE ANÁLISIS Y DISEÑO
-**Proyecto:** [nombre del proyecto]
-**Fase:** F2
-**Fecha:** [fecha actual]
+**Proyecto:** {{projectName}}
+**Fase:** Especificaciones de Análisis y Diseño
+**Fecha:** {{fechaActual}}
 **Basado en:** Marco de Referencia F0 + Informe de Necesidades F1
 
 ---

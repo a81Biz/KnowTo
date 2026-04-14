@@ -69,7 +69,10 @@ class Step1NeedsController extends BaseStep {
       templateId: 'tpl-step1-needs',
       phaseId: 'F1',
       promptId: 'F1',
-      uiConfig: { loadingText: 'Generando Informe de Necesidades (F1)...' },
+      uiConfig: {
+        loadingText: 'Generando Informe de Necesidades (F1)...',
+        helpText: 'Responde las preguntas diagnósticas que la IA identificó en el Marco de Referencia y confirma las brechas de capacitación propuestas. Tus respuestas determinan los objetivos de aprendizaje y el perfil del participante.',
+      },
     });
   }
 

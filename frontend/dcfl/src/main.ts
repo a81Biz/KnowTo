@@ -13,12 +13,12 @@ import { Step2Analysis } from './controllers/step2.analysis';
 import { Step3Recommendations } from './controllers/step3.recommendations';
 import { Step4Specs } from './controllers/step3.specs';
 import { Step5Production } from './controllers/step4.production';
-import { Step6Checklist } from './controllers/step5.checklist';
-import { Step7Evidence } from './controllers/step6.evidence';
-import { Step8Adjustments } from './controllers/step7.adjustments';
-import { Step9Inventory } from './controllers/step8.payment';
+import { Step6Checklist } from './controllers/step6.checklist';
+import { Step7Evidence } from './controllers/step7.evidence';
+import { Step8Adjustments } from './controllers/step8.adjustments';
+import { Step9Inventory } from './controllers/step9.inventory';
 import { Step10Summary } from './controllers/step10.summary';
-import { Step11Closing } from './controllers/step9.closing';
+import { Step11Closing } from './controllers/step11.closing';
 
 // Registro de controladores — SSOT para navegación (índice = stepNumber)
 const STEP_CONTROLLERS = [
@@ -205,6 +205,15 @@ btnPrev.addEventListener('click', () => {
 });
 
 btnNext.addEventListener('click', () => {
+  // Guardar los datos del formulario actual antes de navegar al siguiente paso
+  const currentStep = wizardStore.getCurrentStep();
+  const controller = STEP_CONTROLLERS[currentStep];
+  if (controller) {
+    const data = controller.getData();
+    if (Object.keys(data).length > 0) {
+      wizardStore.setStepInputData(currentStep, data);
+    }
+  }
   wizardStore.nextStep();
   void loadStep(wizardStore.getCurrentStep());
 });

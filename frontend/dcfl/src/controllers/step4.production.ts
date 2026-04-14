@@ -51,7 +51,10 @@ class Step5ProductionController extends BaseStep {
       templateId: 'tpl-step4-production',
       phaseId: 'F4',
       promptId: 'F4_P0',
-      uiConfig: { loadingText: 'Generando producto...' },
+      uiConfig: {
+        loadingText: 'Generando producto...',
+        helpText: 'Genera los 8 productos obligatorios del EC0366 de forma secuencial. Cada producto se revisa y aprueba antes de continuar al siguiente. Los productos aprobados quedan guardados en tu expediente.',
+      },
     });
   }
 
@@ -201,13 +204,16 @@ class Step5ProductionController extends BaseStep {
   }
 
   override _bindEvents(): void {
-    // Sobreescribir: el submit genera el producto actual, no el documento completo
+    // Solo eventos sobre _dom (disponibles antes del cacheSubDom).
+    // Los eventos de _subDom se enlazan en mount() tras _cacheSubDom().
     this._dom.form?.addEventListener('submit', (e) => {
       e.preventDefault();
       this._sharedFormData = this._collectFormData();
       void this._generateCurrentProduct();
     });
+  }
 
+  private _bindSubDomEvents(): void {
     this._subDom.btnApproveProduct?.addEventListener('click', () => {
       this._approveCurrentProduct();
     });
@@ -228,7 +234,7 @@ class Step5ProductionController extends BaseStep {
 
   override async mount(container: HTMLElement): Promise<void> {
     await super.mount(container);
-    this._cacheSubDom();
+    this._cacheSubDom(); // Debe ir antes de _bindSubDomEvents
 
     // Restaurar estado previo si existe
     const stepData = wizardStore.getState().steps[STEP_NUMBER];
@@ -236,6 +242,7 @@ class Step5ProductionController extends BaseStep {
       this._sharedFormData = stepData.inputData;
     }
 
+    this._bindSubDomEvents();
     this._updateProductHeader();
     this._renderProductIndicators();
     this._showGenerateArea();

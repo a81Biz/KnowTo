@@ -22,9 +22,9 @@ Genera guiones de video para los videos principales del curso. Basa el número y
 
 # PRODUCTO 6: GUIONES DE MATERIAL MULTIMEDIA
 **Elemento EC0366:** E1220 — Producto #5
-**Proyecto:** [nombre del proyecto]
-**Candidato:** [clientName]
-**Fecha:** [fecha actual]
+**Proyecto:** {{projectName}}
+**Candidato:** {{clientName}}
+**Fecha:** {{fechaActual}}
 
 ---
 

@@ -22,9 +22,9 @@ EC0366 exige tres instrumentos obligatorios: cuestionario diagnóstico, rúbrica
 
 # PRODUCTO 7: INSTRUMENTOS DE EVALUACIÓN
 **Elemento EC0366:** E1220 — Producto #6
-**Proyecto:** [nombre del proyecto]
-**Candidato:** [clientName]
-**Fecha:** [fecha actual]
+**Proyecto:** {{projectName}}
+**Candidato:** {{clientName}}
+**Fecha:** {{fechaActual}}
 
 ---
 

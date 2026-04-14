@@ -1,0 +1,275 @@
+# flow-map.yaml — DCFL (EC0366)
+# Pipeline multi-agente para el wizard de certificación de cursos en línea.
+#
+# Patrón por fase: extractor → specialist_a ‖ specialist_b → synthesizer → judge
+#   extractor   : extrae datos estructurados del contexto acumulado
+#   specialist_a: genera perspectiva A del documento (llama-3.1-8b)
+#   specialist_b: genera perspectiva B del documento (qwen2.5-7b)
+#   synthesizer : fusiona A+B en documento coherente (mistral-7b)
+#   judge       : valida estructura, referencias EC0366 y devuelve el documento final
+#
+# Compatibilidad: este YAML es leído por PipelineOrchestratorService desde core.
+# Los prompt_id deben existir en la tabla site_prompts (site_id='dcfl').
+# Nota: AIService._runPipeline() usa los pipeline_steps del frontmatter de cada .md.
+version: "3.0.0"
+
+pipelines:
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # F0: Marco de Referencia del Cliente
+  # ─────────────────────────────────────────────────────────────────────────
+  F0:
+    description: "Marco de referencia del curso: sector, competencia, EC relacionados, gaps iniciales"
+    stages:
+      - id: extractor_f0
+        agent: extractor
+        prompt_id: DCFL_F0_EXTRACTOR
+        inputs:
+          - userInputs
+        output_guard: f0_extracted
+        next: specialist_a_f0
+
+      - id: specialist_a_f0
+        agent: specialist_a
+        prompt_id: DCFL_F0_SPECIALIST_A
+        inputs:
+          - f0_extracted
+          - userInputs
+        output_guard: f0_draft_a
+        parallel_with: specialist_b_f0
+
+      - id: specialist_b_f0
+        agent: specialist_b
+        prompt_id: DCFL_F0_SPECIALIST_B
+        inputs:
+          - f0_extracted
+          - userInputs
+        output_guard: f0_draft_b
+        next: synthesizer_f0
+
+      - id: synthesizer_f0
+        agent: synthesizer
+        prompt_id: DCFL_F0_SYNTHESIZER
+        inputs:
+          - f0_draft_a
+          - f0_draft_b
+        output_guard: f0_synthesized
+        next: judge_f0
+
+      - id: judge_f0
+        agent: judge
+        prompt_id: DCFL_F0_JUDGE
+        inputs:
+          - f0_synthesized
+        output_guard: f0_final
+        retry_on_reject: true
+        max_retries: 2
+        fallthrough_on_error: true
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # F1: Informe de Necesidades de Capacitación
+  # ─────────────────────────────────────────────────────────────────────────
+  F1:
+    description: "Diagnóstico de brechas, objetivos SMART y perfil del participante"
+    stages:
+      - id: extractor_f1
+        agent: extractor
+        prompt_id: DCFL_F1_EXTRACTOR
+        inputs:
+          - f0_final
+          - userInputs
+        output_guard: f1_extracted
+        next: specialist_a_f1
+
+      - id: specialist_a_f1
+        agent: specialist_a
+        prompt_id: DCFL_F1_SPECIALIST_A
+        inputs:
+          - f1_extracted
+          - userInputs
+        output_guard: f1_draft_a
+        parallel_with: specialist_b_f1
+
+      - id: specialist_b_f1
+        agent: specialist_b
+        prompt_id: DCFL_F1_SPECIALIST_B
+        inputs:
+          - f1_extracted
+          - userInputs
+        output_guard: f1_draft_b
+        next: synthesizer_f1
+
+      - id: synthesizer_f1
+        agent: synthesizer
+        prompt_id: DCFL_F1_SYNTHESIZER
+        inputs:
+          - f1_draft_a
+          - f1_draft_b
+        output_guard: f1_synthesized
+        next: judge_f1
+
+      - id: judge_f1
+        agent: judge
+        prompt_id: DCFL_F1_JUDGE
+        inputs:
+          - f1_synthesized
+        output_guard: f1_final
+        retry_on_reject: true
+        max_retries: 2
+        fallthrough_on_error: true
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # F2: Especificaciones de Análisis y Diseño
+  # ─────────────────────────────────────────────────────────────────────────
+  F2:
+    description: "Modalidad, SCORM, estructura temática, perfil de ingreso (EC0366 obligatorio)"
+    stages:
+      - id: extractor_f2
+        agent: extractor
+        prompt_id: DCFL_F2_EXTRACTOR
+        inputs:
+          - f1_final
+          - userInputs
+        output_guard: f2_extracted
+        next: specialist_a_f2
+
+      - id: specialist_a_f2
+        agent: specialist_a
+        prompt_id: DCFL_F2_SPECIALIST_A
+        inputs:
+          - f2_extracted
+          - userInputs
+        output_guard: f2_draft_a
+        parallel_with: specialist_b_f2
+
+      - id: specialist_b_f2
+        agent: specialist_b
+        prompt_id: DCFL_F2_SPECIALIST_B
+        inputs:
+          - f2_extracted
+          - userInputs
+        output_guard: f2_draft_b
+        next: synthesizer_f2
+
+      - id: synthesizer_f2
+        agent: synthesizer
+        prompt_id: DCFL_F2_SYNTHESIZER
+        inputs:
+          - f2_draft_a
+          - f2_draft_b
+        output_guard: f2_synthesized
+        next: judge_f2
+
+      - id: judge_f2
+        agent: judge
+        prompt_id: DCFL_F2_JUDGE
+        inputs:
+          - f2_synthesized
+        output_guard: f2_final
+        retry_on_reject: true
+        max_retries: 2
+        fallthrough_on_error: true
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # F3: Especificaciones Técnicas del Curso
+  # ─────────────────────────────────────────────────────────────────────────
+  F3:
+    description: "LMS, SCORM version, duración calculada, multimedia y arquitectura de evaluación"
+    stages:
+      - id: extractor_f3
+        agent: extractor
+        prompt_id: DCFL_F3_EXTRACTOR
+        inputs:
+          - f2_final
+          - userInputs
+        output_guard: f3_extracted
+        next: specialist_a_f3
+
+      - id: specialist_a_f3
+        agent: specialist_a
+        prompt_id: DCFL_F3_SPECIALIST_A
+        inputs:
+          - f3_extracted
+          - userInputs
+        output_guard: f3_draft_a
+        parallel_with: specialist_b_f3
+
+      - id: specialist_b_f3
+        agent: specialist_b
+        prompt_id: DCFL_F3_SPECIALIST_B
+        inputs:
+          - f3_extracted
+          - userInputs
+        output_guard: f3_draft_b
+        next: synthesizer_f3
+
+      - id: synthesizer_f3
+        agent: synthesizer
+        prompt_id: DCFL_F3_SYNTHESIZER
+        inputs:
+          - f3_draft_a
+          - f3_draft_b
+        output_guard: f3_synthesized
+        next: judge_f3
+
+      - id: judge_f3
+        agent: judge
+        prompt_id: DCFL_F3_JUDGE
+        inputs:
+          - f3_synthesized
+        output_guard: f3_final
+        retry_on_reject: true
+        max_retries: 2
+        fallthrough_on_error: true
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # F4_P0: Cronograma de Desarrollo (Producto #1 del sub-wizard E1219)
+  # ─────────────────────────────────────────────────────────────────────────
+  F4_P0:
+    description: "Cronograma detallado del desarrollo del curso (E1219 Producto 1)"
+    stages:
+      - id: extractor_f4_p0
+        agent: extractor
+        prompt_id: DCFL_F4_P0_EXTRACTOR
+        inputs:
+          - f3_final
+          - userInputs
+        output_guard: f4_p0_extracted
+        next: specialist_a_f4_p0
+
+      - id: specialist_a_f4_p0
+        agent: specialist_a
+        prompt_id: DCFL_F4_P0_SPECIALIST_A
+        inputs:
+          - f4_p0_extracted
+          - userInputs
+        output_guard: f4_p0_draft_a
+        parallel_with: specialist_b_f4_p0
+
+      - id: specialist_b_f4_p0
+        agent: specialist_b
+        prompt_id: DCFL_F4_P0_SPECIALIST_B
+        inputs:
+          - f4_p0_extracted
+          - userInputs
+        output_guard: f4_p0_draft_b
+        next: synthesizer_f4_p0
+
+      - id: synthesizer_f4_p0
+        agent: synthesizer
+        prompt_id: DCFL_F4_P0_SYNTHESIZER
+        inputs:
+          - f4_p0_draft_a
+          - f4_p0_draft_b
+        output_guard: f4_p0_synthesized
+        next: judge_f4_p0
+
+      - id: judge_f4_p0
+        agent: judge
+        prompt_id: DCFL_F4_P0_JUDGE
+        inputs:
+          - f4_p0_synthesized
+        output_guard: f4_p0_final
+        retry_on_reject: true
+        max_retries: 2
+        fallthrough_on_error: true

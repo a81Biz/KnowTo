@@ -21,10 +21,10 @@ Usa el contexto acumulado para determinar qué documentos están completados y l
 ## FORMATO DE SALIDA OBLIGATORIO
 
 # LISTA DE VERIFICACIÓN E INVENTARIO DEL EXPEDIENTE EC0366
-**Proyecto:** [nombre del proyecto]
-**Candidato:** [clientName]
+**Proyecto:** {{projectName}}
+**Candidato:** {{clientName}}
 **Folio de expediente:** EC0366-[AÑO]-[4 dígitos aleatorios]
-**Fecha de elaboración:** [fecha actual]
+**Fecha de elaboración:** {{fechaActual}}
 
 ---
 

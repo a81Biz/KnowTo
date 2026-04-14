@@ -13,7 +13,7 @@ Plataforma de microsites de certificación asistidos por IA. Arquitectura multi-
 | Base de datos | Supabase (PostgreSQL) vía stored procedures RPC |
 | Routing local | Nginx (reverse proxy, único puerto expuesto: 80) |
 | Dev local | Docker Compose — Nginx + Node.js + Postgres + Ollama |
-| Tests | Vitest (80 tests, 100 % pass) |
+| Tests | Vitest (115 tests, 100 % pass) |
 
 ---
 
@@ -38,7 +38,8 @@ docker compose up -d
 | URL | Servicio |
 |---|---|
 | `http://localhost` | Directorio de microsites |
-| `http://dcfl.localhost` | Microsite EC0366 |
+| `http://dcfl.localhost` | Microsite EC0366 (DCFL) |
+| `http://cce.localhost` | Microsite EC0249 (CCE) |
 | `http://api.localhost/docs` | Swagger UI (Scalar) |
 | `http://api.localhost/health` | Health check del API |
 
@@ -95,6 +96,7 @@ En producción el deploy sigue siendo `wrangler deploy` → Cloudflare Workers.
 Browser
   ├── localhost           → frontend-root   (directorio)
   ├── dcfl.localhost      → frontend-dcfl   (microsite EC0366)
+  ├── cce.localhost       → frontend-cce    (microsite EC0249)
   └── api.localhost       → backend         (API Gateway)
          ↓
        Nginx (puerto 80, único expuesto)
@@ -102,6 +104,7 @@ Browser
    Docker network (knowto-network 172.20.0.0/24)
    ├── frontend-root   :5174
    ├── frontend-dcfl   :5173
+   ├── frontend-cce    :5175
    ├── backend         :8787  (también :9229 para debugger)
    ├── postgres        :5432
    └── ollama          :11434
@@ -127,37 +130,35 @@ knowto/
 │   └── src/
 │       ├── index.ts              # API Gateway — CORS + OpenAPI + monta routers de microsites
 │       ├── server.dev.ts         # Entry point de desarrollo (Node.js + @hono/node-server)
-│       ├── register-md.cjs       # Loader .md para Node.js (equivale a [[rules]] de wrangler)
-│       ├── core/
-│       │   ├── middleware/
-│       │   │   ├── auth.middleware.ts      # Bearer JWT: dev bypass / Supabase JWT prod
-│       │   │   └── error.middleware.ts
-│       │   └── types/
-│       │       ├── env.ts                  # Bindings de Cloudflare Workers
-│       │       └── modules.d.ts            # Declaración de módulos *.md
-│       └── dcfl/                           # Microsite EC0366
-│           ├── router.ts                   # Compone y exporta el router de dcfl
-│           ├── routes/
-│           │   ├── health.route.ts         # GET /dcfl/health
-│           │   └── wizard.route.ts         # /dcfl/wizard/*
-│           ├── services/
-│           │   ├── ai.service.ts           # Ollama (dev) / Workers AI (prod)
-│           │   ├── context-extractor.service.ts
-│           │   └── supabase.service.ts     # Mocks UUID (dev) / RPC real (prod)
-│           ├── prompts/
-│           │   ├── index.ts                # PromptRegistry singleton
-│           │   ├── flow-map.json           # Mapa de fases, extractores y patrones
-│           │   └── templates/              # Plantillas Markdown (F0–F6_2b, F4_P*, F6_FORM, EXTRACTOR)
-│           └── types/
-│               ├── wizard.types.ts         # PhaseId, PromptId, ProjectContext…
-│               └── document.types.ts
-├── backend/src/__tests__/        # Vitest — 80 tests
+│       ├── core/                 # ← COMPARTIDO entre todos los microsites
+│       │   ├── middleware/       # auth.middleware.ts, error.middleware.ts
+│       │   ├── services/         # AIService, BaseSupabaseService, ContextExtractorService,
+│       │   │                     #   CrawlerService, UploadService, PipelineOrchestratorService
+│       │   ├── prompts/          # PromptRegistry unificado (BD + fallback local)
+│       │   └── types/            # Env, pipeline.types, modules.d.ts
+│       ├── dcfl/                 # Microsite EC0366 (certificación en línea)
+│       │   ├── router.ts         # Compone el router + exporta dcflSiteConfig
+│       │   ├── routes/           # health.route.ts, wizard.route.ts
+│       │   ├── services/         # SupabaseService (extiende BaseSupabaseService)
+│       │   ├── prompts/          # flow-map.yaml + templates/ (F0–F6_2b, EXTRACTOR)
+│       │   └── types/            # PromptId, ProjectContext…
+│       └── cce/                  # Microsite EC0249 (consultoría empresarial)
+│           ├── router.ts         # Compone el router + exporta cceSiteConfig
+│           ├── routes/           # health.route.ts, wizard.route.ts
+│           ├── services/         # SupabaseService (extiende BaseSupabaseService)
+│           ├── prompts/          # flow-map.yaml + templates/ (F0–F6, F0_CLIENT_QUESTIONS_FORM…)
+│           └── types/            # PromptId, ProjectContext…
+├── backend/src/__tests__/        # Vitest — 115 tests
 │   ├── middleware/auth.middleware.test.ts
 │   ├── routes/health.e2e.test.ts
-│   ├── routes/wizard.e2e.test.ts
+│   ├── routes/wizard.e2e.test.ts           # Flujo completo DCFL
 │   ├── services/ai.service.test.ts
 │   ├── services/supabase.service.test.ts
-│   └── prompts/prompt-registry.test.ts
+│   ├── prompts/prompt-registry.test.ts
+│   ├── cce/routes/wizard.cce.test.ts       # Flujo completo CCE
+│   ├── cce/routes/health.cce.test.ts
+│   ├── cce/e2e/pipeline-orchestrator.cce.test.ts
+│   └── cce/services/                       # upload, crawler, supabase (CCE)
 ├── frontend/
 │   ├── core/src/                 # Utilidades compartidas (importadas como @core/*)
 │   │   ├── auth.ts               # Google OAuth + dev bypass
@@ -180,19 +181,60 @@ knowto/
 │   │   ├── templates/            # HTML de cada paso del wizard
 │   │   ├── microsite.json        # Metadatos del microsite (leídos por frontend-root)
 │   │   └── vite.config.ts
+│   ├── cce/                      # Microsite EC0249 — app Vite independiente
+│   │   ├── src/
+│   │   │   ├── main.ts
+│   │   │   ├── shared/endpoints.ts
+│   │   │   └── types/
+│   │   ├── microsite.json
+│   │   └── vite.config.ts
 │   └── root/                     # Directorio de microsites — app Vite independiente
 │       └── src/main.ts           # Descubre microsites leyendo microsite.json de cada uno
 ├── nginx/
 │   ├── nginx.conf                # Config global + map WebSocket
 │   └── conf.d/local.conf         # Un server block por microsite
 ├── docs/
-│   ├── ADDING-A-MICROSITE.md     # Guía paso a paso para añadir un microsite nuevo
+│   ├── ADDING-A-MICROSITE.md     # Guía completa (sección 11: patrón backend unificado)
+│   ├── ARQUITECTURA-UNIFICACION.md
+│   ├── DEVIATIONS.md             # Desviaciones documentadas respecto al plan original
 │   └── dcfl/
 │       └── PROCESO-EC0366.md     # Descripción del proceso de negocio de EC0366
 ├── .env.example                  # Variables de entorno documentadas
 ├── docker-compose.yml
 └── wrangler.toml
 ```
+
+---
+
+## Backend unificado (core)
+
+Desde abril 2026, todos los servicios compartidos residen en `backend/src/core/`. Cada microsite importa desde core en lugar de duplicar la lógica.
+
+| Servicio | Ubicación | Propósito |
+|:---|:---|:---|
+| `AIService` | `core/services/ai.service.ts` | Workers AI (prod) + Ollama (dev), pipeline multi-agente |
+| `PipelineOrchestratorService` | `core/services/pipeline-orchestrator.service.ts` | Ejecuta pipelines extractor → specialist → judge |
+| `ContextExtractorService` | `core/services/context-extractor.service.ts` | Extrae secciones de documentos de fases previas |
+| `CrawlerService` | `core/services/crawler.service.ts` | Scraping web con Cheerio |
+| `UploadService` | `core/services/upload.service.ts` | Base64 → Supabase Storage |
+| `BaseSupabaseService` | `core/services/supabase.service.ts` | Clase base para servicios DB de cada microsite |
+| `PromptRegistry` | `core/prompts/registry.ts` | Resuelve prompts desde BD (`site_prompts`) o archivos locales |
+
+### Patrón de extensión por microsite
+
+Cada microsite define:
+- `<site>/services/supabase.service.ts` — extiende `BaseSupabaseService`, sobrescribe nombres de RPC
+- `<site>/prompts/flow-map.yaml` — define las etapas del pipeline (extractor → specialist → judge)
+- `<site>/prompts/templates/*.md` — plantillas con frontmatter YAML parseado por `PromptRegistry`
+- `<site>/router.ts` — carga el `flow-map.yaml` y exporta un `SiteConfig` inyectable
+
+```typescript
+// Patrón de uso en cualquier route handler de microsite:
+const ai      = new AIService(c.env, getPromptRegistry(), SITE_SYSTEM_PROMPT);
+const extract = new ContextExtractorService(c.env, siteSiteConfig.flow_map);
+```
+
+Ver [docs/ADDING-A-MICROSITE.md](docs/ADDING-A-MICROSITE.md) (sección 11) para la guía completa de cómo añadir un nuevo microsite siguiendo este patrón.
 
 ---
 
@@ -286,14 +328,24 @@ Authorization: Bearer <token>
 | `GET` | `/health` | No | Health check global |
 | `GET` | `/openapi.json` | No | Spec OpenAPI 3.0 |
 | `GET` | `/docs` | No | Swagger UI (Scalar) |
-| `GET` | `/dcfl/health` | No | Health check del microsite dcfl |
-| `POST` | `/dcfl/wizard/project` | Sí | Crear proyecto |
+| `GET` | `/dcfl/health` | No | Health check EC0366 |
+| `POST` | `/dcfl/wizard/project` | Sí | Crear proyecto DCFL |
 | `GET` | `/dcfl/wizard/project/:id` | Sí | Contexto del proyecto |
 | `GET` | `/dcfl/wizard/projects` | Sí | Listar proyectos del usuario |
 | `POST` | `/dcfl/wizard/step` | Sí | Guardar datos de un paso |
 | `POST` | `/dcfl/wizard/extract` | Sí | Extraer contexto compacto de fases previas |
 | `POST` | `/dcfl/wizard/generate` | Sí | Generar documento con IA |
 | `POST` | `/dcfl/wizard/generate-form` | Sí | Generar esquema de formulario dinámico |
+| `GET` | `/cce/health` | No | Health check EC0249 |
+| `POST` | `/cce/wizard/project` | Sí | Crear proyecto CCE |
+| `GET` | `/cce/wizard/project/:id` | Sí | Contexto del proyecto |
+| `GET` | `/cce/wizard/projects` | Sí | Listar proyectos del usuario |
+| `POST` | `/cce/wizard/step` | Sí | Guardar datos de un paso |
+| `POST` | `/cce/wizard/extract` | Sí | Extraer contexto compacto |
+| `POST` | `/cce/wizard/generate` | Sí | Generar documento con IA |
+| `POST` | `/cce/wizard/generate-form` | Sí | Generar formulario dinámico (F0_CLIENT_QUESTIONS_FORM) |
+| `POST` | `/cce/wizard/upload` | Sí | Subir instrumento completado (PDF/JPG/PNG en base64) |
+| `POST` | `/cce/wizard/ocr` | Sí | Extraer texto de imagen escaneada |
 
 ### Ejemplo rápido
 
@@ -315,7 +367,7 @@ curl -X POST http://api.localhost/dcfl/wizard/project \
 ```bash
 # Backend — Vitest
 cd backend
-npm test               # 80 tests
+npm test               # 115 tests
 npm run test:coverage  # con reporte de cobertura HTML
 
 # Frontend dcfl — verificación de tipos TypeScript
@@ -327,14 +379,21 @@ cd frontend/root
 npm run type-check
 ```
 
-| Suite | Qué cubre |
-|---|---|
-| `auth.middleware.test.ts` | Bypass dev, JWT prod, tokens inválidos |
-| `ai.service.test.ts` | Ollama (dev) y Workers AI (prod) |
-| `supabase.service.test.ts` | Mocks dev y llamadas RPC prod |
-| `prompt-registry.test.ts` | PromptRegistry, flow-map, plantillas |
-| `health.e2e.test.ts` | Health global, `/dcfl/health`, spec OpenAPI |
-| `wizard.e2e.test.ts` | Todos los endpoints `/dcfl/wizard/*` |
+| Suite | Tests | Qué cubre |
+|---|---|---|
+| `auth.middleware.test.ts` | 8 | Bypass dev, JWT prod, tokens inválidos |
+| `ai.service.test.ts` | 14 | Ollama (dev) y Workers AI (prod), pipeline multi-agente |
+| `supabase.service.test.ts` | 13 | Mocks dev y llamadas RPC prod |
+| `prompt-registry.test.ts` | 6 | PromptRegistry, gray-matter, renderById |
+| `health.e2e.test.ts` | 7 | Health global, `/dcfl/health`, spec OpenAPI |
+| `wizard.e2e.test.ts` | 32 | Flujo completo DCFL — todos los endpoints `/dcfl/wizard/*` |
+| `wizard.cce.test.ts` | 3 | Flujo completo CCE — F0, F1_1, F0_CLIENT_QUESTIONS_FORM |
+| `health.cce.test.ts` | 6 | Health `/cce/health`, spec OpenAPI CCE |
+| `pipeline-orchestrator.cce.test.ts` | 2 | Pipeline extractor→judge con SiteConfig inyectado |
+| `upload.cce.test.ts` | 7 | UploadService (dev store, UUID, MIME types) |
+| `crawler.cce.test.ts` | 4 | CrawlerService (limpieza HTML, truncado, errores) |
+| `ai.cce.test.ts` | 4 | CrawlerService — variantes CCE |
+| `supabase.cce.test.ts` | 9 | SupabaseService CCE (getPrompt, saveStepOutput…) |
 
 ---
 
@@ -392,7 +451,7 @@ En Docker las variables vienen de `docker-compose.yml`.
 | `npm run dev` | Servidor Node.js en :8787, lee `.dev.vars` |
 | `npm run dev:debug` | Igual + inspector Node.js en :9229 (VS Code attach) |
 | `npm run dev:wrangler` | Servidor workerd (solo para verificar compatibilidad CF) |
-| `npm test` | Vitest — 80 tests |
+| `npm test` | Vitest — 115 tests |
 | `npm run test:watch` | Vitest en modo watch |
 | `npm run test:prompts` | Solo la suite de prompts (verbose) |
 | `wrangler deploy --env production` | Deploy a Cloudflare Workers |

@@ -244,11 +244,39 @@ const PRINT_CSS = `
 `;
 
 /**
+ * Limpia el Markdown antes de enviarlo al renderizador de impresión/PDF.
+ * Elimina artefactos que producen salida visual no deseada en el PDF:
+ *  - Bloques de código ``` que envuelven el documento completo (artefacto del LLM)
+ *  - Etiquetas de pensamiento como <think>…</think>
+ *  - Líneas con solo espacios o guiones repetidos (separadores de LLM)
+ *  - Secciones ## INSTRUCCIONES DE CALIDAD (instrucciones al AI filtradas del output)
+ *  - Blockquotes de criterios/fundamentos (artefacto de plantillas F2.5, F2)
+ *  - Frases de prólogo típicas de LLMs
+ */
+export function cleanMarkdownForPDF(content: string): string {
+  return content
+    // Elimina bloque envolvente ```markdown … ``` o ``` … ```
+    .replace(/^```(?:markdown|md)?\s*\n([\s\S]*?)\n```\s*$/i, '$1')
+    // Elimina etiquetas <think> … </think> (reasoning models)
+    .replace(/<think>[\s\S]*?<\/think>/gi, '')
+    // Elimina secciones de instrucciones al AI que el modelo puede colar en el output
+    .replace(/\n## INSTRUCCIONES(?: DE CALIDAD)?(?:\s*\([^)]*\))?[\s\S]*?(?=\n## |\n# |$)/gi, '')
+    // Elimina blockquotes de criterios/fundamentos (artefacto de plantillas)
+    .replace(/\n> \*\*(?:Criterio(?: de selección)?|Fundamento|Nota|Regla):\*\*[\s\S]*?(?=\n[^>]|\n$|$)/gm, '')
+    .replace(/\n> (?:Criterio|Fundamento|Nota|Regla):.*(?:\n> .*)*/g, '')
+    // Elimina frases de prólogo típicas de LLMs
+    .replace(/^(?:Aquí te presento|A continuación(?:\s+te presento)?|He generado|El siguiente es|Por supuesto,?)[^\n]*\n+/gim, '')
+    // Elimina líneas de solo guiones repetidos (artefacto de separador de LLM)
+    .replace(/^-{10,}\s*$/gm, '')
+    .trim();
+}
+
+/**
  * Abre una ventana de impresión con el contenido Markdown renderizado.
  * El usuario puede elegir "Guardar como PDF" desde el diálogo de impresión.
  */
 export function printDocument(markdown: string, title = 'Documento KnowTo'): void {
-  const html = renderMarkdown(markdown);
+  const html = renderMarkdown(cleanMarkdownForPDF(markdown));
   const printWindow = window.open('', '_blank', 'width=900,height=700');
   if (!printWindow) {
     showError('El navegador bloqueó la ventana emergente. Permite ventanas emergentes para este sitio e intenta de nuevo.');

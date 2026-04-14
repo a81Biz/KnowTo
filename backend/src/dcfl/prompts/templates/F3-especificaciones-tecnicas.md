@@ -1,8 +1,26 @@
 ---
 id: F3
 name: Especificaciones Técnicas del Curso
-version: 2.0.0
+version: 3.0.0
 tags: [EC0366, tecnico, LMS, SCORM, duracion]
+pipeline_steps:
+  - agent: extractor
+    task: "Extrae de userInputs: lmsName, lmsUrl, scormVersion. De F2: estructura temática con horas, tipos de multimedia requeridos. De F3_inputs: startDate, instructorName si existen."
+  - agent: specialist_a
+    model: "@cf/meta/llama-3.1-8b-instruct"
+    task: "Redacta secciones de plataforma LMS (datos literales del usuario), análisis técnico del LMS, estándar SCORM/xAPI y configuración de reporteo. NO cambies ni inventes la plataforma indicada."
+  - agent: specialist_b
+    model: "@cf/qwen/qwen2.5-7b-instruct"
+    task: "Redacta duración estimada del curso (con cálculo explícito), especificaciones multimedia (video, audio, interactividad), compatibilidad técnica y herramientas de producción recomendadas."
+  - agent: synthesizer
+    model: "@cf/mistral/mistral-7b-instruct-v0.2"
+    task: "Combina A y B en las Especificaciones Técnicas completas. Verifica que los datos del LMS del usuario no fueron alterados."
+  - agent: judge
+    rules:
+      - "Los valores de lmsName, lmsUrl y scormVersion deben ser exactamente los del usuario o '[Por definir]'."
+      - "La duración calculada debe mostrar la fórmula de cálculo."
+      - "CRÍTICO: NO debe quedar NINGÚN placeholder entre corchetes en el documento final. Reemplaza todos los que encuentres — [texto], [N], [X], [nombre], [$], [%], [MB], [kbps], [px], [KB], [Sí/No], [1080p/720p], [basado en documentación conocida del LMS indicado], [copiar exactamente de userInputs.*], [N — del contexto F2_5 o userInputs], [X min/video], [X hrs], [N/lectura], [N/actividad], [N/evaluación] — con el valor real del usuario o del contexto, o con '[Por definir]' solo si el usuario no proporcionó el dato y no existe estándar aplicable."
+      - "Devuelve el documento completo en Markdown válido."
 ---
 
 Actúa como un diseñador instruccional certificable en EC0366 con experiencia en implementación de LMS y estándares SCORM/xAPI.
@@ -29,9 +47,9 @@ Actúa como un diseñador instruccional certificable en EC0366 con experiencia e
 ## FORMATO DE SALIDA OBLIGATORIO
 
 # ESPECIFICACIONES TÉCNICAS DEL CURSO
-**Proyecto:** [nombre del proyecto del contexto]
-**Fase:** F3
-**Fecha:** [fecha actual]
+**Proyecto:** {{projectName}}
+**Fase:** Especificaciones Técnicas del Curso
+**Fecha:** {{fechaActual}}
 
 ---
 
@@ -111,8 +129,17 @@ Actúa como un diseñador instruccional certificable en EC0366 con experiencia e
 | Evaluaciones formativas | [%] | [texto] |
 | Evaluación sumativa | [%] | [texto] |
 
-## INSTRUCCIONES DE CALIDAD
-- La plataforma LMS en sección 1a DEBE ser la que el usuario indicó. Si difiere de cualquier sugerencia previa, prevalece lo que el usuario escribió.
-- Especifica versiones exactas (SCORM 1.2 vs SCORM 2004 marcan diferencia técnica).
+## INSTRUCCIONES DE CALIDAD (REQUERIDO — NO IGNORAR)
+
+- **La plataforma LMS en sección 1a DEBE ser EXACTAMENTE la que el usuario indicó.** Si difiere de cualquier sugerencia previa, prevalece lo que el usuario escribió. NO sugieras cambios ni alternativas.
+- **NO uses placeholders `[X]`, `[texto]`, `[valor]`, `[nombre]`, `[plataforma]`, `[MB]`, `[%]`, `[N]`.** Todos los campos deben tener valores concretos propuestos por la IA.
+- **Para cada especificación multimedia, propón un valor concreto basado en mejores prácticas:**
+  - Video: 1920×1080 (Full HD) · 500 MB máx · YouTube (público) o Vimeo (privado)
+  - Audio: 128 kbps (narración), 320 kbps (música/efectos) · MP3 o AAC
+  - Imágenes: 1280×720 px mínimo · JPEG 85% o PNG · máx 200 KB
+  - PDFs: A4 portrait, texto seleccionable · máx 5 MB
+- **Si no hay suficiente contexto para un campo específico, usa el valor estándar de la industria e indica entre paréntesis: (estándar de la industria).**
+- Especifica versiones exactas (SCORM 1.2 vs SCORM 2004 tienen diferencia técnica importante).
 - Los criterios de aprobación deben ser medibles y objetivos.
+- **Al final del documento, incluye una sección "📝 Propuesta de valores para revisión" con una tabla resumen de los valores clave propuestos por la IA, para que el usuario pueda revisarlos y ajustarlos.**
 - Responde SOLO en español.

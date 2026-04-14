@@ -22,9 +22,9 @@ Extrae del contexto: título del curso (F1/F2), objetivos (F1), perfil de ingres
 
 # PRODUCTO 1: DOCUMENTO DE INFORMACIÓN GENERAL
 **Elemento EC0366:** E1219 — Producto #2
-**Proyecto:** [nombre del proyecto]
-**Candidato:** [clientName]
-**Fecha:** [fecha actual]
+**Proyecto:** {{projectName}}
+**Candidato:** {{clientName}}
+**Fecha:** {{fechaActual}}
 
 ---
 

@@ -1,4 +1,4 @@
-// src/dcfl/services/context-extractor.service.ts
+// src/core/services/context-extractor.service.ts
 //
 // Extrae secciones específicas de documentos markdown generados en fases previas,
 // produciendo un contexto compacto para la siguiente fase sin saturar el LLM.
@@ -7,12 +7,33 @@
 //   1. Parser markdown (extracción verbatim por patrón regex).
 //   2. Si el parser no encuentra la sección → fallback a IA con prompt EXTRACTOR.
 //      La IA solo puede copiar texto existente (anti-alucinación).
+//
+// DIFERENCIA vs. versiones anteriores:
+//   El flow-map ya NO se importa estáticamente. Se inyecta como parámetro en el
+//   constructor para desacoplar el servicio de cualquier microsite específico.
 
-import flowMap from '../prompts/flow-map.json';
-import type { Env } from '../../core/types/env';
-import type { ExtractContextRequest, ExtractContextResponse } from '../types/wizard.types';
+import type { Env } from '../types/env';
 
-// ── Tipos internos ────────────────────────────────────────────────────────────
+// ── Tipos públicos ────────────────────────────────────────────────────────────
+
+export interface ExtractContextRequest {
+  projectId: string;
+  /** ID del nodo extractor en el flow-map (ej: "EXTRACTOR_F2") */
+  extractorId: string;
+  /** Documentos fuente indexados por phaseId */
+  sourceDocuments: Record<string, string>;
+}
+
+export interface ExtractContextResponse {
+  extractorId: string;
+  /** Contexto extraído listo para inyectarse en el prompt de la siguiente fase */
+  content: string;
+  /** Indica si se usó el parser (true) o la IA fallback (false) para cada campo */
+  parserUsed: Record<string, boolean>;
+  extractedContextId: string;
+}
+
+// ── Tipos internos del flow-map ───────────────────────────────────────────────
 
 interface FlowMapSalidaField {
   header: string;
@@ -32,7 +53,7 @@ interface FlowMapExtractorNode {
 }
 
 interface FlowMapFaseNode {
-  tipo: 'fase';
+  tipo: 'fase' | 'fase-subwizard' | 'fase-form-dinamico';
   step: number;
   label: string;
   promptId: string;
@@ -40,16 +61,13 @@ interface FlowMapFaseNode {
   next: string;
 }
 
-type FlowMapNode = FlowMapFaseNode | FlowMapExtractorNode | { tipo: 'cierre'; step: number; label: string; promptId: null; salida: Record<string, never>; next: null };
+type FlowMapNode =
+  | FlowMapFaseNode
+  | FlowMapExtractorNode
+  | { tipo: 'cierre'; step: number; label: string; promptId: null; salida: Record<string, never>; next: null };
 
 // ── Parser markdown ───────────────────────────────────────────────────────────
 
-/**
- * Extrae una sección de un documento markdown buscando el patrón de encabezado
- * y copiando todo hasta el siguiente encabezado del mismo nivel o superior.
- *
- * @returns El texto de la sección (con su encabezado) o null si no se encuentra.
- */
 function extractMarkdownSection(doc: string, patron: string): string | null {
   let regex: RegExp;
   try {
@@ -62,31 +80,19 @@ function extractMarkdownSection(doc: string, patron: string): string | null {
   if (!match) return null;
 
   const start = match.index;
-
-  // Detectar nivel del encabezado encontrado (# = 1, ## = 2, etc.)
   const headerLine = doc.slice(start, doc.indexOf('\n', start));
   const levelMatch = headerLine.match(/^(#{1,6})\s/);
   const level = levelMatch ? levelMatch[1]!.length : 2;
-
-  // Patrón para el siguiente encabezado de igual o menor nivel de anidamiento
   const stopPattern = new RegExp(`^#{1,${level}}\\s`, 'm');
-
-  const afterHeader = doc.slice(start + headerLine.length + 1); // +1 por el \n
+  const afterHeader = doc.slice(start + headerLine.length + 1);
   const stopMatch = stopPattern.exec(afterHeader);
-
-  const sectionBody = stopMatch
-    ? afterHeader.slice(0, stopMatch.index)
-    : afterHeader;
+  const sectionBody = stopMatch ? afterHeader.slice(0, stopMatch.index) : afterHeader;
 
   return `${headerLine}\n${sectionBody}`.trimEnd();
 }
 
 // ── AI fallback ───────────────────────────────────────────────────────────────
 
-/**
- * Usa el prompt EXTRACTOR para pedirle a la IA que localice secciones
- * que el parser no encontró. La IA solo puede copiar texto existente.
- */
 async function extractWithAI(
   env: Env,
   faseId: string,
@@ -95,12 +101,10 @@ async function extractWithAI(
 ): Promise<Record<string, string>> {
   const EXTRACTOR_SYSTEM =
     'Eres un extractor de texto. SOLO copias texto que existe literalmente en el documento. ' +
-    'Si una sección no existe, escribe exactamente [NO ENCONTRADO EN ' + faseId + ']. ' +
+    `Si una sección no existe, escribe exactamente [NO ENCONTRADO EN ${faseId}]. ` +
     'NO inventes, NO parafrasees, NO añadas nada propio.';
 
-  const seccionesTexto = missingFields
-    .map((f) => `- ${f.header}`)
-    .join('\n');
+  const seccionesTexto = missingFields.map((f) => `- ${f.header}`).join('\n');
 
   const prompt =
     `DOCUMENTOS FUENTE:\n\n[${faseId}]\n${sourceDocument}\n\n` +
@@ -137,11 +141,9 @@ async function extractWithAI(
       rawResponse = data.response ?? '';
     }
   } catch {
-    // Si la IA falla, marcar todos los campos como no encontrados
     rawResponse = missingFields.map((f) => `${f.header}\n[NO ENCONTRADO EN ${faseId}]`).join('\n\n');
   }
 
-  // Parsear respuesta de la IA para extraer cada sección
   const results: Record<string, string> = {};
   for (const field of missingFields) {
     const escapedHeader = field.header.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -157,10 +159,18 @@ async function extractWithAI(
 // ── Servicio principal ────────────────────────────────────────────────────────
 
 export class ContextExtractorService {
-  constructor(private readonly env: Env) {}
+  /**
+   * @param env     Bindings de Cloudflare Workers (AI, env vars)
+   * @param flowMap Flow-map del microsite (importado estáticamente en el site)
+   *                Ej: import flowMap from '../prompts/flow-map.json'
+   */
+  constructor(
+    private readonly env: Env,
+    private readonly flowMap: Record<string, unknown>
+  ) {}
 
   async extract(req: ExtractContextRequest): Promise<ExtractContextResponse> {
-    const map = flowMap as unknown as Record<string, FlowMapNode>;
+    const map = this.flowMap as Record<string, FlowMapNode>;
     const extractorNode = map[req.extractorId] as FlowMapExtractorNode | undefined;
 
     if (!extractorNode || extractorNode.tipo !== 'extractor') {
@@ -175,7 +185,7 @@ export class ContextExtractorService {
       const sourceDoc = req.sourceDocuments[phaseId] ?? '';
       const faseNode = map[phaseId] as FlowMapFaseNode | undefined;
 
-      if (!faseNode || faseNode.tipo !== 'fase') continue;
+      if (!faseNode || (faseNode.tipo !== 'fase' && faseNode.tipo !== 'fase-subwizard' && faseNode.tipo !== 'fase-form-dinamico')) continue;
 
       const missingFields: Array<{ fieldKey: string; header: string }> = [];
 
@@ -183,9 +193,7 @@ export class ContextExtractorService {
         const fieldDef = faseNode.salida[fieldKey];
         if (!fieldDef) continue;
 
-        const extracted = sourceDoc
-          ? extractMarkdownSection(sourceDoc, fieldDef.patron)
-          : null;
+        const extracted = sourceDoc ? extractMarkdownSection(sourceDoc, fieldDef.patron) : null;
 
         if (extracted) {
           sections.push(`<!-- Extraído de ${phaseId} → ${fieldKey} -->\n${extracted}`);
@@ -196,25 +204,21 @@ export class ContextExtractorService {
         }
       }
 
-      // AI fallback para campos que el parser no encontró
       if (missingFields.length > 0 && sourceDoc) {
         const aiResults = await extractWithAI(this.env, phaseId, sourceDoc, missingFields);
         for (const [fieldKey, content] of Object.entries(aiResults)) {
           sections.push(`<!-- Extraído de ${phaseId} → ${fieldKey} (AI fallback) -->\n${content}`);
         }
       } else if (missingFields.length > 0) {
-        // Sin documento fuente disponible
         for (const f of missingFields) {
           sections.push(`${f.header}\n[DOCUMENTO ${phaseId} NO DISPONIBLE]`);
         }
       }
     }
 
-    const content = sections.join('\n\n---\n\n');
-
     return {
       extractorId: req.extractorId,
-      content,
+      content: sections.join('\n\n---\n\n'),
       parserUsed,
       extractedContextId: crypto.randomUUID(),
     };

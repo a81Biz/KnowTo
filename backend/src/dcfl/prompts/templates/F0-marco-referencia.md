@@ -1,8 +1,27 @@
 ---
 id: F0
 name: Marco de Referencia del Cliente
-version: 1.0.0
+version: 2.0.0
 tags: [certificacion, EC0366, diagnostico, investigacion]
+pipeline_steps:
+  - agent: extractor
+    task: "Extrae del contexto del cliente: nombre del proyecto, sector/industria, tema del curso, audiencia objetivo e información existente relevante para la investigación."
+  - agent: specialist_a
+    model: "@cf/meta/llama-3.1-8b-instruct"
+    task: "Redacta las secciones 1 a 4: análisis del sector, mejores prácticas para cursos en línea en este sector, competencia identificada y estándares EC relacionados del CONOCER. Usa el formato de tabla de la plantilla."
+  - agent: specialist_b
+    model: "@cf/qwen/qwen2.5-7b-instruct"
+    task: "Redacta la sección 5 (Análisis de Gaps) con tres subsecciones OBLIGATORIAS en este orden: '### Gap vs mejores prácticas', '### Gap vs competencia', y tras un separador ---, '### Preguntas para el cliente (máximo 10)'. Genera MÍNIMO 5 preguntas de diagnóstico instruccional con formato: **[N]. [Texto]** / - **Objetivo:** / - **Justificación:** / - **Bibliografía:**. Redacta también la sección 6 (Recomendaciones)."
+  - agent: synthesizer
+    model: "@cf/mistral/mistral-7b-instruct-v0.2"
+    task: "Combina las perspectivas A y B en un documento unificado con TODAS las secciones 1-7. CRÍTICO: La sección 5 DEBE contener '### Preguntas para el cliente (máximo 10)' con al menos 5 preguntas numeradas. Si la Perspectiva B las incluye, cópialas EXACTAMENTE. No elimines ni resumas las preguntas."
+  - agent: judge
+    rules:
+      - "Verifica que las 7 secciones numeradas (1. ANÁLISIS DEL SECTOR, 2. MEJORES PRÁCTICAS, 3. COMPETENCIA, 4. ESTÁNDARES EC, 5. ANÁLISIS DE GAPS, 6. RECOMENDACIONES, 7. REFERENCIAS) estén presentes y completas."
+      - "CRÍTICO: La sección '### Preguntas para el cliente (máximo 10)' DEBE existir dentro de la sección 5, después de un separador ---. Si no existe o tiene menos de 3 preguntas, AGRÉGALA ahora con al menos 5 preguntas de diagnóstico instruccional siguiendo el formato: **[N]. [Texto]** / - **Objetivo:** [qué decisión de diseño permite] / - **Justificación:** [por qué es necesaria] / - **Bibliografía:** [autor, año]."
+      - "Confirma que cada celda de tabla contiene datos reales, no placeholders como [texto] o [referencia]."
+      - "Reemplaza cualquier placeholder restante [X], [nombre], [texto] con el valor encontrado o con 'No se encontró información pública disponible'."
+      - "Devuelve el documento completo en Markdown válido."
 ---
 
 Actúa como un investigador de mercado y consultor especializado en educación en línea, con experiencia en el estándar EC0366 "Desarrollo de cursos de formación en línea" del CONOCER.
@@ -32,8 +51,8 @@ Sigue estos 6 pasos en orden antes de generar la respuesta:
 ## FORMATO DE SALIDA OBLIGATORIO
 
 # MARCO DE REFERENCIA DEL CLIENTE
-**Proyecto:** [nombre del proyecto]
-**Fecha de investigación:** [fecha actual]
+**Proyecto:** {{projectName}}
+**Fecha de investigación:** {{fechaActual}}
 **Investigador:** IA (fuentes documentadas)
 
 ---
@@ -91,6 +110,8 @@ Sigue estos 6 pasos en orden antes de generar la respuesta:
 ### Gap vs competencia
 [texto]
 
+---
+
 ### Preguntas para el cliente (máximo 10)
 
 CRITERIO OBLIGATORIO: Cada pregunta debe ser respondida por el CLIENTE (quien contrata el curso) y su respuesta debe servir directamente para DISEÑAR O MEJORAR el curso. NO son preguntas filosóficas ni de contenido; son preguntas de diagnóstico instruccional.
@@ -127,3 +148,5 @@ Formato por pregunta:
 - Mantén un tono profesional y objetivo.
 - Responde SOLO en español.
 - Las "Preguntas para el cliente" en la sección 5 son EXCLUSIVAMENTE preguntas de diagnóstico instruccional — cada respuesta del cliente debe traducirse en una decisión concreta de diseño del curso. NUNCA hagas preguntas sobre el significado, la filosofía o el propósito artístico del curso.
+- **Reemplaza TODO placeholder `[X]`, `[nombre]`, `[plataforma]`, `[$]`, `[N]`, `[texto]`, `[referencia]` con valores reales encontrados en tu investigación. Si no encuentras un dato concreto, escribe "No se encontró información pública disponible".**
+- **NO dejes ningún placeholder sin reemplazar en el documento final.**

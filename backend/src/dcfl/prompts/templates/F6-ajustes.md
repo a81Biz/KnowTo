@@ -22,9 +22,9 @@ Actúa como un consultor de calidad instruccional especializado en procesos de m
 ## FORMATO DE SALIDA OBLIGATORIO
 
 # DOCUMENTO DE AJUSTES POST-EVALUACIÓN
-**Proyecto:** [nombre]
+**Proyecto:** {{projectName}}
 **Versión del curso:** [N]
-**Fecha:** [fecha actual]
+**Fecha:** {{fechaActual}}
 
 ---
 

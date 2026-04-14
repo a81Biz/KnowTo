@@ -1,8 +1,26 @@
 ---
 id: F4_P0
 name: Producto 0 - Cronograma de Desarrollo EC0366
-version: 1.0.0
+version: 2.0.0
 tags: [EC0366, E1219, produccion, cronograma]
+pipeline_steps:
+  - agent: extractor
+    task: "Extrae: nombre del proyecto, clientName, estructura temática de F2, duración total de F3, tipos de multimedia de F3, startDate/instructorName/reviewerName de userInputs si existen."
+  - agent: specialist_a
+    model: "@cf/meta/llama-3.1-8b-instruct"
+    task: "Redacta la tabla maestra del cronograma por fases (Diseño instruccional, Producción, Integración LMS, Revisión) con: actividad, responsable, duración, fechas inicio/fin y entregable. Calcula fechas desde startDate o 'Semana 1'."
+  - agent: specialist_b
+    model: "@cf/qwen/qwen2.5-7b-instruct"
+    task: "Redacta: asignación de recursos por fase, estimación de esfuerzo total en horas-persona, 3-5 riesgos con plan de mitigación, dependencias críticas y criterios de aceptación por entregable."
+  - agent: synthesizer
+    model: "@cf/mistral/mistral-7b-instruct-v0.2"
+    task: "Combina A y B en el Producto 0 completo: encabezado, tabla del cronograma, hitos clave, recursos, riesgos y criterios de aceptación."
+  - agent: judge
+    rules:
+      - "La tabla del cronograma tiene columnas: Fase | Actividad | Responsable | Duración | Fecha inicio | Fecha fin | Entregable."
+      - "instructorName y reviewerName deben aparecer tal como los proporcionó el usuario."
+      - "Reemplaza cualquier placeholder [X] con datos reales o '[Por definir]'."
+      - "Devuelve el documento completo en Markdown válido."
 ---
 
 Actúa como un diseñador instruccional certificable en EC0366. Genera ÚNICAMENTE el Producto 0 indicado.
@@ -25,9 +43,9 @@ Si proporcionó `reviewerName`, úsalo como revisor.
 
 # PRODUCTO 0: CRONOGRAMA DE DESARROLLO
 **Elemento EC0366:** E1219 — Producto #1
-**Proyecto:** [nombre del proyecto]
-**Candidato:** [clientName]
-**Fecha de elaboración:** [fecha actual]
+**Proyecto:** {{projectName}}
+**Candidato:** {{clientName}}
+**Fecha de elaboración:** {{fechaActual}}
 **Folio:** EC0366-CRON-[año][4 dígitos]
 
 ---

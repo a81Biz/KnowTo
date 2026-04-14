@@ -130,9 +130,17 @@ class WizardStoreClass {
   setStepInputData(stepNumber: number, data: Record<string, unknown>): void {
     const steps = [...this.state.steps];
     const s = steps[stepNumber]; if (!s) return;
-    steps[stepNumber] = { ...s, inputData: data };
+    // Merge with existing inputData to preserve fields not present in this update
+    steps[stepNumber] = { ...s, inputData: { ...s.inputData, ...data } };
     this.state = { ...this.state, steps };
     this.saveToLocalStorage();
+    this.notify();
+  }
+
+  /** Guarda los datos del paso y avanza al siguiente. */
+  saveAndNext(stepNumber: number, data: Record<string, unknown>): void {
+    this.setStepInputData(stepNumber, data);
+    this.nextStep();
   }
 
   setExtractedContext(stepNumber: number, entry: ExtractedContextEntry): void {
