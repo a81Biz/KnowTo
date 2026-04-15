@@ -29,7 +29,7 @@ export class SupabaseService extends BaseSupabaseService {
     sector?: string | undefined;
     email?: string | undefined;
   }): Promise<{ projectId: string }> {
-    if (this.isDev) return { projectId: crypto.randomUUID() };
+    if (!this.client) return { projectId: crypto.randomUUID() };
 
     const { data, error } = await this.client!.rpc('sp_cce_create_project', {
       p_user_id:      params.userId,
@@ -48,7 +48,7 @@ export class SupabaseService extends BaseSupabaseService {
   // ── Pipeline output methods ───────────────────────────────────────────────
 
   async getStepOutputs(projectId: string, keys?: string[]): Promise<Record<string, unknown>> {
-    if (this.isDev) {
+    if (!this.client) {
       const proj = this.devOutputs.get(projectId) ?? {};
       if (!keys || keys.length === 0) return proj;
       const res: Record<string, unknown> = {};
@@ -84,7 +84,7 @@ export class SupabaseService extends BaseSupabaseService {
     outputKey: string;
     outputValue: unknown;
   }): Promise<void> {
-    if (this.isDev) {
+    if (!this.client) {
       const proj = this.devOutputs.get(params.projectId) ?? {};
       proj[params.outputKey] = params.outputValue;
       this.devOutputs.set(params.projectId, proj);
@@ -110,7 +110,7 @@ export class SupabaseService extends BaseSupabaseService {
     if (fromSiteTable) return fromSiteTable;
 
     // Fallback a tabla legada cce_prompts (pre-migración)
-    if (this.isDev && !this.client) {
+    if (!this.client) {
       return {
         system_prompt:         'Dev mock system prompt',
         user_prompt_template:  'Dev mock user prompt: {{inputs}}',
@@ -118,18 +118,15 @@ export class SupabaseService extends BaseSupabaseService {
         agent_type:            'specialist_a',
       };
     }
-
-    if (!this.client) throw new Error('Supabase client is null');
     const { data, error } = await this.client.from('cce_prompts').select('*').eq('id', promptId).single();
     if (error) throw new Error(`getPrompt failed: ${error.message}`);
     return data as Record<string, unknown>;
   }
 
   async listPromptsByFase(fasePrefix: string): Promise<Record<string, unknown>[]> {
-    if (this.isDev && !this.client) {
+    if (!this.client) {
       return [{ id: `${fasePrefix}_MOCK_1` }, { id: `${fasePrefix}_MOCK_2` }];
     }
-    if (!this.client) throw new Error('Supabase client is null');
     const { data, error } = await this.client.from('cce_prompts').select('*').like('id', `${fasePrefix}_%`);
     if (error) throw new Error(`listPromptsByFase failed: ${error.message}`);
     return (data ?? []) as Record<string, unknown>[];

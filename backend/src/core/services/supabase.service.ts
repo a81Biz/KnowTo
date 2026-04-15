@@ -25,11 +25,20 @@ export abstract class BaseSupabaseService {
 
   constructor(protected readonly env: Env) {
     this.isDev = env.ENVIRONMENT !== 'production';
-    this.client = this.isDev
-      ? null
-      : createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, {
+
+    // Crear el cliente Supabase siempre que haya una URL real apuntando a la instancia.
+    // En desarrollo local apunta al Kong interno (http://supabase-kong:8000).
+    // En producción apunta al proyecto Supabase cloud.
+    // Si la URL contiene 'dummy' o está vacía, se deja null y los métodos usan mocks.
+    const url = env.SUPABASE_URL ?? '';
+    const key = env.SUPABASE_SERVICE_ROLE_KEY ?? '';
+    const hasRealSupabase = url.length > 0 && !url.includes('dummy') && key.length > 0 && !key.includes('dummy');
+
+    this.client = hasRealSupabase
+      ? createClient(url, key, {
           auth: { autoRefreshToken: false, persistSession: false },
-        });
+        })
+      : null;
   }
 
   /** Devuelve el cliente Supabase. Solo disponible en producción. */
@@ -45,7 +54,7 @@ export abstract class BaseSupabaseService {
     stepNumber: number;
     inputData: Record<string, unknown>;
   }): Promise<{ stepId: string }> {
-    if (this.isDev) return { stepId: crypto.randomUUID() };
+    if (!this.client) return { stepId: crypto.randomUUID() };
 
     const { data, error } = await this.client!.rpc(this.spSaveStep, {
       p_project_id:   params.projectId,
@@ -65,7 +74,7 @@ export abstract class BaseSupabaseService {
     title: string;
     content: string;
   }): Promise<{ documentId: string }> {
-    if (this.isDev) return { documentId: crypto.randomUUID() };
+    if (!this.client) return { documentId: crypto.randomUUID() };
 
     const { data, error } = await this.client!.rpc(this.spSaveDocument, {
       p_project_id: params.projectId,
@@ -81,7 +90,7 @@ export abstract class BaseSupabaseService {
   }
 
   async getProjectContext(projectId: string): Promise<Record<string, unknown>> {
-    if (this.isDev) return { project: null };
+    if (!this.client) return { project: null };
 
     const { data, error } = await this.client!.rpc(this.spGetProjectContext, {
       p_project_id: projectId,
@@ -92,7 +101,7 @@ export abstract class BaseSupabaseService {
   }
 
   async getUserProjects(userId: string) {
-    if (this.isDev) return [];
+    if (!this.client) return [];
 
     const { data, error } = await this.client!
       .from(this.projectProgressView)
@@ -112,7 +121,7 @@ export abstract class BaseSupabaseService {
     content: string;
     parserUsed: Record<string, boolean>;
   }): Promise<{ extractedContextId: string }> {
-    if (this.isDev) return { extractedContextId: crypto.randomUUID() };
+    if (!this.client) return { extractedContextId: crypto.randomUUID() };
 
     const { data, error } = await this.client!.rpc(this.spSaveExtractedContext, {
       p_project_id:    params.projectId,
@@ -129,7 +138,7 @@ export abstract class BaseSupabaseService {
   }
 
   async markStepError(stepId: string, errorMsg: string): Promise<void> {
-    if (this.isDev) return;
+    if (!this.client) return;
     await this.client!.rpc(this.spMarkStepError, {
       p_step_id:  stepId,
       p_error_msg: errorMsg,
@@ -140,7 +149,7 @@ export abstract class BaseSupabaseService {
     projectId: string;
     extractorId: string;
   }): Promise<{ content: string } | null> {
-    if (this.isDev) return null;
+    if (!this.client) return null;
 
     const { data, error } = await this.client!
       .from('extracted_contexts')
@@ -161,8 +170,7 @@ export abstract class BaseSupabaseService {
    * Fallback: devuelve null si la tabla no existe aún (compatibilidad durante migración).
    */
   async getPromptFromSiteTable(siteId: string, promptId: string): Promise<Record<string, unknown> | null> {
-    if (this.isDev && !this.client) return null;
-    if (!this.client) throw new Error('Supabase client is null');
+    if (!this.client) return null;
 
     const { data, error } = await this.client
       .from('site_prompts')

@@ -26,7 +26,7 @@ export class SupabaseService extends BaseSupabaseService {
     industry?: string | undefined;
     email?: string | undefined;
   }): Promise<{ projectId: string }> {
-    if (this.isDev) return { projectId: crypto.randomUUID() };
+    if (!this.client) return { projectId: crypto.randomUUID() };
 
     const { data, error } = await this.client!.rpc('sp_create_project', {
       p_user_id:     params.userId,

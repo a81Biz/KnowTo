@@ -2,10 +2,10 @@
 //
 // Gestión de pipeline_jobs para generación asíncrona de documentos.
 //
-// Dev:  almacenamiento en memoria (Map). Notifica via callback inyectado desde
-//       server.dev.ts (WebSocket event-bus).
-// Prod: almacenamiento en Supabase. Supabase Realtime notifica al frontend
-//       directamente — no se necesita ningún callback aquí.
+// Con Supabase disponible (dev self-hosted o prod cloud):
+//   Escribe en la tabla pipeline_jobs. Supabase Realtime notifica al frontend.
+// Sin Supabase (solo si SUPABASE_URL contiene 'dummy' o está vacío):
+//   Almacenamiento en memoria (Map). Notifica via callback inyectado.
 
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import type { Env } from '../types/env';
@@ -54,19 +54,25 @@ export class PipelineJobsService {
 
   constructor(env: Env) {
     this.isDev = env.ENVIRONMENT !== 'production';
-    this.supabase =
-      this.isDev
-        ? null
-        : createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, {
-            auth: { autoRefreshToken: false, persistSession: false },
-          });
+
+    // Crear el cliente Supabase siempre que haya una URL real.
+    // En dev con stack self-hosted apunta a http://supabase-kong:8000.
+    // En prod apunta al proyecto Supabase cloud.
+    // Sin Supabase configurado (URL vacía o 'dummy') usa almacenamiento en memoria.
+    const url = env.SUPABASE_URL ?? '';
+    const key = env.SUPABASE_SERVICE_ROLE_KEY ?? '';
+    const hasRealSupabase = url.length > 0 && !url.includes('dummy') && key.length > 0 && !key.includes('dummy');
+
+    this.supabase = hasRealSupabase
+      ? createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } })
+      : null;
   }
 
   /** Crea un job en estado 'pending' y devuelve su ID. */
   async createJob(params: Omit<PipelineJob, 'id' | 'status'>): Promise<string> {
     const id = crypto.randomUUID();
 
-    if (this.isDev) {
+    if (!this.supabase) {
       _devJobs.set(id, { ...params, id, status: 'pending' });
       return id;
     }
@@ -90,7 +96,7 @@ export class PipelineJobsService {
 
   /** Marca el job como completado y notifica si hay notificador registrado. */
   async completeJob(jobId: string, result: Record<string, unknown>): Promise<void> {
-    if (this.isDev) {
+    if (!this.supabase) {
       const job = _devJobs.get(jobId);
       if (!job) return;
       job.status = 'completed';
@@ -109,7 +115,7 @@ export class PipelineJobsService {
 
   /** Devuelve el estado actual de un job por su ID. */
   async getJob(jobId: string): Promise<PipelineJob | null> {
-    if (this.isDev) {
+    if (!this.supabase) {
       return _devJobs.get(jobId) ?? null;
     }
 
@@ -138,7 +144,7 @@ export class PipelineJobsService {
 
   /** Marca el job como fallido y notifica si hay notificador registrado. */
   async failJob(jobId: string, errorMsg: string): Promise<void> {
-    if (this.isDev) {
+    if (!this.supabase) {
       const job = _devJobs.get(jobId);
       if (!job) return;
       job.status = 'failed';

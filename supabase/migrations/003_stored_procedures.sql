@@ -154,9 +154,11 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 -- =============================================================================
 -- VISTAS
 -- =============================================================================
-CREATE OR REPLACE VIEW vw_project_progress AS
+DROP VIEW IF EXISTS vw_project_progress;
+CREATE VIEW vw_project_progress AS
 SELECT
   p.id AS project_id,
+  p.user_id,
   p.name,
   p.client_name,
   p.current_step,
@@ -172,3 +174,6 @@ SELECT
 FROM projects p
 LEFT JOIN wizard_steps ws ON ws.project_id = p.id
 GROUP BY p.id;
+
+-- Permisos sobre la vista (service_role usa BYPASSRLS pero necesita GRANT de tabla)
+GRANT SELECT ON vw_project_progress TO service_role, authenticated, anon;

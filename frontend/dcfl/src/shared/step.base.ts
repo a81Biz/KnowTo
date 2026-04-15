@@ -3,7 +3,7 @@
 // Implementa las 7 secciones obligatorias del FRONTEND ARCHITECTURE DOCUMENT
 
 import { TemplateLoader } from '@core/template.loader';
-import { postData, getData } from '@core/http.client';
+import { postData } from '@core/http.client';
 import { ENDPOINTS, buildEndpoint } from './endpoints';
 import { showLoading, hideLoading, showError, showSuccess, renderMarkdown, printDocument } from '@core/ui';
 import { subscribeToJob, type JobResult } from './supabase.realtime';
@@ -445,10 +445,6 @@ export class BaseStep {
       return;
     }
 
-    const isProduction =
-      (import.meta.env.PROD as boolean) ||
-      (import.meta.env['VITE_ENVIRONMENT'] as string) === 'production';
-
     const onComplete = (result: JobResult) => {
       logger.timeEnd(timerLabel);
       logger.info(`[step${this._config.stepNumber}] Job completado`, { documentId: result.documentId });
@@ -469,66 +465,17 @@ export class BaseStep {
 
     const TIMEOUT_MS = 20 * 60 * 1000; // 20 minutos
 
-    if (isProduction) {
-      logger.info(`[step${this._config.stepNumber}] Esperando via Supabase Realtime...`);
-      // Producción: Supabase Realtime
-      const channel = subscribeToJob(jobId, onComplete, onError);
-      setTimeout(() => {
-        channel.unsubscribe();
-        onError('Timeout: el pipeline tardó más de 20 minutos');
-      }, TIMEOUT_MS);
-    } else {
-      logger.info(`[step${this._config.stepNumber}] Iniciando polling (cada 2s, max 20min)...`);
-      // Desarrollo: polling a GET /job/:jobId
-      void this._pollJob(jobId, onComplete, onError, TIMEOUT_MS);
-    }
+    // Ambos entornos (dev y prod) usan Supabase Realtime vía WebSocket.
+    // En desarrollo el frontend se conecta a ws://localhost:54321/realtime/v1
+    // (Kong local). En producción al proyecto Supabase cloud.
+    logger.info(`[step${this._config.stepNumber}] Esperando via Supabase Realtime (WebSocket)...`);
+    const channel = subscribeToJob(jobId, onComplete, onError);
+    setTimeout(() => {
+      channel.unsubscribe();
+      onError('Timeout: el pipeline tardó más de 20 minutos');
+    }, TIMEOUT_MS);
   }
 
-  /**
-   * Polling para desarrollo: consulta GET /job/:jobId cada 2 s hasta que
-   * el job complete, falle o se agote el timeout.
-   */
-  private async _pollJob(
-    jobId: string,
-    onComplete: (result: JobResult) => void,
-    onError: (error: string) => void,
-    timeoutMs: number,
-  ): Promise<void> {
-    const INTERVAL = 2000;
-    const maxAttempts = Math.floor(timeoutMs / INTERVAL);
-
-    for (let i = 0; i < maxAttempts; i++) {
-      await new Promise<void>((resolve) => setTimeout(resolve, INTERVAL));
-
-      logger.debug(`[poll] job=${jobId} intento=${i + 1}/${maxAttempts}`);
-
-      try {
-        const res = await getData<{
-          jobId: string;
-          status: string;
-          result?: Record<string, unknown>;
-          error?: string;
-        }>(buildEndpoint(ENDPOINTS.wizard.job(jobId)));
-
-        const status = res.data?.status;
-        logger.debug(`[poll] job=${jobId} status=${status ?? 'unknown'}`);
-
-        if (status === 'completed' && res.data?.result) {
-          onComplete(res.data.result as unknown as JobResult);
-          return;
-        }
-        if (status === 'failed') {
-          onError(res.data?.error ?? 'Error en el pipeline');
-          return;
-        }
-        // status === 'pending' | 'running' → seguir esperando
-      } catch (err) {
-        logger.warn(`[poll] job=${jobId} error de red en intento ${i + 1}`, err);
-      }
-    }
-
-    onError('Timeout: el pipeline tardó más de 10 minutos');
-  }
 
   // 6. EVENTOS
   protected _bindEvents(): void {

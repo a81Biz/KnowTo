@@ -284,6 +284,9 @@ LEFT JOIN wizard_steps ws ON ws.project_id = p.id
 WHERE p.microsite = 'cce'
 GROUP BY p.id;
 
+-- Permisos sobre la vista CCE
+GRANT SELECT ON vw_cce_project_progress TO service_role, authenticated, anon;
+
 -- =============================================================================
 -- 10. RLS: políticas de seguridad para las nuevas tablas
 -- =============================================================================

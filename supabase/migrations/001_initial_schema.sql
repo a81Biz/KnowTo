@@ -2,6 +2,70 @@
 -- KNOWTO - Migration 001: Initial Schema
 -- =============================================================================
 
+-- ---------------------------------------------------------------------------
+-- COMPATIBILIDAD: stubs de auth para initdb.d
+--
+-- supabase/postgres no pre-crea auth.users — lo hace GoTrue al arrancar.
+-- Pero initdb.d corre ANTES que GoTrue. La tabla creada aquí debe tener
+-- TODAS las columnas del schema inicial de GoTrue (00_init_auth_schema.up.sql)
+-- para que las migraciones incrementales posteriores de GoTrue encuentren
+-- las columnas que esperan (confirmed_at, instance_id, etc.).
+-- ---------------------------------------------------------------------------
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_namespace WHERE nspname = 'auth') THEN
+    CREATE SCHEMA auth;
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.tables
+    WHERE table_schema = 'auth' AND table_name = 'users'
+  ) THEN
+    -- Schema completo de GoTrue v2 (00_init_auth_schema.up.sql)
+    CREATE TABLE auth.users (
+      instance_id              uuid NULL,
+      id                       uuid NOT NULL,
+      aud                      varchar(255) NULL,
+      "role"                   varchar(255) NULL,
+      email                    varchar(255) NULL UNIQUE,
+      encrypted_password       varchar(255) NULL,
+      confirmed_at             timestamptz NULL,
+      invited_at               timestamptz NULL,
+      confirmation_token        varchar(255) NULL,
+      confirmation_sent_at     timestamptz NULL,
+      recovery_token           varchar(255) NULL,
+      recovery_sent_at         timestamptz NULL,
+      email_change_token       varchar(255) NULL,
+      email_change             varchar(255) NULL,
+      email_change_sent_at     timestamptz NULL,
+      last_sign_in_at          timestamptz NULL,
+      raw_app_meta_data        jsonb NULL,
+      raw_user_meta_data       jsonb NULL,
+      is_super_admin           bool NULL,
+      created_at               timestamptz NULL,
+      updated_at               timestamptz NULL,
+      CONSTRAINT users_pkey PRIMARY KEY (id)
+    );
+    CREATE INDEX IF NOT EXISTS users_instance_id_email_idx ON auth.users (instance_id, email);
+    CREATE INDEX IF NOT EXISTS users_instance_id_idx ON auth.users (instance_id);
+  END IF;
+
+  -- auth.uid() stub para RLS policies de migration 002.
+  -- GoTrue la reemplazará con su implementación real al arrancar.
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_proc p
+    JOIN pg_namespace n ON n.oid = p.pronamespace
+    WHERE n.nspname = 'auth' AND p.proname = 'uid'
+  ) THEN
+    EXECUTE $func$
+      CREATE FUNCTION auth.uid() RETURNS uuid
+      LANGUAGE sql STABLE
+      AS 'SELECT NULL::uuid';
+    $func$;
+  END IF;
+END $$;
+
+
+
 -- Habilitar extensiones
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
@@ -102,3 +166,29 @@ CREATE TRIGGER set_updated_at_wizard_steps
 CREATE TRIGGER set_updated_at_documents
   BEFORE UPDATE ON documents
   FOR EACH ROW EXECUTE FUNCTION trigger_set_updated_at();
+
+-- =============================================================================
+-- SEED: usuario de desarrollo
+-- UUID fijo para el token 'dev-local-bypass' (auth.middleware.ts DEV_USER_ID).
+-- Usa las columnas del stub de auth.users creado arriba (confirmed_at, no
+-- email_confirmed_at, que es la columna que añade GoTrue en sus propias
+-- migraciones incrementales).
+-- =============================================================================
+INSERT INTO auth.users (
+  id, instance_id, aud, role, email,
+  encrypted_password, confirmed_at,
+  created_at, updated_at,
+  confirmation_token, recovery_token,
+  email_change_token, email_change
+) VALUES (
+  '00000000-0000-0000-0000-000000000001',
+  '00000000-0000-0000-0000-000000000000',
+  'authenticated', 'authenticated',
+  'dev@local.dev',
+  crypt('dev-password', gen_salt('bf')),
+  NOW(), NOW(), NOW(), '', '', '', ''
+) ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO profiles (id, email, full_name)
+VALUES ('00000000-0000-0000-0000-000000000001', 'dev@local.dev', 'Dev User')
+ON CONFLICT (id) DO NOTHING;

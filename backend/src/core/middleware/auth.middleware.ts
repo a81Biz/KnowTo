@@ -11,7 +11,9 @@ import { createClient } from '@supabase/supabase-js';
 import type { Env } from '../types/env';
 
 export const DEV_TOKEN = 'dev-local-bypass';
-export const DEV_USER_ID = 'dev-user-local';
+// UUID fijo para el usuario de desarrollo. Debe existir en auth.users + profiles.
+// Semilla creada en 000_supabase_setup.sql (o manualmente en la BD local).
+export const DEV_USER_ID = '00000000-0000-0000-0000-000000000001';
 
 export const authMiddleware = createMiddleware<{ Bindings: Env; Variables: { userId: string } }>(
   async (c, next) => {

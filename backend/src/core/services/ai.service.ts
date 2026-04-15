@@ -277,6 +277,10 @@ export class AIService {
     const base  = (this.env.OLLAMA_URL   ?? 'http://localhost:11434').replace(/\/$/, '');
     const model = modelOverride ?? (this.env.OLLAMA_MODEL ?? 'llama3.2:3b');
 
+    // 20 minutos — suficiente para llama3.2:3b en CPU sin GPU.
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 20 * 60 * 1000);
+
     const res = await fetch(`${base}/api/generate`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -286,7 +290,8 @@ export class AIService {
         system: sysPrompt ?? this.systemPrompt,
         stream: false,
       }),
-    });
+      signal: controller.signal,
+    }).finally(() => clearTimeout(timeout));
 
     if (!res.ok) throw new Error(`Ollama HTTP ${res.status}: ${await res.text()}`);
     const data = (await res.json()) as { response?: string };
@@ -330,11 +335,15 @@ export class AIService {
   private async _ollamaVision(prompt: string, base64: string): Promise<string> {
     const base = (this.env.OLLAMA_URL ?? 'http://localhost:11434').replace(/\/$/, '');
 
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 20 * 60 * 1000);
+
     const res = await fetch(`${base}/api/generate`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ model: 'llava:7b', prompt, images: [base64], stream: false }),
-    });
+      signal: controller.signal,
+    }).finally(() => clearTimeout(timeout));
 
     if (!res.ok) throw new Error(`Ollama Vision HTTP ${res.status}: ${await res.text()}`);
     const data = (await res.json()) as { response?: string };

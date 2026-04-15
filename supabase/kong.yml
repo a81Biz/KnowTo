@@ -1,0 +1,58 @@
+_format_version: "2.1"
+
+# =============================================================================
+# Supabase Kong — API Gateway declarativo (sin base de datos)
+# Unifica Auth, REST, Realtime y Studio en un solo punto de entrada
+# expuesto en el host en el puerto 54321.
+#
+# Flujo de una petición:
+#   Host:54321/auth/v1/...    → supabase-auth:9999
+#   Host:54321/rest/v1/...    → supabase-rest:3000
+#   Host:54321/realtime/v1/...→ supabase-realtime:4000 (WebSocket upgrade)
+# =============================================================================
+
+services:
+
+  # ── Auth (GoTrue) ────────────────────────────────────────────────────────
+  - name: auth-v1
+    url: http://supabase-auth:9999/
+    routes:
+      - name: auth-v1-route
+        strip_path: true
+        paths:
+          - /auth/v1
+    plugins:
+      - name: cors
+
+  # ── REST API (PostgREST) ──────────────────────────────────────────────────
+  - name: rest-v1
+    url: http://supabase-rest:3000/
+    routes:
+      - name: rest-v1-route
+        strip_path: true
+        paths:
+          - /rest/v1
+    plugins:
+      - name: cors
+
+  # ── Realtime (WebSocket) ──────────────────────────────────────────────────
+  - name: realtime-v1
+    url: http://supabase-realtime:4000/
+    routes:
+      - name: realtime-v1-route
+        strip_path: true
+        paths:
+          - /realtime/v1
+        protocols:
+          - ws
+          - wss
+          - http
+          - https
+    plugins:
+      - name: cors
+        config:
+          origins:
+            - http://dcfl.localhost
+            - http://cce.localhost
+            - http://localhost
+          credentials: true

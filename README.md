@@ -5,15 +5,16 @@ Plataforma de microsites de certificación asistidos por IA. Arquitectura multi-
 ## Stack
 
 | Capa | Tecnología |
-|---|---|
+|:---|:---|
 | Frontend | TypeScript + Vite + Tailwind CSS (Vanilla TS, sin framework) |
 | Backend | Hono + `@hono/zod-openapi` — Node.js en dev, Cloudflare Workers en prod |
 | IA — producción | Workers AI — `@cf/meta/llama-3.2-3b-instruct` |
 | IA — desarrollo | Ollama local — `llama3.2:3b` (configurable) |
-| Base de datos | Supabase (PostgreSQL) vía stored procedures RPC |
+| Base de datos | Supabase self-hosted (PostgreSQL 15 + PostgREST + Realtime + GoTrue + Kong) |
+| Notificaciones async | Supabase Realtime — `postgres_changes` en tabla `pipeline_jobs` (WebSocket, sin polling) |
 | Routing local | Nginx (reverse proxy, único puerto expuesto: 80) |
-| Dev local | Docker Compose — Nginx + Node.js + Postgres + Ollama |
-| Tests | Vitest (115 tests, 100 % pass) |
+| Dev local | Docker Compose — Nginx + Node.js + Supabase stack completo + Ollama |
+| Tests | Vitest (152 tests, 100 % pass) |
 
 ---
 
@@ -21,13 +22,14 @@ Plataforma de microsites de certificación asistidos por IA. Arquitectura multi-
 
 ### Con Docker (recomendado)
 
-**Prerequisito único por máquina** — añadir al archivo `hosts`:
+**Prerrequisito único por máquina** — añadir al archivo `hosts`:
 
 ```
 # Windows: C:\Windows\System32\drivers\etc\hosts  (abrir como Administrador)
 # Linux/Mac: /etc/hosts
 
 127.0.0.1  dcfl.localhost
+127.0.0.1  cce.localhost
 127.0.0.1  api.localhost
 ```
 
@@ -36,14 +38,18 @@ docker compose up -d
 ```
 
 | URL | Servicio |
-|---|---|
+|:---|:---|
 | `http://localhost` | Directorio de microsites |
 | `http://dcfl.localhost` | Microsite EC0366 (DCFL) |
 | `http://cce.localhost` | Microsite EC0249 (CCE) |
 | `http://api.localhost/docs` | Swagger UI (Scalar) |
 | `http://api.localhost/health` | Health check del API |
+| `http://localhost:54321` | Supabase Kong (API Gateway de Supabase) |
+| `http://localhost:54323` | Supabase Studio (UI de administración de la BD) |
+| `http://localhost:54321/rest/v1/` | PostgREST (API REST automática de la BD) |
 
 El backend tarda ~20 s en estar listo (npm install + arranque de Node.js).
+El stack de Supabase tarda ~30 s en estar completamente operativo.
 
 ### Sin Docker (desarrollo nativo)
 
@@ -94,21 +100,41 @@ En producción el deploy sigue siendo `wrangler deploy` → Cloudflare Workers.
 
 ```
 Browser
-  ├── localhost           → frontend-root   (directorio)
-  ├── dcfl.localhost      → frontend-dcfl   (microsite EC0366)
-  ├── cce.localhost       → frontend-cce    (microsite EC0249)
-  └── api.localhost       → backend         (API Gateway)
+  ├── localhost           → frontend-root     (directorio)
+  ├── dcfl.localhost      → frontend-dcfl     (microsite EC0366)
+  ├── cce.localhost       → frontend-cce      (microsite EC0249)
+  └── api.localhost       → backend           (API Gateway)
          ↓
        Nginx (puerto 80, único expuesto)
          ↓
    Docker network (knowto-network 172.20.0.0/24)
-   ├── frontend-root   :5174
-   ├── frontend-dcfl   :5173
-   ├── frontend-cce    :5175
-   ├── backend         :8787  (también :9229 para debugger)
-   ├── postgres        :5432
-   └── ollama          :11434
+   ├── frontend-root      :5174
+   ├── frontend-dcfl      :5173
+   ├── frontend-cce       :5175
+   ├── backend            :8787  (también :9229 para debugger)
+   ├── ollama             :11434
+   │
+   └── Supabase self-hosted
+       ├── supabase-kong     :54321  (único punto de entrada al stack Supabase)
+       ├── supabase-db       :5432   (PostgreSQL 15)
+       ├── supabase-rest     :3000   (PostgREST — API REST automática)
+       ├── supabase-realtime :4000   (Realtime v2 — WebSocket CDC)
+       ├── supabase-auth     :9999   (GoTrue — autenticación JWT)
+       ├── supabase-meta     :8080   (Supabase Meta — introspección DB)
+       └── supabase-studio   :54323  (Supabase Studio — UI de administración)
 ```
+
+**Flujo de notificaciones async (pipeline de documentos):**
+
+```
+backend → INSERT/UPDATE pipeline_jobs → PostgreSQL → Supabase Realtime
+                                                           ↓ WebSocket
+                                              frontend ← supabase-js
+                                           (subscribeToJob en step.base.ts)
+```
+
+> **Nota:** El fallback a polling fue eliminado. En desarrollo y producción se usa
+> exclusivamente WebSocket (Supabase Realtime).
 
 Cada microsite tiene su propio frontend Vite y su propio router en el backend.
 Un fallo en un microsite no afecta a los demás.
@@ -116,7 +142,7 @@ Un fallo en un microsite no afecta a los demás.
 **Convención de URLs:**
 
 | Entorno | Frontend | API |
-|---|---|---|
+|:---|:---|:---|
 | Desarrollo | `[slug].localhost` | `api.localhost/[slug]/...` |
 | Producción | `[slug].[dominio]` | `api.[dominio]/[slug]/...` |
 
@@ -148,7 +174,7 @@ knowto/
 │           ├── services/         # SupabaseService (extiende BaseSupabaseService)
 │           ├── prompts/          # flow-map.yaml + templates/ (F0–F6, F0_CLIENT_QUESTIONS_FORM…)
 │           └── types/            # PromptId, ProjectContext…
-├── backend/src/__tests__/        # Vitest — 115 tests
+├── backend/src/__tests__/        # Vitest — 152 tests
 │   ├── middleware/auth.middleware.test.ts
 │   ├── routes/health.e2e.test.ts
 │   ├── routes/wizard.e2e.test.ts           # Flujo completo DCFL
@@ -243,6 +269,7 @@ Ver [docs/ADDING-A-MICROSITE.md](docs/ADDING-A-MICROSITE.md) (sección 11) para 
 ```nginx
 localhost        →  frontend-root:5174
 dcfl.localhost   →  frontend-dcfl:5173
+cce.localhost    →  frontend-cce:5175
 api.localhost    →  backend:8787
 ```
 
@@ -280,7 +307,7 @@ En desarrollo             →  acepta cualquier *.localhost
 ## Motores de IA por entorno
 
 | Entorno | Motor | Mecanismo |
-|---|---|---|
+|:---|:---|:---|
 | `development` | Ollama local | `fetch(OLLAMA_URL/api/generate)` — sin auth |
 | `production` | Workers AI | `env.AI.run('@cf/meta/llama-3.2-3b-instruct')` — binding CF |
 
@@ -295,13 +322,112 @@ El modelo de Ollama es configurable con `OLLAMA_MODEL` (default: `llama3.2:3b`).
 ## Comportamiento por entorno
 
 | Servicio | Desarrollo | Producción |
-|---|---|---|
+|:---|:---|:---|
 | Runtime backend | Node.js (`server.dev.ts`) | Cloudflare Workers (workerd) |
 | IA | Ollama Docker (`llama3.2:3b`) | Workers AI (`llama-3.2-3b-instruct`) |
-| Base de datos | Mocks en memoria (UUIDs) | Supabase — stored procedures RPC |
+| Base de datos | Supabase self-hosted (Docker) | Supabase cloud |
+| Notificaciones async | Supabase Realtime self-hosted | Supabase Realtime cloud |
 | Auth | Token literal `dev-local-bypass` | JWT Google OAuth via Supabase |
 | CORS | Acepta `*.localhost` | Solo `*.[apex-domain]` |
 | Login Cloudflare | No requerido | Requerido para `wrangler deploy` |
+
+---
+
+## Base de datos — Supabase self-hosted
+
+El stack de desarrollo incluye Supabase completo ejecutándose en Docker. El backend usa
+`SUPABASE_URL=http://supabase-kong:54321` y `SUPABASE_SERVICE_ROLE_KEY` para operar con
+`service_role` (sin RLS). El frontend usa `VITE_SUPABASE_URL=http://localhost:54321` y la
+`anon key` para suscribirse a Realtime.
+
+### Tablas clave
+
+| Tabla | Propósito |
+|:---|:---|
+| `projects` | Proyectos de consultoría/certificación |
+| `steps` | Pasos del wizard guardados |
+| `documents` | Documentos generados por fase |
+| `pipeline_jobs` | Jobs asíncronos para pipelines de IA |
+| `site_prompts` | Prompts unificados para todos los microsites (discriminados por `site_id`) |
+
+### Servicios y puertos
+
+| Servicio | Puerto (host) | Descripción |
+|:---|:---|:---|
+| Kong (API Gateway) | `54321` | Punto de entrada único; autentica JWTs |
+| PostgreSQL 15 | `5432` | Base de datos; acceso directo con `psql` |
+| PostgREST | `3000` (interno) | REST automático sobre tablas de `public` |
+| Realtime | `4000` (interno) | WebSocket CDC — notifica cambios en `pipeline_jobs` |
+| GoTrue (Auth) | `9999` (interno) | Autenticación JWT |
+| Studio | `54323` | UI de administración — `http://localhost:54323` |
+
+### Migraciones
+
+Las migraciones se ejecutan automáticamente al crear el contenedor `supabase-db` (al hacer
+`docker compose up` por primera vez, o tras un reset de volúmenes). El orden de ejecución
+está dado por el nombre de archivo:
+
+```
+supabase/migrations/
+├── 000_supabase_setup.sql         # Roles base (anon, authenticated, service_role), schemas
+├── 001_initial_schema.sql         # Tablas core: projects, steps, prompts…
+├── 008_unify_prompts_table.sql    # Unificación de site_prompts
+└── 010_create_pipeline_jobs.sql   # Tabla pipeline_jobs + RLS + Realtime publication
+```
+
+### Resetear la base de datos
+
+Necesario cuando:
+- Las migraciones cambiaron y el volumen existente tiene el esquema anterior
+- `supabase-db` aparece como `(unhealthy)` y no arranca
+- Se quiere un estado limpio de desarrollo
+
+**Opción A — Script incluido (Windows PowerShell):**
+
+```powershell
+.\scripts\reset-db.ps1
+```
+
+**Opción B — Manual:**
+
+```powershell
+# Windows — PowerShell
+docker compose down -v
+docker compose up -d
+```
+
+```bash
+# Linux / Mac / Git Bash
+docker compose down -v
+docker compose up -d
+```
+
+> Esto borra **todos** los datos de la BD local. Los proyectos y documentos generados
+> en desarrollo se pierden. Solo afecta el entorno local.
+
+### Verificar que el stack está operativo
+
+```bash
+# Health de Kong
+curl http://localhost:54321/rest/v1/ -H "apikey: <SUPABASE_ANON_KEY>"
+
+# Listar tabla pipeline_jobs via REST
+curl http://localhost:54321/rest/v1/pipeline_jobs \
+  -H "apikey: <SUPABASE_SERVICE_ROLE_KEY>" \
+  -H "Authorization: Bearer <SUPABASE_SERVICE_ROLE_KEY>"
+# → debe devolver [] (array vacío) con status 200
+
+# Acceso directo a PostgreSQL
+docker exec -it knowto-supabase-db psql -U postgres -c "\dt"
+```
+
+Las claves para desarrollo están en `.env.example` y son los valores por defecto del stack.
+
+### Nota sobre Studio `(unhealthy)`
+
+Studio puede aparecer como `(unhealthy)` en `docker compose ps`. Esto es un bug cosmético en
+Realtime v2 donde el healthcheck interno lanza `Protocol.UndefinedError`. Studio es
+**completamente funcional** en `http://localhost:54323` a pesar del estado reportado.
 
 ---
 
@@ -317,25 +443,28 @@ Authorization: Bearer <token>
 ```
 
 | Entorno | Token válido |
-|---|---|
+|:---|:---|
 | Desarrollo | `dev-local-bypass` (literal, sin firma) |
 | Producción | JWT de Google OAuth emitido por Supabase |
 
-### Endpoints
+### Endpoints DCFL (EC0366)
 
 | Método | Ruta | Auth | Descripción |
-|---|---|---|---|
-| `GET` | `/health` | No | Health check global |
-| `GET` | `/openapi.json` | No | Spec OpenAPI 3.0 |
-| `GET` | `/docs` | No | Swagger UI (Scalar) |
+|:---|:---|:---|:---|
 | `GET` | `/dcfl/health` | No | Health check EC0366 |
 | `POST` | `/dcfl/wizard/project` | Sí | Crear proyecto DCFL |
 | `GET` | `/dcfl/wizard/project/:id` | Sí | Contexto del proyecto |
 | `GET` | `/dcfl/wizard/projects` | Sí | Listar proyectos del usuario |
 | `POST` | `/dcfl/wizard/step` | Sí | Guardar datos de un paso |
 | `POST` | `/dcfl/wizard/extract` | Sí | Extraer contexto compacto de fases previas |
-| `POST` | `/dcfl/wizard/generate` | Sí | Generar documento con IA |
+| `POST` | `/dcfl/wizard/generate-async` | Sí | Generar documento con IA (asíncrono, vía WebSocket) |
+| `GET` | `/dcfl/wizard/job/:jobId` | Sí | Consultar estado de un job (fallback) |
 | `POST` | `/dcfl/wizard/generate-form` | Sí | Generar esquema de formulario dinámico |
+
+### Endpoints CCE (EC0249)
+
+| Método | Ruta | Auth | Descripción |
+|:---|:---|:---|:---|
 | `GET` | `/cce/health` | No | Health check EC0249 |
 | `POST` | `/cce/wizard/project` | Sí | Crear proyecto CCE |
 | `GET` | `/cce/wizard/project/:id` | Sí | Contexto del proyecto |
@@ -367,7 +496,7 @@ curl -X POST http://api.localhost/dcfl/wizard/project \
 ```bash
 # Backend — Vitest
 cd backend
-npm test               # 115 tests
+npm test               # 152 tests
 npm run test:coverage  # con reporte de cobertura HTML
 
 # Frontend dcfl — verificación de tipos TypeScript
@@ -380,7 +509,7 @@ npm run type-check
 ```
 
 | Suite | Tests | Qué cubre |
-|---|---|---|
+|:---|:---|:---|
 | `auth.middleware.test.ts` | 8 | Bypass dev, JWT prod, tokens inválidos |
 | `ai.service.test.ts` | 14 | Ollama (dev) y Workers AI (prod), pipeline multi-agente |
 | `supabase.service.test.ts` | 13 | Mocks dev y llamadas RPC prod |
@@ -394,6 +523,7 @@ npm run type-check
 | `crawler.cce.test.ts` | 4 | CrawlerService (limpieza HTML, truncado, errores) |
 | `ai.cce.test.ts` | 4 | CrawlerService — variantes CCE |
 | `supabase.cce.test.ts` | 9 | SupabaseService CCE (getPrompt, saveStepOutput…) |
+| **Total** | **152** | **100% passing** |
 
 ---
 
@@ -405,10 +535,14 @@ npm run type-check
 ENVIRONMENT=development
 OLLAMA_URL=http://localhost:11434
 OLLAMA_MODEL=llama3.2:3b
+# Supabase self-hosted local (puerto 54321 = Kong)
 SUPABASE_URL=http://localhost:54321
-SUPABASE_SERVICE_ROLE_KEY=dummy-service-role-key
-SUPABASE_JWT_SECRET=dummy-jwt-secret
+SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...  # ver .env.example
+SUPABASE_JWT_SECRET=super-secret-jwt-token-with-at-least-32-characters-long
 ```
+
+> Si usas `SUPABASE_URL` vacío o con el string `dummy`, el backend cae a modo en-memoria
+> (sin persistencia). Con la URL real del Supabase local, usa la BD completa.
 
 En Docker las variables vienen de `docker-compose.yml`; `.dev.vars` se ignora.
 
@@ -447,11 +581,11 @@ En Docker las variables vienen de `docker-compose.yml`.
 ## Scripts del backend
 
 | Script | Descripción |
-|---|---|
+|:---|:---|
 | `npm run dev` | Servidor Node.js en :8787, lee `.dev.vars` |
 | `npm run dev:debug` | Igual + inspector Node.js en :9229 (VS Code attach) |
 | `npm run dev:wrangler` | Servidor workerd (solo para verificar compatibilidad CF) |
-| `npm test` | Vitest — 115 tests |
+| `npm test` | Vitest — 152 tests |
 | `npm run test:watch` | Vitest en modo watch |
 | `npm run test:prompts` | Solo la suite de prompts (verbose) |
 | `wrangler deploy --env production` | Deploy a Cloudflare Workers |
@@ -461,7 +595,7 @@ En Docker las variables vienen de `docker-compose.yml`.
 ## Comandos Docker
 
 | Comando | Descripción |
-|---|---|
+|:---|:---|
 | `docker compose up -d` | Arrancar todo |
 | `docker compose down` | Detener y eliminar contenedores |
 | `docker compose restart nginx` | Recargar config de Nginx sin reiniciar todo |
@@ -471,6 +605,18 @@ En Docker las variables vienen de `docker-compose.yml`.
 | `docker compose logs -f nginx` | Logs de routing |
 | `docker compose up -d --scale ollama=0` | Levantar sin Ollama (sin GPU / sin modelo) |
 | `docker compose logs -f ollama` | Ver progreso de descarga del modelo |
+
+### Comandos Supabase
+
+| Comando | Descripción |
+|:---|:---|
+| `docker compose logs -f supabase-db` | Logs de PostgreSQL (migraciones, errores) |
+| `docker compose logs -f supabase-realtime` | Logs de Realtime (suscripciones WebSocket) |
+| `docker compose logs -f supabase-rest` | Logs de PostgREST |
+| `docker compose logs -f supabase-kong` | Logs del API Gateway |
+| `docker exec -it knowto-supabase-db psql -U postgres` | Shell psql directo a la BD |
+| `docker volume rm knowto_supabase_db_data` | Borrar volumen DB (resetear BD — ver sección anterior) |
+| `.\scripts\reset-db.ps1` | Reset completo del stack (Windows) — baja, borra volúmenes, sube |
 
 ---
 
@@ -519,7 +665,7 @@ npm run dev:debug   # Node.js en :8787 + inspector en :9229
 ### Configuraciones `launch.json`
 
 | Nombre | Descripción |
-|---|---|
+|:---|:---|
 | `Backend: Attach (Docker)` | Adjunta al proceso Node.js del contenedor |
 | `Backend: Launch (Host)` | Lanza `server.dev.ts` directamente en el host |
 | `Frontend: Chrome` | Abre Chrome con source maps del frontend |
@@ -583,8 +729,8 @@ async function check(label, fn) {
 
   // 4. Generar documento — puede tardar 60-180s en CPU
   console.log('⏳ Generando documento con Ollama (puede tardar ~60s en CPU)...');
-  const gen = await check('POST /dcfl/wizard/generate', async () => {
-    return (await fetch(`${API}/dcfl/wizard/generate`, {
+  const gen = await check('POST /dcfl/wizard/generate-async', async () => {
+    return (await fetch(`${API}/dcfl/wizard/generate-async`, {
       method: 'POST', headers: AUTH,
       body: JSON.stringify({
         projectId, stepId,
@@ -595,11 +741,9 @@ async function check(label, fn) {
     })).json();
   });
 
-  if (gen?.data?.content) {
-    console.log('📄 Primeras 300 chars:', gen.data.content.substring(0, 300) + '...');
-    console.log(gen.data.content.includes('Preguntas para el cliente')
-      ? '✅ F0 contiene "Preguntas para el cliente" — Step 1 las mostrará como inputs'
-      : '⚠️  F0 no generó "Preguntas para el cliente"');
+  if (gen?.data?.jobId) {
+    console.log(`📋 Job encolado: ${gen.data.jobId}`);
+    console.log('✅ WebSocket recibirá la notificación cuando el documento esté listo');
   }
 
   console.groupEnd();
@@ -626,7 +770,7 @@ curl -X POST http://localhost:11434/api/generate \
 ## Tiempos esperados (CPU, sin GPU)
 
 | Operación | Tiempo |
-|---|---|
+|:---|:---|
 | Health check | < 50 ms |
 | Crear / listar proyecto | < 100 ms |
 | Generar documento (Ollama CPU) | 60–180 s |
@@ -637,7 +781,7 @@ curl -X POST http://localhost:11434/api/generate \
 ## Problemas comunes
 
 | Error | Causa | Solución |
-|---|---|---|
+|:---|:---|:---|
 | `ENOENT /app/api/package.json` | `working_dir` incorrecto en docker-compose | El `package.json` está en `backend/`, el `working_dir` debe ser `/app` |
 | `ENOTFOUND dcfl.localhost` (en logs del contenedor) | `hmr.host` resuelve dentro del contenedor donde no existe | Usar `hmr.clientPort` en vez de `hmr.host` en `vite.config.ts` |
 | Recargas infinitas en el navegador | Windows Docker genera eventos inotify espurios | `server.watch: { usePolling: true, interval: 1000 }` en `vite.config.ts` |
@@ -647,6 +791,14 @@ curl -X POST http://localhost:11434/api/generate \
 | `EADDRINUSE 8787` | Otra instancia corriendo | `pkill -f server.dev` o reiniciar Docker |
 | `Unauthorized` | Token incorrecto | Usar exactamente `Bearer dev-local-bypass` |
 | `502 Bad Gateway` en Nginx | Contenedor del microsite aún arrancando | Esperar ~30 s o ver `docker compose logs -f frontend-dcfl` |
+| `supabase-db (unhealthy)` al arrancar | Migración falló (p.ej. rol no existe) | Revisar `docker compose logs supabase-db`; resetear volumen si es necesario |
+| `role "anon" does not exist` en migración | `000_supabase_setup.sql` no se ejecutó | Verificar que el archivo existe en `supabase/migrations/`; resetear volumen |
+| `PGRST301: JWSInvalidSignature` | JWT firmado con secret diferente al configurado | Asegúrate de que `JWT_SECRET` en `.env` coincide con el usado para generar `SUPABASE_ANON_KEY` |
+| `permission denied for table pipeline_jobs` | `service_role` carece de GRANT a nivel de tabla | Ejecutar `GRANT ALL ON TABLE pipeline_jobs TO service_role;` en psql, o resetear la BD |
+| `Bad key size` en Realtime | `DB_ENC_KEY` no tiene exactamente 16 bytes (AES-128) | El valor en `docker-compose.yml` debe ser exactamente 16 caracteres |
+| Studio `(unhealthy)` en `docker compose ps` | Bug cosmético en Realtime v2.28.x (`Protocol.UndefinedError`) | Ignorar — Studio funciona en `http://localhost:54323`; no afecta WebSocket |
+| Realtime no notifica cambios | `pipeline_jobs` no está en publicación `supabase_realtime` | La publicación se crea al conectar el primer suscriptor; si persiste, revisar RLS policies |
+| WebSocket no conecta | Kong no tiene configuración CORS para WebSocket | Verificar `kong.yml` con `protocols: [ws, wss, http, https]` |
 
 ---
 

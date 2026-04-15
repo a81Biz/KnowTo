@@ -67,19 +67,20 @@ CREATE TRIGGER trg_site_prompts_updated_at
 -- 3. Migrar datos existentes de cce_prompts → site_prompts
 -- ----------------------------------------------------------------------------
 
+-- Nota: cce_prompts no tiene columna fase_id/phase_id; se deriva del id del prompt.
 INSERT INTO site_prompts (site_id, phase_id, prompt_id, content, metadata, version, active)
 SELECT
-  'cce'                                                        AS site_id,
-  COALESCE(fase_id, split_part(id, '_', 1))                   AS phase_id,
-  id                                                           AS prompt_id,
-  COALESCE(user_prompt_template, '')                           AS content,
+  'cce'                           AS site_id,
+  split_part(id, '_', 1)          AS phase_id,
+  id                              AS prompt_id,
+  COALESCE(user_prompt_template, '') AS content,
   jsonb_build_object(
-    'system_prompt',        COALESCE(system_prompt, ''),
-    'model',                COALESCE(model, 'llama3.2:3b'),
-    'agent_type',           COALESCE(agent_type, 'specialist')
-  )                                                            AS metadata,
-  1                                                            AS version,
-  true                                                         AS active
+    'system_prompt',  COALESCE(system_prompt, ''),
+    'model',          COALESCE(model, 'llama3.2:3b'),
+    'agent_type',     COALESCE(agent_type, 'specialist')
+  )                               AS metadata,
+  1                               AS version,
+  true                            AS active
 FROM cce_prompts
 ON CONFLICT (site_id, prompt_id, version) DO NOTHING;
 

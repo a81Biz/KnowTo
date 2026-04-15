@@ -6,8 +6,11 @@ version: '3.9'
 # Acceso:
 #   http://localhost          → Sitio raíz (lista de microsites)
 #   http://dcfl.localhost     → Microsite EC0366
+#   http://cce.localhost      → Microsite EC0249
 #   http://api.localhost      → API Gateway
 #   http://api.localhost/docs → Swagger UI (Scalar)
+#   http://localhost:54321    → Supabase API Gateway (REST + Auth + Realtime)
+#   http://localhost:54323    → Supabase Studio (administración de BD)
 #
 # Prerequisito (una sola vez en cada máquina):
 #   Añadir al archivo hosts del sistema operativo:
@@ -22,12 +25,13 @@ version: '3.9'
 #   docker compose up -d          → Arrancar todo
 #   docker compose logs -f nginx  → Ver logs de routing
 #   docker compose restart nginx  → Recargar config de nginx sin reiniciar todo
+#   .\scripts\reset-db.ps1       → Borrar volúmenes y reiniciar desde cero
 # =============================================================================
 
 services:
 
   # ---------------------------------------------------------------------------
-  # NGINX — Reverse proxy (ÚNICO puerto expuesto al host)
+  # NGINX — Reverse proxy (ÚNICO puerto expuesto al host para microsites)
   # Enruta subdominios al frontend o backend correcto.
   # ---------------------------------------------------------------------------
   nginx:
@@ -68,11 +72,12 @@ services:
       ENVIRONMENT: development
       OLLAMA_URL: "http://ollama:11434"
       OLLAMA_MODEL: "llama3.2:3b"
-      SUPABASE_URL: ${SUPABASE_URL:-http://postgres:5432}
-      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY:-dummy-key}
-      SUPABASE_JWT_SECRET: ${SUPABASE_JWT_SECRET:-dummy-secret}
+      # Kong interno — el backend se conecta al gateway de Supabase dentro de la red Docker
+      SUPABASE_URL: "http://supabase-kong:8000"
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY:-eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1sb2NhbCIsInJvbGUiOiJzZXJ2aWNlX3JvbGUiLCJpYXQiOjE2MTM1MzE5ODUsImV4cCI6NDc2OTIwNTk4NX0.tWpFmTM_nlJqPZnZ3sfxUTBJX43KaPSufIkghx35BJA}
+      SUPABASE_JWT_SECRET: ${JWT_SECRET:-super-secret-jwt-token-with-at-least-32-characters-long}
     depends_on:
-      postgres:
+      supabase-db:
         condition: service_healthy
       ollama:
         condition: service_started
@@ -97,9 +102,9 @@ services:
       - frontend_dcfl_node_modules:/frontend/dcfl/node_modules
     environment:
       NODE_ENV: development
+      # Kong externo — el frontend se conecta desde el navegador del host
       VITE_SUPABASE_URL: ${VITE_SUPABASE_URL:-http://localhost:54321}
-      VITE_SUPABASE_ANON_KEY: ${VITE_SUPABASE_ANON_KEY:-dummy-key}
-      # VITE_API_BASE_URL no es necesaria — se resuelve en runtime desde dcfl.localhost
+      VITE_SUPABASE_ANON_KEY: ${VITE_SUPABASE_ANON_KEY:-eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1sb2NhbCIsInJvbGUiOiJhbm9uIiwiaWF0IjoxNjEzNTMxOTg1LCJleHAiOjQ3NjkyMDU5ODV9.9oDfITnetRe3EYQzDh9CmgUFEJkLgHsGeKT8s1tHtvM}
     depends_on:
       - backend
     networks:
@@ -124,7 +129,7 @@ services:
     environment:
       NODE_ENV: development
       VITE_SUPABASE_URL: ${VITE_SUPABASE_URL:-http://localhost:54321}
-      VITE_SUPABASE_ANON_KEY: ${VITE_SUPABASE_ANON_KEY:-dummy-key}
+      VITE_SUPABASE_ANON_KEY: ${VITE_SUPABASE_ANON_KEY:-eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1sb2NhbCIsInJvbGUiOiJhbm9uIiwiaWF0IjoxNjEzNTMxOTg1LCJleHAiOjQ3NjkyMDU5ODV9.9oDfITnetRe3EYQzDh9CmgUFEJkLgHsGeKT8s1tHtvM}
     depends_on:
       - backend
     networks:
@@ -153,30 +158,192 @@ services:
         ipv4_address: 172.20.0.50
     restart: unless-stopped
 
+  # ===========================================================================
+  # SUPABASE STACK (Postgres + Auth + Realtime + REST + Studio + Kong)
+  # ===========================================================================
+
   # ---------------------------------------------------------------------------
-  # BASE DE DATOS
+  # Supabase Database — Postgres 15 con extensiones y esquema auth pre-instalado
   # ---------------------------------------------------------------------------
-  postgres:
-    image: postgres:15-alpine
-    container_name: knowto-postgres
+  supabase-db:
+    image: supabase/postgres:15.8.1.032
+    container_name: knowto-supabase-db
     environment:
-      POSTGRES_USER: knowto
-      POSTGRES_PASSWORD: knowto123
-      POSTGRES_DB: knowto_dev
-    expose:
-      - "5432"
+      POSTGRES_HOST: /var/run/postgresql
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: supabase_admin
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-supabase123}
+      POSTGRES_DB: postgres
+      # Requerido por supabase/postgres para inicializar GoTrue internamente
+      JWT_SECRET: ${JWT_SECRET:-super-secret-jwt-token-with-at-least-32-characters-long}
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - supabase_db_data:/var/lib/postgresql/data
       - ./supabase/migrations:/docker-entrypoint-initdb.d:ro
     networks:
       - knowto-network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U knowto -d knowto_dev"]
+      test: ["CMD-SHELL", "pg_isready -U supabase_admin -d postgres"]
       interval: 10s
       timeout: 5s
-      retries: 5
-      start_period: 10s
+      retries: 10
+      start_period: 30s
+
+  # ---------------------------------------------------------------------------
+  # Supabase Auth — GoTrue (gestión de usuarios y sesiones JWT)
+  # Versión del stack oficial de Supabase self-hosted (docker-compose de supabase/supabase)
+  # ---------------------------------------------------------------------------
+  supabase-auth:
+    image: supabase/gotrue:v2.151.0
+    container_name: knowto-supabase-auth
+    environment:
+      GOTRUE_API_HOST: 0.0.0.0
+      GOTRUE_API_PORT: 9999
+      API_EXTERNAL_URL: http://localhost:54321
+      GOTRUE_API_EXTERNAL_URL: http://localhost:54321
+      GOTRUE_DB_DRIVER: postgres
+      # GoTrue v2.x requiere DATABASE_URL (sin prefijo GOTRUE_)
+      DATABASE_URL: postgres://supabase_admin:${POSTGRES_PASSWORD:-supabase123}@supabase-db:5432/postgres
+      GOTRUE_DATABASE_URL: postgres://supabase_admin:${POSTGRES_PASSWORD:-supabase123}@supabase-db:5432/postgres
+      GOTRUE_JWT_SECRET: ${JWT_SECRET:-super-secret-jwt-token-with-at-least-32-characters-long}
+      GOTRUE_JWT_EXP: 3600
+      GOTRUE_SITE_URL: http://localhost
+      GOTRUE_MAILER_AUTOCONFIRM: "true"
+      GOTRUE_DISABLE_SIGNUP: "false"
+      GOTRUE_URI_ALLOW_LIST: "http://localhost,http://dcfl.localhost,http://cce.localhost"
+    depends_on:
+      supabase-db:
+        condition: service_healthy
+    networks:
+      - knowto-network
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # Supabase Realtime — WebSockets (suscripción reactiva a cambios en la BD)
+  # Versión del stack oficial de Supabase self-hosted
+  # ---------------------------------------------------------------------------
+  supabase-realtime:
+    image: supabase/realtime:v2.28.32
+    container_name: knowto-supabase-realtime
+    # CRÍTICO: el command ejecuta las migraciones de Ecto (_realtime schema)
+    # y siembra el tenant por defecto ANTES de arrancar el servidor.
+    # Sin este command, _realtime schema no se crea y postgres_changes no funciona.
+    command:
+      - "sh"
+      - "-c"
+      - "/app/bin/migrate && /app/bin/realtime eval 'Realtime.Release.seeds(Realtime.Repo)' && /app/bin/server"
+    environment:
+      DB_HOST: supabase-db
+      DB_PORT: 5432
+      DB_USER: supabase_admin
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-supabase123}
+      DB_NAME: postgres
+      DB_AFTER_CONNECT_QUERY: "SET search_path TO _realtime"
+      DB_ENC_KEY: "supabase-key-dev"
+      DB_SSL: "false"
+      # API_JWT_SECRET es el nombre correcto para Realtime v2 (no JWT_SECRET)
+      API_JWT_SECRET: ${JWT_SECRET:-super-secret-jwt-token-with-at-least-32-characters-long}
+      PORT: 4000
+      REPLICATION_MODE: RLS
+      REPLICATION_POLL_INTERVAL: 100
+      SECURE_CHANNELS: "false"
+      SLOT_NAME: supabase_realtime_rls
+      TEMPORARY_SLOT: "true"
+      SECRET_KEY_BASE: "aaaabbbbccccddddeeeeffffgggghhhhiiiijjjjkkkkllllmmmmnnnnoooopppp"
+      FLY_APP_NAME: knowto-realtime
+      # ERL_AFLAGS y DNS_NODES suprimen los warnings de cluster Fly.io en dev
+      ERL_AFLAGS: "-proto_dist inet_tcp"
+      DNS_NODES: "''"
+    depends_on:
+      supabase-db:
+        condition: service_healthy
+    networks:
+      - knowto-network
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # Supabase REST — PostgREST (API REST auto-generada desde el schema público)
+  # ---------------------------------------------------------------------------
+  supabase-rest:
+    image: postgrest/postgrest:v12.2.0
+    container_name: knowto-supabase-rest
+    environment:
+      PGRST_DB_URI: postgres://supabase_admin:${POSTGRES_PASSWORD:-supabase123}@supabase-db:5432/postgres
+      PGRST_DB_SCHEMAS: public,storage
+      PGRST_DB_ANON_ROLE: anon
+      PGRST_JWT_SECRET: ${JWT_SECRET:-super-secret-jwt-token-with-at-least-32-characters-long}
+      PGRST_DB_USE_LEGACY_GUCS: "false"
+    depends_on:
+      supabase-db:
+        condition: service_healthy
+    networks:
+      - knowto-network
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # Supabase Meta — API de metadatos (usada por Studio para introspección)
+  # ---------------------------------------------------------------------------
+  supabase-meta:
+    image: supabase/postgres-meta:v0.84.2
+    container_name: knowto-supabase-meta
+    environment:
+      PG_META_PORT: 8080
+      PG_META_DB_HOST: supabase-db
+      PG_META_DB_PORT: 5432
+      PG_META_DB_NAME: postgres
+      PG_META_DB_USER: supabase_admin
+      PG_META_DB_PASSWORD: ${POSTGRES_PASSWORD:-supabase123}
+    depends_on:
+      supabase-db:
+        condition: service_healthy
+    networks:
+      - knowto-network
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # Supabase Studio — Interfaz web de administración
+  # Accesible en http://localhost:54323
+  # ---------------------------------------------------------------------------
+  supabase-studio:
+    image: supabase/studio:2026.04.13-sha-e95f1cc
+    container_name: knowto-supabase-studio
+    ports:
+      - "54323:3000"
+    environment:
+      STUDIO_PG_META_URL: http://supabase-meta:8080
+      SUPABASE_URL: http://supabase-kong:8000
+      SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY:-eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1sb2NhbCIsInJvbGUiOiJhbm9uIiwiaWF0IjoxNjEzNTMxOTg1LCJleHAiOjQ3NjkyMDU5ODV9.9oDfITnetRe3EYQzDh9CmgUFEJkLgHsGeKT8s1tHtvM}
+      SUPABASE_SERVICE_KEY: ${SUPABASE_SERVICE_ROLE_KEY:-eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1sb2NhbCIsInJvbGUiOiJzZXJ2aWNlX3JvbGUiLCJpYXQiOjE2MTM1MzE5ODUsImV4cCI6NDc2OTIwNTk4NX0.tWpFmTM_nlJqPZnZ3sfxUTBJX43KaPSufIkghx35BJA}
+    depends_on:
+      - supabase-meta
+      - supabase-kong
+    networks:
+      - knowto-network
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # Supabase Kong — API Gateway (unifica Auth + REST + Realtime)
+  # Accesible desde el host en http://localhost:54321
+  # Accesible dentro de la red Docker en http://supabase-kong:8000
+  # ---------------------------------------------------------------------------
+  supabase-kong:
+    image: kong:2.8.1
+    container_name: knowto-supabase-kong
+    environment:
+      KONG_DATABASE: "off"
+      KONG_DECLARATIVE_CONFIG: /var/lib/kong/kong.yml
+      KONG_PROXY_ACCESS_LOG: /dev/stdout
+      KONG_PROXY_ERROR_LOG: /dev/stderr
+      KONG_ADMIN_ACCESS_LOG: /dev/stdout
+      KONG_ADMIN_ERROR_LOG: /dev/stderr
+      KONG_PLUGINS: request-transformer,cors,key-auth,acl
+    volumes:
+      - ./supabase/kong.yml:/var/lib/kong/kong.yml:ro
+    ports:
+      - "54321:8000"   # API Gateway (REST, Auth, Realtime WebSocket)
+    networks:
+      - knowto-network
+    restart: unless-stopped
 
   # ---------------------------------------------------------------------------
   # OLLAMA (IA local)
@@ -218,7 +385,7 @@ networks:
         - subnet: 172.20.0.0/24
 
 volumes:
-  postgres_data:
+  supabase_db_data:       # Reemplaza a postgres_data
   ollama_data:
   backend_node_modules:
   frontend_dcfl_node_modules:

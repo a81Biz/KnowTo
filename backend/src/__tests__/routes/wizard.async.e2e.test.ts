@@ -10,11 +10,12 @@
 //   • PipelineJobsService se usa SIN mock para los tests de notificación,
 //     de modo que el notificador en memoria es invocado correctamente.
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import app from '../../index';
 import type { Env } from '../../core/types/env';
 // PipelineJobsService: usamos la implementación real; solo inyectamos el notificador
 import { setGlobalNotifier } from '../../core/services/pipeline-jobs.service';
+import { DEV_USER_ID } from '../../core/middleware/auth.middleware';
 
 // ── Mocks ────────────────────────────────────────────────────────────────────
 
@@ -46,7 +47,8 @@ vi.mock('../../core/services/ai.service', () => ({
   })),
 }));
 
-// Notificador mock — se inyecta en PipelineJobsService vía setGlobalNotifier en beforeEach
+// Notificador mock — simula el rol que Supabase Realtime cumple en producción.
+// En dev, PipelineJobsService invoca este notificador en memoria directamente.
 const mockNotifier = vi.fn();
 
 // ── Constantes ───────────────────────────────────────────────────────────────
@@ -154,6 +156,12 @@ describe('POST /dcfl/wizard/generate-async — validación', () => {
 describe('POST /dcfl/wizard/generate-async — respuesta inmediata', () => {
   beforeEach(() => { vi.clearAllMocks(); setGlobalNotifier(mockNotifier); });
 
+  // Drenar los pipelines en background antes de pasar al siguiente test
+  // para evitar que llamen a mockNotifier durante otros describe.
+  afterEach(async () => {
+    await vi.waitFor(() => expect(mockNotifier).toHaveBeenCalled(), { timeout: 500, interval: 10 }).catch(() => {});
+  });
+
   it('devuelve 202 con jobId UUID y status pending', async () => {
     const res = await post('/dcfl/wizard/generate-async', GENERATE_ASYNC_BODY);
 
@@ -197,10 +205,10 @@ describe('POST /dcfl/wizard/generate-async — respuesta inmediata', () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// PIPELINE EN BACKGROUND — polling con vi.waitFor
+// PIPELINE EN BACKGROUND — notificación via notificador (Supabase Realtime en prod)
 // ─────────────────────────────────────────────────────────────────────────────
 
-describe('POST /dcfl/wizard/generate-async — pipeline en background (polling)', () => {
+describe('POST /dcfl/wizard/generate-async — pipeline en background (notificación async)', () => {
   beforeEach(() => { vi.clearAllMocks(); setGlobalNotifier(mockNotifier); });
 
   it('el pipeline llama a AIService.generate con los parámetros correctos', async () => {
@@ -241,7 +249,7 @@ describe('POST /dcfl/wizard/generate-async — pipeline en background (polling)'
         const [userId, payload] = mockNotifier.mock.calls[0] as [string, {
           job_id: string; status: string; result?: { documentId: string; content: string };
         }];
-        expect(userId).toBe('dev-user-local');
+        expect(userId).toBe(DEV_USER_ID);
         expect(payload.status).toBe('completed');
         expect(payload.result?.documentId).toBe('cccccccc-dddd-4eee-ffff-000000000000');
         expect(payload.result?.content).toBe(AI_CONTENT);

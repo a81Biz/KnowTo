@@ -1,12 +1,11 @@
 // frontend/dcfl/src/shared/ws.client.ts
 //
-// Cliente WebSocket — solo activo en PRODUCCIÓN.
-// En desarrollo se usa polling (GET /job/:jobId).
+// LEGADO — No se usa actualmente. Conservado por referencia.
 //
-// Uso:
-//   wsClient.connect();
-//   wsClient.on('job_<jobId>', (msg) => { ... });
-//   wsClient.off('job_<jobId>', handler);
+// La notificación de jobs usa Supabase Realtime (supabase.realtime.ts)
+// tanto en desarrollo (self-hosted Kong) como en producción (Supabase cloud).
+// Este cliente WebSocket personalizado solo se activaría en producción (PROD=true)
+// y solo si se re-integra en step.base.ts.
 
 type WsMessage = {
   type?: string;
