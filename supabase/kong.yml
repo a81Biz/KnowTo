@@ -36,23 +36,46 @@ services:
       - name: cors
 
   # ── Realtime (WebSocket) ──────────────────────────────────────────────────
+  # Supabase Realtime v2 monta su socket Phoenix en /socket.
+  # El endpoint WebSocket es /socket/websocket (no /websocket).
+  #
+  # Flujo: cliente → ws://localhost:54321/realtime/v1/websocket
+  #   Kong strip_path: /realtime/v1  →  /websocket
+  #   upstream: http://supabase-realtime:4000/socket + /websocket
+  #          =  http://supabase-realtime:4000/socket/websocket  ✓
+  #
+  # Kong 2.8.x maneja WebSocket transparentemente en rutas HTTP.
+  # NO usar protocols: ws/wss — esos valores no existen hasta Kong 3.x.
+  #
+  # FIX confirmado con lectura del código fuente v2.28.32:
+  #
+  # BUG 1 — SECURE_CHANNELS=false causaba nil:
+  #   connect/3 tiene `if secure_channels do ... end` sin rama else.
+  #   En Elixir un if sin else devuelve nil cuando la condición es false.
+  #   Phoenix recibe nil → "connect/3 returned invalid value nil" → 403.
+  #   Solución: SECURE_CHANNELS=true en docker-compose.yml.
+  #
+  # BUG 2 — tenant lookup fallaba con host incorrecto:
+  #   connect/3 extrae external_id de uri.host (el Host header HTTP).
+  #   Kong por defecto envía Host: supabase-realtime al upstream.
+  #   get_external_id("supabase-realtime") → external_id="supabase-realtime"
+  #   → no hay tenant con ese external_id → error.
+  #   Solución: request-transformer reemplaza Host antes de llegar a Realtime
+  #   → get_external_id("realtime-dev.localhost") → "realtime-dev" → tenant OK.
   - name: realtime-v1
-    url: http://supabase-realtime:4000/
+    url: http://supabase-realtime:4000/socket
     routes:
       - name: realtime-v1-route
         strip_path: true
         paths:
           - /realtime/v1
         protocols:
-          - ws
-          - wss
           - http
           - https
     plugins:
       - name: cors
+      - name: request-transformer
         config:
-          origins:
-            - http://dcfl.localhost
-            - http://cce.localhost
-            - http://localhost
-          credentials: true
+          replace:
+            headers:
+              - "Host:realtime-dev.localhost"

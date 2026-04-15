@@ -6,7 +6,7 @@ import { TemplateLoader } from '@core/template.loader';
 import { postData } from '@core/http.client';
 import { ENDPOINTS, buildEndpoint } from './endpoints';
 import { showLoading, hideLoading, showError, showSuccess, renderMarkdown, printDocument } from '@core/ui';
-import { subscribeToJob, type JobResult } from './supabase.realtime';
+import { subscribeToJob, type JobResult, type JobSubscription } from './supabase.realtime';
 import { logger } from './logger';
 import { wizardStore } from '../stores/wizard.store';
 import type { PhaseId, PromptId } from '../types/wizard.types';
@@ -58,6 +58,9 @@ export class BaseStep {
   // 2. ESTADO PRIVADO
   protected _container!: HTMLElement;
   protected _config: StepConfig;
+  // Suscripción activa al job en curso. Se cancela antes de crear una nueva
+  // para evitar múltiples polling timers simultáneos.
+  private _jobSubscription: JobSubscription | null = null;
 
   protected _dom: {
     form?: HTMLFormElement;
@@ -465,13 +468,17 @@ export class BaseStep {
 
     const TIMEOUT_MS = 20 * 60 * 1000; // 20 minutos
 
-    // Ambos entornos (dev y prod) usan Supabase Realtime vía WebSocket.
-    // En desarrollo el frontend se conecta a ws://localhost:54321/realtime/v1
-    // (Kong local). En producción al proyecto Supabase cloud.
+    // Cancelar cualquier suscripción anterior antes de crear la nueva.
+    // Sin esto, cada "Regenerar" acumula un polling timer adicional que nunca
+    // se detiene si el job anterior quedó atascado — origen de los 30 000 requests.
+    this._jobSubscription?.cancel();
+
     logger.info(`[step${this._config.stepNumber}] Esperando via Supabase Realtime (WebSocket)...`);
-    const channel = subscribeToJob(jobId, onComplete, onError);
+    const subscription = subscribeToJob(jobId, onComplete, onError);
+    this._jobSubscription = subscription;
+
     setTimeout(() => {
-      channel.unsubscribe();
+      subscription.cancel();  // detiene WebSocket Y pollingTimer
       onError('Timeout: el pipeline tardó más de 20 minutos');
     }, TIMEOUT_MS);
   }

@@ -111,6 +111,11 @@ export class PipelineJobsService {
       .eq('id', jobId);
 
     if (error) throw new Error(`completeJob failed: ${error.message}`);
+
+    // Broadcast directo: complementa postgres_changes CDC.
+    // Si Realtime falla con CHANNEL_ERROR (problema conocido en self-hosted),
+    // el frontend aún recibe el resultado por este canal de broadcast.
+    this._broadcastJobUpdate(jobId, { job_id: jobId, status: 'completed', result });
   }
 
   /** Devuelve el estado actual de un job por su ID. */
@@ -159,5 +164,36 @@ export class PipelineJobsService {
       .eq('id', jobId);
 
     if (error) throw new Error(`failJob failed: ${error.message}`);
+
+    this._broadcastJobUpdate(jobId, { job_id: jobId, status: 'failed', error: errorMsg });
+  }
+
+  /**
+   * Envía un broadcast por Supabase Realtime al canal `job-{jobId}`.
+   *
+   * Complementa la notificación CDC (postgres_changes). En dev self-hosted
+   * Realtime v2 devuelve CHANNEL_ERROR en postgres_changes; este broadcast
+   * usa el mismo WebSocket pero un mecanismo más directo (no WAL).
+   *
+   * Fire-and-forget: si Realtime no está disponible, el frontend tiene
+   * polling HTTP como fallback final.
+   */
+  private _broadcastJobUpdate(
+    jobId: string,
+    payload: { job_id: string; status: string; result?: Record<string, unknown>; error?: string },
+  ): void {
+    if (!this.supabase) return;
+
+    const ch = this.supabase.channel(`job-${jobId}`);
+
+    // Timeout de seguridad: si subscribe no conecta en 5s, liberar el canal
+    const cleanup = setTimeout(() => { ch.unsubscribe().catch(() => {}); }, 5_000);
+
+    ch.subscribe((status) => {
+      if (status !== 'SUBSCRIBED') return;
+      ch.send({ type: 'broadcast', event: 'job_update', payload })
+        .then(() => { clearTimeout(cleanup); ch.unsubscribe().catch(() => {}); })
+        .catch(() => { clearTimeout(cleanup); ch.unsubscribe().catch(() => {}); });
+    });
   }
 }

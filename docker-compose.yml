@@ -43,10 +43,14 @@ services:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./nginx/conf.d:/etc/nginx/conf.d:ro
     depends_on:
-      - backend
-      - frontend-dcfl
-      - frontend-cce
-      - frontend-root
+      backend:
+        condition: service_healthy
+      frontend-dcfl:
+        condition: service_started
+      frontend-cce:
+        condition: service_started
+      frontend-root:
+        condition: service_started
     networks:
       - knowto-network
     restart: unless-stopped
@@ -59,7 +63,25 @@ services:
     image: node:20
     container_name: knowto-backend
     working_dir: /app
-    command: sh -c "npm install && npm run dev:debug"
+    # Saltar npm install si el volumen ya tiene los módulos (tsx presente = OK).
+    # Esto evita ~1 min de espera en cada reinicio y elimina los 502 al arrancar.
+    # En la primera ejecución (volumen vacío) sí se instala.
+    command: >
+      sh -c "
+        if [ ! -f /app/node_modules/.bin/tsx ]; then
+          echo '[knowto] Instalando dependencias...';
+          npm install;
+        else
+          echo '[knowto] Dependencias ya instaladas, omitiendo npm install.';
+        fi &&
+        npm run dev:debug
+      "
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8787/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 120s
     expose:
       - "8787"
       - "9229"
@@ -246,7 +268,7 @@ services:
       PORT: 4000
       REPLICATION_MODE: RLS
       REPLICATION_POLL_INTERVAL: 100
-      SECURE_CHANNELS: "false"
+      SECURE_CHANNELS: "true"
       SLOT_NAME: supabase_realtime_rls
       TEMPORARY_SLOT: "true"
       SECRET_KEY_BASE: "aaaabbbbccccddddeeeeffffgggghhhhiiiijjjjkkkkllllmmmmnnnnoooopppp"

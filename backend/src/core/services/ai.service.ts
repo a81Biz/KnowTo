@@ -277,26 +277,73 @@ export class AIService {
     const base  = (this.env.OLLAMA_URL   ?? 'http://localhost:11434').replace(/\/$/, '');
     const model = modelOverride ?? (this.env.OLLAMA_MODEL ?? 'llama3.2:3b');
 
-    // 20 minutos — suficiente para llama3.2:3b en CPU sin GPU.
+    // stream:true mantiene la conexión HTTP activa durante la generación.
+    // Con stream:false, Ollama cierra la conexión tras ~5 min → "fetch failed".
+    //
+    // num_ctx:8192 evita la truncación silenciosa del prompt.
+    // El log de Ollama muestra "truncating input prompt limit=4096 prompt=4895"
+    // cuando specialist_a recibe el output del extractor — el contexto por
+    // defecto (4096) se queda corto. Con 8192 hay margen suficiente para todos
+    // los pasos del pipeline sin perder el inicio del prompt.
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 20 * 60 * 1000);
 
-    const res = await fetch(`${base}/api/generate`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model,
-        prompt,
-        system: sysPrompt ?? this.systemPrompt,
-        stream: false,
-      }),
-      signal: controller.signal,
-    }).finally(() => clearTimeout(timeout));
+    let res: Response;
+    try {
+      res = await fetch(`${base}/api/generate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model,
+          prompt,
+          system: sysPrompt ?? this.systemPrompt,
+          stream: true,
+          options: { num_ctx: 8192 },
+        }),
+        signal: controller.signal,
+      });
+    } catch (err) {
+      clearTimeout(timeout);
+      const cause = err instanceof Error && err.cause instanceof Error
+        ? err.cause.message
+        : String((err as Error)?.cause ?? '');
+      throw new Error(`Ollama no accesible (${base}): ${(err as Error).message}${cause ? ` — ${cause}` : ''}`);
+    }
+    clearTimeout(timeout);
 
-    if (!res.ok) throw new Error(`Ollama HTTP ${res.status}: ${await res.text()}`);
-    const data = (await res.json()) as { response?: string };
-    if (!data.response) throw new Error('Empty response from Ollama');
-    return data.response;
+    // Acumular el stream línea a línea.
+    // Cada línea es un JSON: { "response": "<token>", "done": false|true }
+    const reader  = res.body.getReader();
+    const decoder = new TextDecoder();
+    let full = '';
+    let buf  = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+      const lines = buf.split('\n');
+      buf = lines.pop() ?? '';           // último fragmento (puede ser incompleto)
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed) continue;
+        try {
+          const obj = JSON.parse(trimmed) as { response?: string; done?: boolean };
+          if (obj.response) full += obj.response;
+        } catch { /* línea parcial o no-JSON — ignorar */ }
+      }
+    }
+
+    // Procesar cualquier resto en el buffer
+    if (buf.trim()) {
+      try {
+        const obj = JSON.parse(buf.trim()) as { response?: string };
+        if (obj.response) full += obj.response;
+      } catch { /* ignorar */ }
+    }
+
+    if (!full) throw new Error('Empty response from Ollama');
+    return full;
   }
 
   // ── Workers AI Vision (OCR producción) ────────────────────────────────────
