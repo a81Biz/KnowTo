@@ -91,7 +91,11 @@ app.use(
     maxAge: 86400,
   })
 );
-app.use('*', logger());
+const _honoLogger = logger();
+app.use('*', (c, next) => {
+  if (c.req.path === '/health' || c.req.path.endsWith('/health')) return next();
+  return _honoLogger(c, next);
+});
 app.use('*', errorMiddleware);
 
 // ============================================================================

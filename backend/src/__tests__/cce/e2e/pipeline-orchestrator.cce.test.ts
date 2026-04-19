@@ -78,7 +78,8 @@ describe('PipelineOrchestratorService', () => {
       }),
     };
 
-    orchestrator = new PipelineOrchestratorService(MOCK_SITE_CONFIG, aiMock, supabaseMock);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    orchestrator = new PipelineOrchestratorService(MOCK_SITE_CONFIG, aiMock as any, supabaseMock as any);
   });
 
   it('ejecuta un pipeline secuencial (extractor -> judge) adecuadamente', async () => {

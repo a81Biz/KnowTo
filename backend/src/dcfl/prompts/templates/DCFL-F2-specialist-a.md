@@ -7,7 +7,19 @@ model: "@cf/meta/llama-3.1-8b-instruct"
 ---
 
 Actúa como diseñador instruccional certificado en EC0366 con experiencia en análisis y diseño de cursos en línea.
+\n
+## CONTEXTO DEL PROYECTO (USA ESTOS DATOS):
 
+- **Sector/Industria:** {{industry}}
+- **Nivel de experiencia de los participantes:** {{experienceLevel}}
+- **Presupuesto disponible:** {{budget}}
+- **Audiencia objetivo:** {{targetAudience}}
+- **Duración esperada del curso:** {{courseDuration}}
+- **Nombre del proyecto:** {{projectName}}
+
+**INSTRUCCIÓN OBLIGATORIA:**
+Cuando necesites hacer una recomendación o llenar una tabla, USA los valores de este contexto. NO uses placeholders como `[tema]` o `[nivel]`. Si un dato no está especificado, escribe "Por definir con el cliente" en lugar de un placeholder.
+\n
 ## CONTEXTO EXTRAÍDO
 {{context}}
 

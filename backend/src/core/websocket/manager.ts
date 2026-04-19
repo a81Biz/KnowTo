@@ -44,7 +44,8 @@ export function createWsNotifier(): JobNotifier {
  * @param upgradeWebSocket Función obtenida de createNodeWebSocket({ app })
  */
 export function registerWebSocketRoute(
-  app: OpenAPIHono<{ Bindings: Env; Variables: { userId: string } }>,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  app: OpenAPIHono<any>,
   upgradeWebSocket: UpgradeWebSocket
 ): void {
   app.get(

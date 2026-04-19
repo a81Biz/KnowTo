@@ -11,7 +11,7 @@ import { showLoading, hideLoading, showError } from '@core/ui';
 import { wizardStore } from '../stores/wizard.store';
 import type { DynamicFormField, DynamicFormSchema } from '../types/wizard.types';
 
-const STEP_NUMBER = 8;
+const STEP_NUMBER = 9;
 
 class Step8AdjustmentsController extends BaseStep {
   private _adjDom: {
@@ -128,10 +128,7 @@ class Step8AdjustmentsController extends BaseStep {
   }
 
   override _bindEvents(): void {
-    this._adjDom.btnGenerateForm?.addEventListener('click', () => {
-      void this._loadDynamicForm();
-    });
-
+    // Solo eventos de _dom. Los de _adjDom van en _bindSubDomEvents.
     // El submit usa _generateDocumentAsync de BaseStep con los datos del formulario dinámico
     this._dom.form?.addEventListener('submit', (e) => {
       e.preventDefault();
@@ -152,9 +149,16 @@ class Step8AdjustmentsController extends BaseStep {
     });
   }
 
+  private _bindSubDomEvents(): void {
+    this._adjDom.btnGenerateForm?.addEventListener('click', () => {
+      void this._loadDynamicForm();
+    });
+  }
+
   override async mount(container: HTMLElement): Promise<void> {
     await super.mount(container);
     this._cacheAdjDom();
+    this._bindSubDomEvents();
 
     // Si ya había un documento generado, mostrar preview
     const step = wizardStore.getState().steps[STEP_NUMBER];

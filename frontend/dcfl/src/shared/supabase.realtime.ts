@@ -55,6 +55,7 @@ interface JobPollData {
   status:  'pending' | 'running' | 'completed' | 'failed';
   result?: JobResult;
   error?:  string;
+  progress?: { currentStep: string; stepIndex: number; totalSteps: number };
 }
 
 /**
@@ -67,9 +68,9 @@ export interface JobSubscription {
 
 // ── Constantes ───────────────────────────────────────────────────────────────
 
-const REALTIME_TIMEOUT_MS  = 8_000;  // sin SUBSCRIBED en 8s → polling
-const POLLING_INTERVAL_MS  = 3_000;  // frecuencia del polling HTTP
-const MAX_POLL_ATTEMPTS    = 60;     // 60 × 3s = 3 minutos máximo de polling
+const REALTIME_TIMEOUT_MS  = 8_000;   // sin SUBSCRIBED en 8s → polling
+const POLLING_INTERVAL_MS  = 3_000;   // frecuencia del polling HTTP
+const POLLING_TIMEOUT_MS   = 1_200_000; // 20 minutos máximo de polling
 
 // ── subscribeToJob ────────────────────────────────────────────────────────────
 
@@ -85,12 +86,13 @@ const MAX_POLL_ATTEMPTS    = 60;     // 60 × 3s = 3 minutos máximo de polling
 export function subscribeToJob(
   jobId: string,
   onComplete: (result: JobResult) => void,
-  onError: (error: string) => void
+  onError: (error: string) => void,
+  onUpdate?: (job: JobPollData) => void
 ): JobSubscription {
   let done         = false;
   let pollingTimer: ReturnType<typeof setInterval> | null = null;
   let fallbackTimer: ReturnType<typeof setTimeout> | null = null;
-  let pollCount    = 0;
+  let pollStartTime = Date.now();
   // channel se asigna justo abajo; let para que cancel() pueda acceder.
   let channel: RealtimeChannel;
 
@@ -113,15 +115,15 @@ export function subscribeToJob(
     if (done || pollingTimer !== null) return;
 
     console.info('[realtime] Fallback activo: polling HTTP cada 3s para job', jobId);
-    pollCount = 0;
+    pollStartTime = Date.now();
 
     pollingTimer = setInterval(async () => {
       if (done) { clearInterval(pollingTimer!); pollingTimer = null; return; }
 
-      pollCount++;
-      if (pollCount > MAX_POLL_ATTEMPTS) {
+      const elapsed = Date.now() - pollStartTime;
+      if (elapsed > POLLING_TIMEOUT_MS) {
         finish(() => onError(
-          `Timeout: el pipeline no respondió en ${MAX_POLL_ATTEMPTS * POLLING_INTERVAL_MS / 60_000} minutos`
+          `Timeout: el pipeline no respondió en ${Math.round(POLLING_TIMEOUT_MS / 60_000)} minutos`
         ));
         return;
       }
@@ -137,6 +139,8 @@ export function subscribeToJob(
           finish(() => onComplete(job.result!));
         } else if (job.status === 'failed') {
           finish(() => onError(job.error ?? 'Error desconocido en el pipeline'));
+        } else if (onUpdate && job.progress) {
+          onUpdate(job);
         }
         // pending / running → continuar polling
       } catch {
@@ -147,20 +151,7 @@ export function subscribeToJob(
 
   // ── Canal Realtime ───────────────────────────────────────────────────────
   channel = getSupabaseClient()
-    .channel(`job-${jobId}`)
-    // Vía 1: broadcast directo desde el backend (más fiable en self-hosted)
-    .on(
-      'broadcast',
-      { event: 'job_update' },
-      (payload) => {
-        const data = payload.payload as { job_id?: string; status?: string; result?: JobResult; error?: string };
-        if (data.status === 'completed' && data.result) {
-          finish(() => { channel.unsubscribe(); onComplete(data.result!); });
-        } else if (data.status === 'failed') {
-          finish(() => { channel.unsubscribe(); onError(data.error ?? 'Error desconocido en el pipeline'); });
-        }
-      }
-    )
+    .channel(`jobs-${jobId}`)
     // Vía 2: postgres_changes CDC (funciona cuando Realtime WAL está OK)
     .on(
       'postgres_changes',
@@ -171,11 +162,13 @@ export function subscribeToJob(
         filter: `id=eq.${jobId}`,
       },
       (payload) => {
-        const row = payload.new as { status: string; result?: JobResult; error?: string };
+        const row = payload.new as JobPollData;
         if (row.status === 'completed' && row.result) {
           finish(() => { channel.unsubscribe(); onComplete(row.result!); });
         } else if (row.status === 'failed') {
           finish(() => { channel.unsubscribe(); onError(row.error ?? 'Error desconocido en el pipeline'); });
+        } else if (onUpdate && row.progress) {
+          onUpdate(row);
         }
       }
     )
@@ -183,6 +176,22 @@ export function subscribeToJob(
       if (status === 'SUBSCRIBED') {
         console.info('[realtime] Suscripción activa para job', jobId);
         if (fallbackTimer) { clearTimeout(fallbackTimer); fallbackTimer = null; }
+        // Verificación inmediata: el job pudo completar/fallar ANTES de que
+        // la suscripción se estableciera. Si ya terminó, finish() lo captura
+        // y evita que el frontend quede atascado esperando un evento que nunca llega.
+        void (async () => {
+          if (done) return;
+          try {
+            const resp = await getData<JobPollData>(buildEndpoint(ENDPOINTS.wizard.job(jobId)));
+            const job = resp.data;
+            if (!job) return;
+            if (job.status === 'completed' && job.result) {
+              finish(() => onComplete(job.result!));
+            } else if (job.status === 'failed') {
+              finish(() => onError(job.error ?? 'Error desconocido en el pipeline'));
+            }
+          } catch { /* ignorar — Realtime se encargará si el job sigue en progreso */ }
+        })();
         return;
       }
 
@@ -205,7 +214,7 @@ export function subscribeToJob(
       }
     });
 
-  // Si en 8s no llega SUBSCRIBED (WebSocket lento o caído), activar polling
+  // Si en 8s no llega SUBSCRIBED (WebSocket lento o caído), activar polling.
   fallbackTimer = setTimeout(() => {
     if (done) return;
     console.warn('[realtime] Sin SUBSCRIBED en 8s, activando polling para job', jobId);

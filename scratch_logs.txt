@@ -1,0 +1,175 @@
+﻿knowto-backend  | [knowto] Instalando dependencias...
+knowto-backend  | npm warn deprecated whatwg-encoding@3.1.1: Use @exodus/bytes instead for a more spec-conformant and faster implementation
+knowto-backend  | npm warn deprecated sourcemap-codec@1.4.8: Please use @jridgewell/sourcemap-codec instead
+knowto-backend  | npm warn deprecated rollup-plugin-inject@3.0.2: This package has been deprecated and is no longer maintained. Please use @rollup/plugin-inject.
+knowto-backend  | 
+knowto-backend  | added 206 packages, and audited 207 packages in 17s
+knowto-backend  | 
+knowto-backend  | 55 packages are looking for funding
+knowto-backend  |   run `npm fund` for details
+knowto-backend  | 
+knowto-backend  | 9 vulnerabilities (8 moderate, 1 high)
+knowto-backend  | 
+knowto-backend  | To address issues that do not require attention, run:
+knowto-backend  |   npm audit fix
+knowto-backend  | 
+knowto-backend  | To address all issues (including breaking changes), run:
+knowto-backend  |   npm audit fix --force
+knowto-backend  | 
+knowto-backend  | Run `npm audit` for details.
+knowto-backend  | npm notice
+knowto-backend  | npm notice New major version of npm available! 10.8.2 -> 11.12.1
+knowto-backend  | npm notice Changelog: https://github.com/npm/cli/releases/tag/v11.12.1
+knowto-backend  | npm notice To update run: npm install -g npm@11.12.1
+knowto-backend  | npm notice
+knowto-backend  | 
+knowto-backend  | > knowto-backend@1.0.0 dev:debug
+knowto-backend  | > node --require ./src/register-md.cjs --env-file=.dev.vars --inspect=0.0.0.0:9229 -r tsx/cjs src/server.dev.ts
+knowto-backend  | 
+knowto-backend  | Debugger listening on ws://0.0.0.0:9229/114b0f49-f671-455a-903b-1bc8ee5350b9
+knowto-backend  | For help, see: https://nodejs.org/en/docs/inspector
+knowto-backend  | [knowto-dev] Backend corriendo en http://0.0.0.0:8787
+knowto-backend  | [knowto-dev] OLLAMA_URL  : http://ollama:11434
+knowto-backend  | [knowto-dev] OLLAMA_MODEL: llama3.2:3b
+knowto-backend  | [knowto-dev] WebSocket   : ws://api.localhost/ws?token=dev-local-bypass
+knowto-backend  | [knowto-dev] Docs        : http://api.localhost/docs  (o http://localhost:8787/docs en nativo)
+knowto-backend  | <-- GET /health
+knowto-backend  | --> GET /health [32m200[0m 1ms
+knowto-backend  | <-- GET /health
+knowto-backend  | --> GET /health [32m200[0m 1ms
+knowto-backend  | <-- GET /health
+knowto-backend  | --> GET /health [32m200[0m 1ms
+knowto-backend  | <-- GET /dcfl/wizard/projects
+knowto-backend  | --> GET /dcfl/wizard/projects [32m200[0m 4s
+knowto-backend  | <-- GET /dcfl/wizard/projects
+knowto-backend  | --> GET /dcfl/wizard/projects [32m200[0m 4ms
+knowto-backend  | <-- GET /health
+knowto-backend  | --> GET /health [32m200[0m 1ms
+knowto-backend  | <-- POST /dcfl/wizard/project
+knowto-backend  | --> POST /dcfl/wizard/project [32m201[0m 4s
+knowto-backend  | <-- POST /dcfl/wizard/step
+knowto-backend  | --> POST /dcfl/wizard/step [32m200[0m 11ms
+knowto-backend  | <-- POST /dcfl/wizard/generate-async
+knowto-backend  | [pipeline] START job=ad9e4755-7765-4b9f-a434-c91595666b27 phase=F0 prompt=F0
+knowto-backend  | [pipeline] Llamando a AI...
+knowto-backend  | --> POST /dcfl/wizard/generate-async [32m202[0m 57ms
+knowto-backend  | <-- GET /health
+knowto-backend  | --> GET /health [32m200[0m 0ms
+knowto-backend  | [pipeline] Ejecutando paso del pipeline: 'extractor' con modelo llama3.2:3b...
+knowto-backend  | [Ollama request] Model: llama3.2:3b | Prompt size: 1141 chars
+knowto-backend  | <-- GET /health
+knowto-backend  | --> GET /health [32m200[0m 0ms
+knowto-backend  | [Ollama response] Size: 760 chars. Raw: ### Informaci├│n del Proyecto #### **Nombre del Proyecto:** *Curso b├ísico: Entender algoritmos sin pr...
+knowto-backend  | [pipeline] Ejecutando paso del pipeline: 'specialist_a' con modelo llama3.2:3b...
+knowto-backend  | [Ollama request] Model: llama3.2:3b | Prompt size: 7964 chars
+knowto-backend  | <-- GET /health
+knowto-backend  | --> GET /health [32m200[0m 1ms
+knowto-backend  | <-- GET /health
+knowto-backend  | --> GET /health [32m200[0m 0ms
+knowto-backend  | <-- GET /health
+knowto-backend  | --> GET /health [32m200[0m 0ms
+knowto-backend  | <-- GET /health
+knowto-backend  | --> GET /health [32m200[0m 0ms
+knowto-backend  | <-- GET /health
+knowto-backend  | --> GET /health [32m200[0m 1ms
+knowto-backend  | [Ollama response] Size: 3781 chars. Raw: ## CONTEXTO DEL PROYECTO {   "projectName": "Curso b├ísico: Entender algoritmos sin programar",   "cl...
+knowto-backend  | [pipeline] Ejecutando paso del pipeline: 'specialist_b' con modelo llama3.2:3b...
+knowto-backend  | [Ollama request] Model: llama3.2:3b | Prompt size: 8166 chars
+knowto-backend  | <-- GET /health
+knowto-backend  | --> GET /health [32m200[0m 0ms
+knowto-backend  | <-- GET /health
+knowto-backend  | --> GET /health [32m200[0m 0ms
+knowto-backend  | <-- GET /health
+knowto-backend  | --> GET /health [32m200[0m 0ms
+knowto-backend  | <-- GET /health
+knowto-backend  | --> GET /health [32m200[0m 1ms
+knowto-backend  | <-- GET /health
+knowto-backend  | --> GET /health [32m200[0m 0ms
+knowto-backend  | <-- GET /health
+knowto-backend  | --> GET /health [32m200[0m 0ms
+knowto-backend  | <-- GET /health
+knowto-backend  | --> GET /health [32m200[0m 1ms
+knowto-backend  | <-- GET /health
+knowto-backend  | --> GET /health [32m200[0m 0ms
+knowto-backend  | <-- GET /health
+knowto-backend  | --> GET /health [32m200[0m 0ms
+knowto-backend  | [Ollama response] Size: 8495 chars. Raw: ## CONTEXTO DEL PROYECTO {   "projectName": "Curso b├ísico: Entender algoritmos sin programar",   "cl...
+knowto-backend  | [pipeline] Ejecutando paso del pipeline: 'synthesizer' con modelo llama3.2:3b...
+knowto-backend  | [Ollama request] Model: llama3.2:3b | Prompt size: 17893 chars
+knowto-backend  | <-- GET /health
+knowto-backend  | --> GET /health [32m200[0m 0ms
+knowto-backend  | <-- GET /health
+knowto-backend  | --> GET /health [32m200[0m 1ms
+knowto-backend  | <-- GET /health
+knowto-backend  | --> GET /health [32m200[0m 0ms
+knowto-backend  | <-- GET /health
+knowto-backend  | --> GET /health [32m200[0m 1ms
+knowto-backend  | <-- GET /health
+knowto-backend  | --> GET /health [32m200[0m 1ms
+knowto-backend  | <-- GET /health
+knowto-backend  | --> GET /health [32m200[0m 0ms
+knowto-backend  | <-- GET /health
+knowto-backend  | --> GET /health [32m200[0m 1ms
+knowto-backend  | <-- GET /health
+knowto-backend  | --> GET /health [32m200[0m 0ms
+knowto-backend  | <-- GET /health
+knowto-backend  | --> GET /health [32m200[0m 1ms
+knowto-backend  | <-- GET /health
+knowto-backend  | --> GET /health [32m200[0m 0ms
+knowto-backend  | <-- GET /health
+knowto-backend  | --> GET /health [32m200[0m 0ms
+knowto-backend  | [Ollama response] Size: 6444 chars. Raw: ## MARCO DE REFERENCIA DEL CLIENTE **Proyecto:** Curso b├ísico: Entender algoritmos sin programar **F...
+knowto-backend  | [pipeline] Ejecutando paso del pipeline: 'judge' con modelo llama3.2:3b...
+knowto-backend  | [Ollama request] Model: llama3.2:3b | Prompt size: 13832 chars
+knowto-backend  | <-- GET /health
+knowto-backend  | --> GET /health [32m200[0m 1ms
+knowto-backend  | <-- GET /health
+knowto-backend  | --> GET /health [32m200[0m 0ms
+knowto-backend  | <-- GET /health
+knowto-backend  | --> GET /health [32m200[0m 0ms
+knowto-backend  | <-- GET /health
+knowto-backend  | --> GET /health [32m200[0m 0ms
+knowto-backend  | <-- GET /health
+knowto-backend  | --> GET /health [32m200[0m 1ms
+knowto-backend  | <-- GET /health
+knowto-backend  | --> GET /health [32m200[0m 1ms
+knowto-backend  | <-- GET /health
+knowto-backend  | --> GET /health [32m200[0m 1ms
+knowto-backend  | [Ollama response] Size: 5046 chars. Raw: ```markdown ## MARCO DE REFERENCIA DEL CLIENTE **Proyecto:** Curso b├ísico: Entender algoritmos sin p...
+knowto-backend  | [pipeline] AI completada, chars=5030. Guardando documento...
+knowto-backend  | [pipeline] Documento guardado documentId=8d2d2053-9290-47e9-a6a5-3a17165da0cf. Completando job...
+knowto-backend  | [pipeline] DONE job=ad9e4755-7765-4b9f-a434-c91595666b27
+knowto-backend  | <-- GET /health
+knowto-backend  | --> GET /health [32m200[0m 1ms
+knowto-backend  | <-- GET /health
+knowto-backend  | --> GET /health [32m200[0m 0ms
+knowto-backend  | <-- GET /health
+knowto-backend  | --> GET /health [32m200[0m 0ms
+knowto-backend  | <-- GET /health
+knowto-backend  | --> GET /health [32m200[0m 0ms
+knowto-backend  | <-- GET /health
+knowto-backend  | --> GET /health [32m200[0m 0ms
+knowto-backend  | <-- GET /health
+knowto-backend  | --> GET /health [32m200[0m 0ms
+knowto-backend  | <-- GET /health
+knowto-backend  | --> GET /health [32m200[0m 1ms
+knowto-backend  | <-- GET /health
+knowto-backend  | --> GET /health [32m200[0m 0ms
+knowto-backend  | <-- GET /health
+knowto-backend  | --> GET /health [32m200[0m 0ms
+knowto-backend  | <-- GET /health
+knowto-backend  | --> GET /health [32m200[0m 0ms
+knowto-backend  | <-- GET /health
+knowto-backend  | --> GET /health [32m200[0m 0ms
+knowto-backend  | <-- GET /health
+knowto-backend  | --> GET /health [32m200[0m 1ms
+knowto-backend  | <-- GET /health
+knowto-backend  | --> GET /health [32m200[0m 0ms
+knowto-backend  | <-- GET /health
+knowto-backend  | --> GET /health [32m200[0m 0ms
+knowto-backend  | <-- GET /health
+knowto-backend  | --> GET /health [32m200[0m 0ms
+knowto-backend  | <-- GET /health
+knowto-backend  | --> GET /health [32m200[0m 0ms
+knowto-backend  | <-- GET /health
+knowto-backend  | --> GET /health [32m200[0m 0ms

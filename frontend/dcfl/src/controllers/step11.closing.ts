@@ -3,7 +3,7 @@
 import { createStep } from '../shared/step.factory';
 
 export const Step11Closing = createStep({
-  stepNumber: 11,
+  stepNumber: 12,
   templateId: 'tpl-step9-closing',
   phaseId: 'CLOSE',
   promptId: null, // Paso de cierre: solo guarda y marca como completado, sin IA

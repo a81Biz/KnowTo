@@ -26,7 +26,10 @@ const STEP_DEFINITIONS: Omit<WizardStep, 'status' | 'inputData'>[] = [
 const initialState: WizardState = {
   currentStep: 0,
   projectId: null,
-  clientData: { clientName: '', projectName: '', industry: '', email: '' },
+  clientData: { 
+    clientName: '', projectName: '', industry: '', email: '',
+    experienceLevel: '', budget: '', targetAudience: '', courseDuration: ''
+  },
   needsData: null,
   analysisData: null,
   specsData: null,
@@ -174,14 +177,24 @@ class WizardStoreClass {
   buildContext(forStep?: number): Record<string, unknown> {
     const prev: Record<string, unknown> = {};
     this.state.steps.filter((s) => s.status === 'completed').forEach((s) => {
-      prev[s.phaseId] = { inputData: s.inputData, content: s.documentContent };
+      const title = s.label || s.phaseId;
+      prev[title] = { inputData: s.inputData, content: s.documentContent };
     });
 
+    const state = this.getState();
     const base = {
-      projectName: this.state.clientData.projectName,
-      clientName: this.state.clientData.clientName,
-      industry: this.state.clientData.industry,
-      email: this.state.clientData.email,
+      projectName: state.clientData.projectName || 'Sin especificar',
+      clientName: state.clientData.clientName || 'Sin especificar',
+      industry: state.clientData.industry || 'No especificado',
+      courseTopic: state.clientData.courseTopic || 'No especificado',
+      experienceLevel: state.clientData.experienceLevel || state.clientData.courseLevel || 'No especificado',
+      targetAudience: state.clientData.targetAudience || 'No especificado',
+      expectedOutcome: state.clientData.expectedOutcome || 'No especificado',
+      budget: state.clientData.budget || 'No especificado',
+      courseDuration: state.clientData.courseDuration || 'No especificado',
+      deadline: state.clientData.deadline || 'No especificado',
+      constraints: state.clientData.constraints || 'No especificado',
+      currentDate: new Date().toLocaleDateString('es-MX'),
     };
 
     // Pasos 2+ usan el contexto extraído compacto cuando esté disponible

@@ -60,7 +60,7 @@ export class BaseStep {
   protected _config: StepConfig;
   // Suscripción activa al job en curso. Se cancela antes de crear una nueva
   // para evitar múltiples polling timers simultáneos.
-  private _jobSubscription: JobSubscription | null = null;
+  protected _jobSubscription: JobSubscription | null = null;
 
   protected _dom: {
     form?: HTMLFormElement;
@@ -91,6 +91,7 @@ export class BaseStep {
     this._dom.documentPreview = this._container.querySelector('#document-preview') ?? undefined;
     this._dom.btnCopy = this._container.querySelector('#btn-copy-doc') ?? undefined;
     this._dom.btnRegenerate = this._container.querySelector('#btn-regenerate') ?? undefined;
+    this._dom.btnPrint = this._container.querySelector('#btn-print') ?? undefined;
   }
 
   // 4. LÓGICA DE VISTA
@@ -177,8 +178,11 @@ export class BaseStep {
       this._dom.btnPrint.onclick = () => printDocument(markdown, title);
       return;
     }
-    const btnContainer = this._dom.previewPanel.querySelector<HTMLElement>('.flex.gap-2');
-    if (!btnContainer) return;
+
+    const btnContainer =
+      this._dom.previewPanel.querySelector<HTMLElement>('.flex.gap-2') ??
+      this._dom.previewPanel.querySelector<HTMLElement>('.preview-actions') ??
+      this._dom.previewPanel;
 
     const btn = document.createElement('button');
     btn.id = 'btn-print';
@@ -198,12 +202,14 @@ export class BaseStep {
     return `${this._config.stepNumber}_${label}`;
   }
 
-  protected _setLoading(loading: boolean): void {
+  protected _setLoading(loading: boolean, text?: string): void {
     if (!this._dom.btnSubmit) return;
     this._dom.btnSubmit.disabled = loading;
-    this._dom.btnSubmit.textContent = loading
-      ? this._uiConfig.submittingText
-      : this._uiConfig.submitText;
+    if (loading) {
+      this._dom.btnSubmit.textContent = text ?? `⏳ Procesando... (iniciando)`;
+    } else {
+      this._dom.btnSubmit.textContent = this._uiConfig.submitText;
+    }
   }
 
   // 5. LÓGICA DE NEGOCIO
@@ -247,6 +253,14 @@ export class BaseStep {
             clientName: formData['clientName'] as string,
             industry: formData['industry'] as string ?? '',
             email: formData['email'] as string ?? '',
+            courseTopic: formData['courseTopic'] as string ?? '',
+            experienceLevel: formData['experienceLevel'] as string ?? '',
+            targetAudience: formData['targetAudience'] as string ?? '',
+            expectedOutcome: formData['expectedOutcome'] as string ?? '',
+            budget: formData['budget'] as string ?? '',
+            courseDuration: formData['courseDuration'] as string ?? '',
+            deadline: formData['deadline'] as string ?? '',
+            constraints: formData['constraints'] as string ?? '',
           });
           state = wizardStore.getState();
         }
@@ -288,14 +302,25 @@ export class BaseStep {
     showLoading(this._uiConfig.loadingText);
     wizardStore.setStepInputData(this._config.stepNumber, formData);
 
+    if (this._config.stepNumber === 0) {
+      wizardStore.setClientData({
+        projectName: formData['projectName'] as string,
+        clientName: formData['clientName'] as string,
+        industry: formData['industry'] as string ?? '',
+        email: formData['email'] as string ?? '',
+        courseTopic: formData['courseTopic'] as string ?? '',
+        experienceLevel: formData['experienceLevel'] as string ?? '',
+        targetAudience: formData['targetAudience'] as string ?? '',
+        expectedOutcome: formData['expectedOutcome'] as string ?? '',
+        budget: formData['budget'] as string ?? '',
+        courseDuration: formData['courseDuration'] as string ?? '',
+        deadline: formData['deadline'] as string ?? '',
+        constraints: formData['constraints'] as string ?? '',
+      });
+    }
+
     try {
-      const context = wizardStore.buildContext(this._config.stepNumber) as {
-        projectName: string;
-        clientName: string;
-        industry?: string;
-        email?: string;
-        previousData?: Record<string, unknown>;
-      };
+      const context = wizardStore.buildContext(this._config.stepNumber);
 
       const res = await postData<{ documentId: string; content: string }>(
         buildEndpoint(ENDPOINTS.wizard.generate),
@@ -369,6 +394,14 @@ export class BaseStep {
             clientName: formData['clientName'] as string,
             industry: formData['industry'] as string ?? '',
             email: formData['email'] as string ?? '',
+            courseTopic: formData['courseTopic'] as string ?? '',
+            experienceLevel: formData['experienceLevel'] as string ?? '',
+            targetAudience: formData['targetAudience'] as string ?? '',
+            expectedOutcome: formData['expectedOutcome'] as string ?? '',
+            budget: formData['budget'] as string ?? '',
+            courseDuration: formData['courseDuration'] as string ?? '',
+            deadline: formData['deadline'] as string ?? '',
+            constraints: formData['constraints'] as string ?? '',
           });
           state = wizardStore.getState();
           logger.info(`[step${this._config.stepNumber}] Proyecto creado`, { projectId: res.data.projectId });
@@ -413,16 +446,27 @@ export class BaseStep {
     }
 
     this._setLoading(true);
-    showLoading('Procesando… recibirás una notificación cuando termine.');
+    showLoading(`⏳ Procesando... (iniciando)\nPuedes seguir el progreso detallado en la consola del backend.`);
     wizardStore.setStepInputData(this._config.stepNumber, formData);
 
-    const context = wizardStore.buildContext(this._config.stepNumber) as {
-      projectName: string;
-      clientName:  string;
-      industry?:   string;
-      email?:      string;
-      previousData?: Record<string, unknown>;
-    };
+    if (this._config.stepNumber === 0) {
+      wizardStore.setClientData({
+        projectName: formData['projectName'] as string,
+        clientName: formData['clientName'] as string,
+        industry: formData['industry'] as string ?? '',
+        email: formData['email'] as string ?? '',
+        courseTopic: formData['courseTopic'] as string ?? '',
+        experienceLevel: formData['experienceLevel'] as string ?? '',
+        targetAudience: formData['targetAudience'] as string ?? '',
+        expectedOutcome: formData['expectedOutcome'] as string ?? '',
+        budget: formData['budget'] as string ?? '',
+        courseDuration: formData['courseDuration'] as string ?? '',
+        deadline: formData['deadline'] as string ?? '',
+        constraints: formData['constraints'] as string ?? '',
+      });
+    }
+
+    const context = wizardStore.buildContext(this._config.stepNumber);
 
     let jobId: string;
     try {
@@ -466,21 +510,22 @@ export class BaseStep {
       hideLoading();
     };
 
-    const TIMEOUT_MS = 20 * 60 * 1000; // 20 minutos
+    const onUpdate = (job: any) => {
+      if (job.progress?.currentStep) {
+        const { currentStep, stepIndex, totalSteps } = job.progress;
+        const msg = `⏳ Procesando... (${currentStep} - paso ${stepIndex + 1}/${totalSteps})`;
+        this._setLoading(true, msg);
+        // Usar showLoading de nuevo reescribe el texto del modal si usas @core/ui modal clásico
+        showLoading(`${msg}\nPuedes seguir el progreso detallado en la consola del backend.`);
+      }
+    };
 
     // Cancelar cualquier suscripción anterior antes de crear la nueva.
-    // Sin esto, cada "Regenerar" acumula un polling timer adicional que nunca
-    // se detiene si el job anterior quedó atascado — origen de los 30 000 requests.
+    // Sin esto, cada "Regenerar" acumula un polling timer adicional.
     this._jobSubscription?.cancel();
 
     logger.info(`[step${this._config.stepNumber}] Esperando via Supabase Realtime (WebSocket)...`);
-    const subscription = subscribeToJob(jobId, onComplete, onError);
-    this._jobSubscription = subscription;
-
-    setTimeout(() => {
-      subscription.cancel();  // detiene WebSocket Y pollingTimer
-      onError('Timeout: el pipeline tardó más de 20 minutos');
-    }, TIMEOUT_MS);
+    this._jobSubscription = subscribeToJob(jobId, onComplete, onError, onUpdate);
   }
 
 

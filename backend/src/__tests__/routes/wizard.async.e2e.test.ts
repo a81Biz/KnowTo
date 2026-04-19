@@ -216,11 +216,13 @@ describe('POST /dcfl/wizard/generate-async — pipeline en background (notificac
 
     // Polling: espera hasta que el pipeline haya invocado la IA
     await vi.waitFor(
-      () => expect(mockAiGenerate).toHaveBeenCalledWith({
-        promptId:   'F0',
-        context:    GENERATE_ASYNC_BODY.context,
-        userInputs: GENERATE_ASYNC_BODY.userInputs,
-      }),
+      () => expect(mockAiGenerate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          promptId:   'F0',
+          context:    GENERATE_ASYNC_BODY.context,
+          userInputs: GENERATE_ASYNC_BODY.userInputs,
+        })
+      ),
       { timeout: 2000, interval: 50 }
     );
   });

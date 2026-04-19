@@ -105,7 +105,7 @@ CREATE TABLE IF NOT EXISTS projects (
 CREATE TABLE IF NOT EXISTS wizard_steps (
   id            UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   project_id    UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
-  step_number   INTEGER NOT NULL CHECK (step_number BETWEEN 0 AND 9),
+  step_number   INTEGER NOT NULL CHECK (step_number BETWEEN 0 AND 11),
   phase_id      TEXT NOT NULL,
   input_data    JSONB NOT NULL DEFAULT '{}',
   output_text   TEXT,

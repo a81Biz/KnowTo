@@ -22,18 +22,18 @@ import { Step11Closing } from './controllers/step11.closing';
 
 // Registro de controladores — SSOT para navegación (índice = stepNumber)
 const STEP_CONTROLLERS = [
-  Step0ClientData,    // 0  F0  — Marco de Referencia
-  Step1Needs,         // 1  F1  — Informe de Necesidades
-  Step2Analysis,      // 2  F2  — Especificaciones de Análisis
+  Step0ClientData,      // 0  F0   — Marco de Referencia
+  Step1Needs,           // 1  F1   — Informe de Necesidades
+  Step2Analysis,        // 2  F2   — Especificaciones de Análisis (confrontación F1↔F2 integrada)
   Step3Recommendations, // 3  F2.5 — Recomendaciones Pedagógicas
-  Step4Specs,         // 4  F3  — Especificaciones Técnicas
-  Step5Production,    // 5  F4  — Producción (sub-wizard 8 productos)
-  Step6Checklist,     // 6  F5.1 — Verificación
-  Step7Evidence,      // 7  F5.2 — Evidencias
-  Step8Adjustments,   // 8  F6.1 — Ajustes (formulario dinámico)
-  Step9Inventory,     // 9  F6.2a — Inventario y Firmas
-  Step10Summary,      // 10 F6.2b — Resumen Ejecutivo y Declaración
-  Step11Closing,      // 11 CLOSE — Finalización
+  Step4Specs,           // 4  F3   — Especificaciones Técnicas
+  Step5Production,      // 5  F4   — Producción (sub-wizard 8 productos)
+  Step6Checklist,       // 6  F5.1 — Verificación
+  Step7Evidence,        // 7  F5.2 — Evidencias
+  Step8Adjustments,     // 8  F6.1 — Ajustes (formulario dinámico)
+  Step9Inventory,       // 9  F6.2a — Inventario y Firmas
+  Step10Summary,        // 10 F6.2b — Resumen Ejecutivo y Declaración
+  Step11Closing,        // 11 CLOSE — Finalización
 ] as const;
 
 // ============================================================================
@@ -143,6 +143,8 @@ async function resumeProject(projectId: string): Promise<void> {
       buildEndpoint(ENDPOINTS.wizard.getProject(projectId))
     );
     const project = res.data?.['project'] as Record<string, unknown> | undefined;
+    const steps = res.data?.['steps'] as Record<string, unknown>[] | undefined;
+    
     if (project) {
       wizardStore.setProjectId(projectId);
       wizardStore.setClientData({
@@ -151,6 +153,27 @@ async function resumeProject(projectId: string): Promise<void> {
         industry: String(project['industry'] ?? ''),
         email: String(project['email'] ?? ''),
       });
+
+      if (steps) {
+        for (const apiStep of steps) {
+          const stepNumber = Number(apiStep['step_number']);
+          const status = String(apiStep['status']);
+          const outputText = apiStep['output_text'] as string | undefined;
+          const stepId = apiStep['id'] as string;
+
+          if (apiStep['input_data']) {
+            const parsedInput = typeof apiStep['input_data'] === 'string' 
+              ? JSON.parse(apiStep['input_data']) 
+              : apiStep['input_data'];
+            wizardStore.setStepInputData(stepNumber, parsedInput);
+          }
+          if (status === 'completed' && outputText) {
+            wizardStore.setStepDocument(stepNumber, outputText, stepId);
+          }
+          if (stepId) wizardStore.setStepId(stepNumber, stepId);
+        }
+      }
+
       wizardStore.goToStep(Number(project['current_step'] ?? 0));
     }
     dashboardContainer.classList.add('hidden');

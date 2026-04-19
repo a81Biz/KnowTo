@@ -18,7 +18,7 @@ export type StepStatus = 'pending' | 'processing' | 'completed' | 'error';
 export interface WizardStep {
   stepNumber: number;
   phaseId: PhaseId;
-  promptId: PromptId;
+  promptId: PromptId | null;
   label: string;
   icon: string;
   status: StepStatus;
@@ -37,10 +37,12 @@ export interface ClientData {
   industry: string;
   email: string;
   courseTopic?: string;
+  experienceLevel?: string;
   courseLevel?: string;
   targetAudience?: string;
   expectedOutcome?: string;
   budget?: string;
+  courseDuration?: string;
   deadline?: string;
   constraints?: string;
 }

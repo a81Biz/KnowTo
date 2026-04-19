@@ -63,8 +63,8 @@ describe('AIService — modo desarrollo (Ollama)', () => {
     const fetchSpy = mockFetch({ response: AI_CONTENT });
     const content = await makeAI(makeDevEnv()).generate(BASE_OPTS);
 
-    expect(content).toBe(AI_CONTENT);
-    expect(fetchSpy).toHaveBeenCalledTimes(5); // F0 tiene 5 pipeline_steps
+    expect(content).toContain(AI_CONTENT); // ensamblador prefija header; el contenido está incluido
+    expect(fetchSpy).toHaveBeenCalledTimes(9); // F0: 10 pipeline_steps, ensamblador no llama a IA
     const [url] = fetchSpy.mock.calls[0] as [string, ...unknown[]];
     expect(url).toContain('/api/generate');
     expect(url).toContain('ollama');
@@ -87,7 +87,7 @@ describe('AIService — modo desarrollo (Ollama)', () => {
     expect(body['model']).toBe('llama3.2:3b');
     expect(typeof body['prompt']).toBe('string');
     expect(typeof body['system']).toBe('string');
-    expect(body['stream']).toBe(false);
+    expect(body['stream']).toBe(true);
   });
 
   it('el prompt contiene el contexto del proyecto', async () => {
@@ -131,7 +131,7 @@ describe('AIService — modo desarrollo (Ollama)', () => {
       mockFetch({ response: AI_CONTENT }); // mockResolvedValue — persiste para todos los pasos del pipeline
       await expect(
         makeAI(makeDevEnv()).generate({ ...BASE_OPTS, promptId: id })
-      ).resolves.toBe(AI_CONTENT);
+      ).resolves.toContain(AI_CONTENT); // F0: ensamblador añade header; otros: output directo
       vi.restoreAllMocks(); // limpia el spy antes de la siguiente iteración
     }
   });
@@ -150,12 +150,12 @@ describe('AIService — modo producción (Workers AI)', () => {
 
   it('devuelve el contenido del objeto {response}', async () => {
     const content = await makeAI(makeProdEnv({ response: AI_CONTENT })).generate(BASE_OPTS);
-    expect(content).toBe(AI_CONTENT);
+    expect(content).toContain(AI_CONTENT); // ensamblador añade header en F0
   });
 
   it('acepta respuesta como string plano', async () => {
     const content = await makeAI(makeProdEnv(AI_CONTENT)).generate(BASE_OPTS);
-    expect(content).toBe(AI_CONTENT);
+    expect(content).toContain(AI_CONTENT); // ensamblador añade header en F0
   });
 
   it('lanza error si Workers AI devuelve response vacío', async () => {

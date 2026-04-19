@@ -31,7 +31,7 @@ describe('PromptRegistry', () => {
       expect(entry.metadata.name).toBeTruthy();
       expect(entry.metadata.version).toMatch(/^\d+\.\d+\.\d+$/);
       expect(Array.isArray(entry.metadata.tags)).toBe(true);
-      expect(entry.metadata.tags.length).toBeGreaterThan(0);
+      expect((entry.metadata.tags ?? []).length).toBeGreaterThan(0);
     }
   });
 

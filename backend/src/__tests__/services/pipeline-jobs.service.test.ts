@@ -141,7 +141,7 @@ describe('PipelineJobsService — desarrollo (in-memory)', () => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe('PipelineJobsService — simulación de pipeline asíncrono (polling)', () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => { vi.clearAllMocks(); });
 
   it('el notificador se recibe después de un delay (pipeline tardío)', async () => {
     const notifier = vi.fn();

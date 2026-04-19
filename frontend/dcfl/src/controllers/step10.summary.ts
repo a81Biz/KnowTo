@@ -5,7 +5,7 @@
 import { createStep } from '../shared/step.factory';
 
 export const Step10Summary = createStep({
-  stepNumber: 10,
+  stepNumber: 11,
   templateId: 'tpl-step10-summary',
   phaseId: 'F6.2b',
   promptId: 'F6_2b',

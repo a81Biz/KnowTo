@@ -1,26 +1,97 @@
 ---
 id: F4_P0
 name: Producto 0 - Cronograma de Desarrollo EC0366
-version: 2.0.0
+version: 3.0.0
 tags: [EC0366, E1219, produccion, cronograma]
 pipeline_steps:
-  - agent: extractor
-    task: "Extrae: nombre del proyecto, clientName, estructura temática de F2, duración total de F3, tipos de multimedia de F3, startDate/instructorName/reviewerName de userInputs si existen."
-  - agent: specialist_a
+  - agent: extractor_f4_p0
+    inputs_from: []
+    include_template: false
+    task: |
+      Extrae del context y userInputs los siguientes datos y devuélvelos en JSON puro (sin texto extra):
+      {
+        "projectName": string,
+        "clientName": string,
+        "modulos": [{ "nombre": string, "duracion_horas": number }],
+        "duracionTotal": string,
+        "startDate": string,
+        "instructorName": string,
+        "reviewerName": string
+      }
+      - projectName, clientName: del contexto del proyecto.
+      - modulos: estructura temática de F2 (cada módulo con nombre y duración en horas).
+      - duracionTotal: duración total del curso de F3 (horas o semanas).
+      - startDate, instructorName, reviewerName: de userInputs (si no existen, usa "Por definir").
+      SOLO el JSON. Sin explicaciones.
+
+  - agent: agente_a_p0
     model: "@cf/meta/llama-3.1-8b-instruct"
-    task: "Redacta la tabla maestra del cronograma por fases (Diseño instruccional, Producción, Integración LMS, Revisión) con: actividad, responsable, duración, fechas inicio/fin y entregable. Calcula fechas desde startDate o 'Semana 1'."
-  - agent: specialist_b
-    model: "@cf/qwen/qwen2.5-7b-instruct"
-    task: "Redacta: asignación de recursos por fase, estimación de esfuerzo total en horas-persona, 3-5 riesgos con plan de mitigación, dependencias críticas y criterios de aceptación por entregable."
-  - agent: synthesizer
-    model: "@cf/mistral/mistral-7b-instruct-v0.2"
-    task: "Combina A y B en el Producto 0 completo: encabezado, tabla del cronograma, hitos clave, recursos, riesgos y criterios de aceptación."
-  - agent: judge
-    rules:
-      - "La tabla del cronograma tiene columnas: Fase | Actividad | Responsable | Duración | Fecha inicio | Fecha fin | Entregable."
-      - "instructorName y reviewerName deben aparecer tal como los proporcionó el usuario."
-      - "Reemplaza cualquier placeholder [X] con datos reales o '[Por definir]'."
-      - "Devuelve el documento completo en Markdown válido."
+    inputs_from: [extractor_f4_p0]
+    include_template: false
+    max_input_chars: 3000
+    task: |
+      Eres Diseñador Instruccional A. Basado en EXTRACTOR_F4_P0, genera la tabla maestra del
+      CRONOGRAMA DE DESARROLLO por fases. Las 4 fases obligatorias EC0366 son:
+      1. Diseño instruccional
+      2. Producción de contenidos
+      3. Integración LMS
+      4. Revisión y pruebas
+      Para cada fase, lista las actividades con columnas: Actividad | Responsable | Duración (días) | Fecha inicio | Fecha fin | Entregable.
+      Si startDate está disponible, calcula fechas reales. Si no, usa "Semana N" como referencia.
+      instructorName = responsable de producción. reviewerName = responsable de revisión.
+      Formato Markdown, tablas con pipes. Sin texto introductorio ni conclusiones.
+
+  - agent: agente_b_p0
+    model: "@cf/meta/llama-3.3-70b-instruct-fp8-fast"
+    inputs_from: [extractor_f4_p0]
+    include_template: false
+    max_input_chars: 3000
+    task: |
+      Eres Diseñador Instruccional B. Basado en EXTRACTOR_F4_P0, genera una perspectiva
+      diferente e independiente del CRONOGRAMA DE DESARROLLO. Incluye:
+      - Las mismas 4 fases EC0366 con enfoque en estimación de esfuerzo (horas-persona).
+      - Tabla con columnas: Fase | Actividad | Responsable | Duración | Horas-persona | Entregable.
+      - Sección RIESGOS Y MITIGACIÓN: 3-5 riesgos con probabilidad, impacto y acción.
+      - Sección DEPENDENCIAS CRÍTICAS: qué debe completarse antes de cada fase.
+      Formato Markdown. Sin texto introductorio.
+
+  - agent: juez_p0
+    model: "@cf/meta/llama-3.1-8b-instruct"
+    inputs_from: [agente_a_p0, agente_b_p0]
+    include_template: false
+    max_input_chars: 4000
+    task: |
+      Compara AGENTE_A_P0 y AGENTE_B_P0. Evalúa cuál cronograma es más completo según EC0366.
+      Criterios:
+      1. Las 4 fases EC0366 están presentes (Diseño instruccional, Producción, Integración LMS, Revisión)
+      2. Cada fase tiene actividades con responsables y fechas/semanas
+      3. instructorName y reviewerName aparecen como responsables
+      4. Sin placeholders [X] en campos críticos
+      Devuelve SOLO este JSON:
+      {
+        "borrador_elegido": "A" | "B",
+        "razon": string,
+        "campos_faltantes": [string],
+        "placeholders_detectados": number
+      }
+      Regla: si ambos tienen placeholders, elige el de menor conteo.
+      SOLO el JSON. Sin texto adicional.
+
+  - agent: validador_p0
+    inputs_from: [extractor_f4_p0, agente_a_p0, agente_b_p0, juez_p0]
+
+  - agent: sintetizador_final_f4
+    inputs_from: [extractor_f4_p0, agente_a_p0, agente_b_p0, juez_p0, validador_p0]
+    include_template: true
+    max_input_chars: 6000
+    task: |
+      Toma el borrador elegido por JUEZ_P0 y genera el CRONOGRAMA DE DESARROLLO final.
+      REGLAS:
+      - Reemplaza todos los placeholders [X], [Por definir] con datos reales del EXTRACTOR_F4_P0.
+      - instructorName y reviewerName deben aparecer tal como los proporcionó el usuario.
+      - El documento DEBE incluir las 4 fases EC0366 con actividades, responsables, duración y entregables.
+      - Añade sección RIESGOS Y MITIGACIÓN y RESUMEN EJECUTIVO al final.
+      - Responde SOLO en español. Sigue el FORMATO DE SALIDA OBLIGATORIO de la plantilla.
 ---
 
 Actúa como un diseñador instruccional certificable en EC0366. Genera ÚNICAMENTE el Producto 0 indicado.
@@ -31,14 +102,6 @@ Actúa como un diseñador instruccional certificable en EC0366. Genera ÚNICAMEN
 ## DATOS DE ENTRADA DEL USUARIO EN ESTA FASE
 {{userInputs}}
 
-## INSTRUCCIÓN
-Genera SOLO el CRONOGRAMA DE DESARROLLO (Producto 0 / E1219 - producto #1). No generes ningún otro producto.
-
-Usa los datos del contexto: nombre del proyecto, clientName, estructura temática de F2, especificaciones técnicas de F3.
-Si el usuario proporcionó `startDate` en userInputs, úsala como fecha de inicio del cronograma.
-Si proporcionó `instructorName`, úsalo como nombre del desarrollador.
-Si proporcionó `reviewerName`, úsalo como revisor.
-
 ## FORMATO DE SALIDA OBLIGATORIO
 
 # PRODUCTO 0: CRONOGRAMA DE DESARROLLO
@@ -46,37 +109,57 @@ Si proporcionó `reviewerName`, úsalo como revisor.
 **Proyecto:** {{projectName}}
 **Candidato:** {{clientName}}
 **Fecha de elaboración:** {{fechaActual}}
-**Folio:** EC0366-CRON-[año][4 dígitos]
+**Folio:** EC0366-CRON-{{fechaActual}}
 
 ---
 
-**Curso:** [título del curso del contexto]
-**Desarrollador:** [instructorName o clientName]
-**Objetivo general:** [del contexto F2/F1]
-**Fecha de inicio:** [startDate de userInputs o fecha actual]
+## FASE 1: Diseño instruccional
 
-| # | Actividad | Duración estimada | Fecha inicio | Fecha fin | Responsable |
-|:---|:---|:---|:---|:---|:---|
-| 1 | Elaborar estructura temática del curso | [N días] | [fecha] | [fecha] | [nombre] |
-| 2 | Desarrollar documento de información general | [N días] | [fecha] | [fecha] | [nombre] |
-| 3 | Diseñar guías de actividades por módulo | [N días] | [fecha] | [fecha] | [nombre] |
-| 4 | Elaborar calendario general de actividades | [N días] | [fecha] | [fecha] | [nombre] |
-| 5 | Desarrollar documentos de texto (contenido) | [N días] | [fecha] | [fecha] | [nombre] |
-| 6 | Crear presentación electrónica | [N días] | [fecha] | [fecha] | [nombre] |
-| 7 | Producir material multimedia (guión de video) | [N días] | [fecha] | [fecha] | [nombre] |
-| 8 | Diseñar instrumentos de evaluación | [N días] | [fecha] | [fecha] | [nombre] |
-| 9 | Configurar curso en plataforma LMS | [N días] | [fecha] | [fecha] | [nombre] |
-| 10 | Verificar funcionamiento técnico y publicar | [N días] | [fecha] | [fecha] | [nombre] |
-| **TOTAL** | | **[N días totales]** | [fecha inicio] | [fecha fin] | |
+| Actividad | Responsable | Duración (días) | Fecha inicio | Fecha fin | Entregable |
+|:---|:---|:---:|:---|:---|:---|
+| [Actividad de diseño 1] | [instructorName] | [N] | [fecha] | [fecha] | [entregable] |
+| [Actividad de diseño 2] | [instructorName] | [N] | [fecha] | [fecha] | [entregable] |
 
-**Firmas:**
+## FASE 2: Producción de contenidos
 
-| Rol | Nombre | Firma | Fecha |
-|:---|:---|:---|:---|
-| Elaboró | [instructorName o clientName] | _________________ | [fecha] |
-| Revisó | [reviewerName o "Por designar"] | _________________ | [fecha] |
+| Actividad | Responsable | Duración (días) | Fecha inicio | Fecha fin | Entregable |
+|:---|:---|:---:|:---|:---|:---|
+| [Actividad producción 1] | [instructorName] | [N] | [fecha] | [fecha] | [entregable] |
+| [Actividad producción 2] | [instructorName] | [N] | [fecha] | [fecha] | [entregable] |
 
-## INSTRUCCIONES DE CALIDAD
-- Las fechas deben ser consecuentes (una actividad termina antes de que empiece la siguiente).
-- Estima duraciones realistas según la complejidad del curso definida en el contexto.
-- Responde SOLO en español. Genera únicamente este producto, sin preámbulos.
+## FASE 3: Integración LMS
+
+| Actividad | Responsable | Duración (días) | Fecha inicio | Fecha fin | Entregable |
+|:---|:---|:---:|:---|:---|:---|
+| [Actividad integración 1] | [instructorName] | [N] | [fecha] | [fecha] | [entregable] |
+| [Actividad integración 2] | [instructorName] | [N] | [fecha] | [fecha] | [entregable] |
+
+## FASE 4: Revisión y pruebas
+
+| Actividad | Responsable | Duración (días) | Fecha inicio | Fecha fin | Entregable |
+|:---|:---|:---:|:---|:---|:---|
+| [Actividad revisión 1] | [reviewerName] | [N] | [fecha] | [fecha] | [entregable] |
+| [Actividad revisión 2] | [reviewerName] | [N] | [fecha] | [fecha] | [entregable] |
+
+---
+
+## RIESGOS Y PLAN DE MITIGACIÓN
+
+| Riesgo | Probabilidad | Impacto | Mitigación |
+|:---|:---:|:---:|:---|
+| [Riesgo 1] | [Alta/Media/Baja] | [Alto/Medio/Bajo] | [acción de mitigación] |
+| [Riesgo 2] | [Alta/Media/Baja] | [Alto/Medio/Bajo] | [acción de mitigación] |
+
+---
+
+## RESUMEN EJECUTIVO
+
+| Dato | Valor |
+|:---|:---|
+| Duración total del proyecto | [N semanas / N días hábiles] |
+| Fecha de inicio | [startDate o "Por definir"] |
+| Fecha estimada de entrega | [fecha calculada] |
+| Instructor / Desarrollador | [instructorName] |
+| Revisor | [reviewerName] |
+| Total de módulos | [N módulos de F2] |
+| Duración total del curso | [duracionTotal de F3] |

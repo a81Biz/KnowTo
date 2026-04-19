@@ -397,16 +397,13 @@ wizard.openapi(routeGenerate, async (c) => {
   try {
     content = await ai.generate({
       promptId: body.promptId as PromptId,
-      context: body.context as import('../types/wizard.types').ProjectContext,
+      context: body.context as Record<string, unknown>,
       userInputs: body.userInputs,
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error(`[CCE/generate] AI error: ${msg}`);
-    return c.json(
-      { success: false as const, error: `Error al generar el documento: ${msg}`, timestamp: new Date().toISOString() },
-      500
-    );
+    throw new Error(`Error al generar el documento: ${msg}`);
   }
 
   let documentId: string;
@@ -436,7 +433,7 @@ wizard.openapi(routeGenerateForm, async (c) => {
 
   const rawJson = await ai.generate({
     promptId: promptId as PromptId,
-    context: context as import('../types/wizard.types').ProjectContext,
+    context: context as Record<string, unknown>,
     userInputs: {},
   });
 

@@ -21,6 +21,7 @@ CREATE TABLE IF NOT EXISTS pipeline_jobs (
   context      JSONB,
   user_inputs  JSONB,
   result       JSONB,
+  progress     JSONB       DEFAULT '{"currentStep": null, "stepIndex": 0, "totalSteps": 0}'::jsonb,
   error        TEXT,
   user_id      UUID        NOT NULL,
   created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -60,6 +61,13 @@ FOR EACH ROW EXECUTE FUNCTION _update_pipeline_jobs_timestamp();
 -- ─────────────────────────────────────────────────────────────────────────────
 DO $$
 BEGIN
+  -- CRÍTICO: Supabase Realtime v2 ejecuta internamente:
+  --   GRANT USAGE ON SCHEMA realtime TO postgres, anon, authenticated, service_role
+  -- Si el rol 'postgres' no existe, la conexión de Realtime al tenant falla con
+  -- "role postgres does not exist" y ningún canal de postgres_changes funcionará.
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'postgres') THEN
+    CREATE ROLE postgres SUPERUSER LOGIN PASSWORD 'postgres';
+  END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon') THEN
     CREATE ROLE anon NOLOGIN;
   END IF;
@@ -94,6 +102,7 @@ CREATE POLICY pipeline_jobs_service_all ON pipeline_jobs
 GRANT ALL    ON TABLE pipeline_jobs TO service_role;
 GRANT SELECT ON TABLE pipeline_jobs TO anon;
 GRANT SELECT ON TABLE pipeline_jobs TO authenticated;
+GRANT SELECT ON TABLE pipeline_jobs TO postgres;
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- 4. Realtime publication

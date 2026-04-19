@@ -16,15 +16,15 @@ RETURNS JSON AS $$
 DECLARE
   v_project_id UUID;
   v_step       INTEGER;
-  v_phases     TEXT[] := ARRAY['F0','F1','F2','F3','F4','F5.1','F5.2','F6.1','F6.2','CLOSE'];
+  v_phases     TEXT[] := ARRAY['F0','F1','F2','F2.5','F3','F4','F5.1','F5.2','F6.1','F6.2a','F6.2b','CLOSE'];
 BEGIN
   -- Crear el proyecto
   INSERT INTO projects (user_id, name, client_name, industry, email)
   VALUES (p_user_id, p_name, p_client_name, p_industry, p_email)
   RETURNING id INTO v_project_id;
 
-  -- Inicializar los 10 wizard_steps
-  FOR v_step IN 0..9 LOOP
+  -- Inicializar los 12 wizard_steps
+  FOR v_step IN 0..11 LOOP
     INSERT INTO wizard_steps (project_id, step_number, phase_id)
     VALUES (v_project_id, v_step, v_phases[v_step + 1]);
   END LOOP;

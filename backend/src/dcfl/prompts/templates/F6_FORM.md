@@ -17,6 +17,7 @@ Reglas:
 - Devuelve ÚNICAMENTE el JSON, sin explicaciones, sin texto antes ni después.
 - Analiza qué observaciones y problemas surgieron en el checklist de F5.
 - Los campos deben ser específicos para los problemas detectados, no genéricos.
+- NO uses corchetes `[` o `]` en los labels. Redacta el nombre del ajuste con tus propias palabras basado en el contexto F5. Ejemplo de label esperado: "Ajuste de navegación en el módulo 2 — Descripción del problema"
 - Si no hay contexto de F5, genera campos estándar de ajuste.
 
 ## TIPOS DE CAMPO DISPONIBLES
@@ -50,7 +51,7 @@ Reglas:
     },
     {
       "id": "adjustment_1_description",
-      "label": "[Nombre del ajuste según F5] — Descripción del problema",
+      "label": "Ajuste de navegación en el módulo 2 — Descripción del problema",
       "type": "textarea",
       "placeholder": "Describe con precisión qué problema se detectó.",
       "required": true,
@@ -58,7 +59,7 @@ Reglas:
     },
     {
       "id": "adjustment_1_solution",
-      "label": "[Nombre del ajuste] — Solución implementada",
+      "label": "Ajuste de navegación en el módulo 2 — Solución implementada",
       "type": "textarea",
       "placeholder": "Describe qué cambio realizaste exactamente.",
       "required": true,
@@ -66,7 +67,7 @@ Reglas:
     },
     {
       "id": "adjustment_1_type",
-      "label": "[Nombre del ajuste] — Tipo de ajuste",
+      "label": "Ajuste de navegación en el módulo 2 — Tipo de ajuste",
       "type": "select",
       "required": true,
       "options": [
@@ -77,7 +78,7 @@ Reglas:
     },
     {
       "id": "adjustment_1_priority",
-      "label": "[Nombre del ajuste] — Prioridad",
+      "label": "Ajuste de navegación en el módulo 2 — Prioridad",
       "type": "select",
       "required": true,
       "options": [
@@ -88,7 +89,7 @@ Reglas:
     },
     {
       "id": "adjustment_1_verification",
-      "label": "[Nombre del ajuste] — ¿Cómo verificaste que quedó resuelto?",
+      "label": "Ajuste de navegación en el módulo 2 — ¿Cómo verificaste que quedó resuelto?",
       "type": "text",
       "placeholder": "Ej: Revisé el video corregido y confirmo que el audio funciona correctamente.",
       "required": true,

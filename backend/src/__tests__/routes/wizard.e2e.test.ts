@@ -207,10 +207,10 @@ describe('POST /dcfl/wizard/step', () => {
     expect(res.status).toBe(400);
   });
 
-  it('devuelve 400 si stepNumber está fuera de rango [0-11]', async () => {
+  it('devuelve 400 si stepNumber está fuera de rango [0-12]', async () => {
     const res = await post('/dcfl/wizard/step', {
       projectId: VALID_PROJECT_ID,
-      stepNumber: 12,
+      stepNumber: 13,
       inputData: {},
     });
     expect(res.status).toBe(400);
