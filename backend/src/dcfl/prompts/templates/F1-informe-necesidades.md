@@ -5,45 +5,26 @@ version: 3.0.0
 tags: [EC0249, necesidades, gap-analysis, SMART, Bloom]
 pipeline_steps:
   - agent: extractor
-    inputs_from: []
+    model: "@cf/meta/llama-3.1-8b-instruct"
     include_template: false
     task: |
-      Extrae del contexto y userInputs los siguientes datos y devuélvelos en JSON puro (sin texto extra):
+      Extrae del contexto:
+      - projectName: nombre del proyecto
+      - courseTopic: tema del curso
+      - brechas: brechas identificadas (campo confirmedGaps de userInputs)
+      
+      Las PREGUNTAS y RESPUESTAS del cliente están en previousData.preguntas_respuestas_estructuradas.
+      Es un array donde cada elemento tiene { pregunta, respuesta }.
+      
+      Para cada par encontrado, inclúyelo en el array qa.
+      
+      Devuelve SOLO JSON:
       {
         "projectName": string,
-        "industry": string,
         "courseTopic": string,
-        "targetAudience": string,
         "brechas": string,
-        "qa": [
-          { "pregunta": string, "respuesta": string }
-        ],
-        "perfilParticipante": {
-          "perfil_profesional": string,
-          "nivel_educativo_minimo": string,
-          "experiencia_previa": string,
-          "conocimientos_previos_requeridos": string,
-          "rango_de_edad_estimado": string,
-          "motivacion_principal": string
-        }
+        "qa": [ { "pregunta": string, "respuesta": string } ]
       }
-      Instrucciones:
-      - projectName, industry, courseTopic, targetAudience: tómalos del context.
-      - brechas: toma el campo confirmedGaps de userInputs. Si está vacío, usa el texto de brechas de previousData.F0.
-      - qa: construye los pares pregunta-respuesta de la siguiente forma:
-        1. Las preguntas son las que el agente F0 generó. Búscalas en previousData.F0.content
-           dentro de la sección "Preguntas para el cliente" o similar, en orden de aparición.
-        2. Las respuestas están en userInputs como clientAnswer_0, clientAnswer_1, … clientAnswer_8.
-        3. Para cada índice i (0 a N-1 donde N = número de preguntas encontradas):
-           - pregunta: el texto de la pregunta i del F0
-           - respuesta: el valor de clientAnswer_i de userInputs.
-             Si clientAnswer_i no existe o está vacío → usa exactamente el texto "No especificada".
-        4. Devuelve TODOS los pares encontrados (puede ser entre 5 y 9 según lo que generó F0).
-           NO inventes preguntas. NO omitas ningún par.
-      - perfilParticipante: infiere los 6 campos a partir de targetAudience, industry, las respuestas
-        de los clientes (clientAnswer_*) y cualquier dato del contexto F0 sobre el participante.
-        Si un campo no puede determinarse, usa una descripción genérica del sector. NUNCA dejes vacío.
-      SOLO el JSON. Sin explicaciones. Sin texto fuera del JSON.
 
   - agent: validador_f1
     inputs_from: [extractor]
@@ -178,50 +159,88 @@ pipeline_steps:
 
   - agent: sintetizador_final
     model: "@cf/mistral/mistral-7b-instruct-v0.2"
-    inputs_from: [extractor, qa_tabla_builder, sintetizador_parcial, diseno_a, diseno_b, juez]
-    include_template: true
-    max_input_chars: 4000
+    inputs_from: [extractor, juez]
+    include_template: false
+    max_input_chars: 6000
     task: |
       DOMINIO OBLIGATORIO: El tema del curso es el campo "courseTopic" del JSON del extractor.
-      Todo el documento debe referirse EXCLUSIVAMENTE a ese tema.
-      Si DISENO_A o DISENO_B mencionan un dominio diferente, descarta ese contenido y usa
-      solo lo que sea coherente con el courseTopic del extractor.
-
-      Tienes el veredicto del JUEZ y dos propuestas de diseño (DISENO_A y DISENO_B).
-      REGLAS según la decision del juez:
-      - decision == "ok" (≥80%): fusiona lo mejor de ambas propuestas.
-      - decision == "revisar" o "humano": usa DISENO_A como base y complementa con DISENO_B
-        solo donde sea compatible con el dominio. No pidas intervención humana.
-      En TODOS los casos: genera el INFORME DE NECESIDADES completo.
-      Sigue el FORMATO DE SALIDA OBLIGATORIO de la plantilla al pie de la letra.
-      NO dejes placeholders entre corchetes en el documento final.
+      El campo "brechas" del extractor debe usarse para la sección 2. COPIA el texto tal como viene.
+      Si qa tiene 9 elementos, la tabla debe tener 9 filas. NO inventes información.
       Responde SOLO en español.
 
-      REGLA CRÍTICA PARA SECCIÓN 1 — Tabla de preguntas y respuestas:
-      Debajo de "### Preguntas y respuestas del cliente" COPIA EXACTAMENTE el contenido de
-      QA_TABLA_BUILDER, sin modificar ni resumir ninguna fila. Si QA_TABLA_BUILDER tiene 9
-      filas, el documento final debe tener 9 filas. No agregues ni elimines filas.
+      Genera el INFORME DE NECESIDADES DE CAPACITACIÓN siguiendo EXACTAMENTE esta estructura:
 
-      REGLA CRÍTICA PARA SECCIÓN 5 — Perfil del participante:
-      Usa el campo "perfilParticipante" del JSON del extractor para llenar la tabla.
-      Los 6 campos son obligatorios: perfil_profesional, nivel_educativo_minimo,
-      experiencia_previa, conocimientos_previos_requeridos, rango_de_edad_estimado,
-      motivacion_principal. NO uses [texto] como valor.
+      # INFORME DE NECESIDADES DE CAPACITACIÓN
+      **Proyecto:** [projectName del extractor]
+      **Fecha:** [fecha actual]
+      **Analista:** IA (basado en EC0249)
 
-      REGLAS PARA SECCIÓN 3 — Declaración del Problema:
-      Usa EXACTAMENTE esta estructura de dos oraciones:
-      "[Colectivo del courseTopic] actualmente [situación actual problemática], lo cual genera [consecuencia medible].
-      Se requiere [necesidad de capacitación sobre el courseTopic que resuelve la brecha]."
-      NO uses ejemplos de otros dominios. NO uses listas. NO uses más de 2 oraciones.
+      ---
 
-      REGLAS PARA SECCIÓN 4 — Objetivos de Aprendizaje (Taxonomía de Bloom):
-      Usa ÚNICAMENTE verbos de estos niveles. El verbo debe ir en **negrita** dentro del objetivo:
-      - Recordar:   identificar, reconocer, listar
-      - Comprender: explicar, describir, interpretar
-      - Aplicar:    resolver, usar, demostrar, ejecutar
-      - Analizar:   comparar, diferenciar, organizar
-      - Evaluar:    criticar, justificar, validar
-      - Crear:      diseñar, construir, planificar
+      ## 1. SÍNTESIS DEL CONTEXTO
+      [Resumen de 2-3 oraciones basado en el contexto del proyecto]
+
+      ### Preguntas y respuestas del cliente
+
+      | # | Pregunta | Respuesta del cliente |
+      |:---|:---|:---|
+      [Todas las filas del array qa del extractor, numeradas del 1 al N]
+
+      ---
+
+      ## 2. ANÁLISIS DE BRECHAS DE COMPETENCIA
+
+      | Tipo de Brecha | Descripción | Capacitable |
+      |:---|:---|:---|
+      | Conocimiento | [basado en el campo brechas del extractor] | Sí |
+      | Habilidad | [basado en el campo brechas del extractor] | Parcialmente |
+
+      **Brechas NO capacitables identificadas:** [texto del campo brechas o "Ninguna"]
+
+      ---
+
+      ## 3. DECLARACIÓN DEL PROBLEMA DE CAPACITACIÓN
+
+      [Una oración: situación actual → consecuencia → necesidad de capacitación]
+
+      ---
+
+      ## 4. OBJETIVOS DE APRENDIZAJE (SMART + Taxonomía de Bloom)
+
+      | # | Objetivo (verbo Bloom en **negrita**) | Nivel Bloom | Tipo |
+      |:---|:---|:---|:---|
+      | 1 | Al finalizar, el participante **[identificará]** [resultado medible] | Recordar | Conocimiento |
+      | 2 | Al finalizar, el participante **[explicará]** [resultado medible] | Comprender | Conocimiento |
+      | 3 | Al finalizar, el participante **[aplicará]** [resultado medible] | Aplicar | Habilidad |
+
+      ---
+
+      ## 5. PERFIL DEL PARTICIPANTE IDEAL
+
+      | Característica | Descripción |
+      |:---|:---|
+      | Perfil profesional | [texto inferido del contexto] |
+      | Nivel educativo mínimo | [texto] |
+      | Experiencia previa | [texto] |
+      | Conocimientos previos requeridos | [texto] |
+      | Rango de edad estimado | [texto] |
+      | Motivación principal | [texto] |
+
+      ---
+
+      ## 6. RESULTADOS ESPERADOS DEL CURSO
+
+      Al finalizar el curso, los participantes serán capaces de:
+      1. [Resultado medible 1]
+      2. [Resultado medible 2]
+      3. [Resultado medible 3]
+
+      ---
+
+      ## 7. RECOMENDACIONES PARA EL DISEÑO
+      1. [recomendación basada en el análisis]
+      2. [recomendación basada en el análisis]
+      3. [recomendación basada en el análisis]
 
 ---
 

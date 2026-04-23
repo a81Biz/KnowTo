@@ -61,6 +61,8 @@ export const ENDPOINTS = {
     phaseQuestions: (projectId: string, phaseDestino: number) =>
       `/wizard/project/${projectId}/phase-questions/${phaseDestino}`,
     phaseAnswers:   (projectId: string) => `/wizard/project/${projectId}/phase-answers`,
+    fase1PreguntasRespuestas: (projectId: string) => `/wizard/project/${projectId}/fase1/preguntas-respuestas`,
+    f0Estructurado: (projectId: string) => `/wizard/project/${projectId}/f0-estructurado`,
     listProjects:  '/wizard/projects',
     job:           (jobId: string) => `/wizard/job/${jobId}`,
   },

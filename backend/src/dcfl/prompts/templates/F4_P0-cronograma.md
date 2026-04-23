@@ -18,10 +18,14 @@ pipeline_steps:
         "instructorName": string,
         "reviewerName": string
       }
-      - projectName, clientName: del contexto del proyecto.
-      - modulos: estructura temática de F2 (cada módulo con nombre y duración en horas).
-      - duracionTotal: duración total del curso de F3 (horas o semanas).
-      - startDate, instructorName, reviewerName: de userInputs (si no existen, usa "Por definir").
+      FUENTES DE DATOS:
+      - projectName, clientName: del encabezado del contexto.
+      - modulos: busca la tabla en "## 3. ESTRUCTURA TEMÁTICA PRELIMINAR" en el contexto. Extrae "Nombre" y "Duración (hrs)".
+      - duracionTotal: busca "## 3. DURACIÓN CALCULADA" en el contexto. Extrae el valor de "DURACIÓN TOTAL EN HORAS".
+      - startDate: de userInputs. Si no existe, usa "Por definir".
+      - instructorName, reviewerName: de userInputs. Si no existen, usa "Por definir".
+      
+      REGLA: Si no encuentras módulos o duración, usa datos coherentes basados en el resto del contexto pero NUNCA devuelvas campos vacíos.
       SOLO el JSON. Sin explicaciones.
 
   - agent: agente_a_p0

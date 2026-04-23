@@ -178,7 +178,12 @@ class WizardStoreClass {
     const prev: Record<string, unknown> = {};
     this.state.steps.filter((s) => s.status === 'completed').forEach((s) => {
       const title = s.label || s.phaseId;
-      prev[title] = { inputData: s.inputData, content: s.documentContent };
+      // Para F1 (paso 1) y F2 (paso 2), excluir el content de documentos previos
+      if (forStep === 1 || forStep === 2) {
+        prev[title] = { inputData: s.inputData };
+      } else {
+        prev[title] = { inputData: s.inputData, content: s.documentContent };
+      }
     });
 
     const state = this.getState();

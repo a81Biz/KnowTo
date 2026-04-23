@@ -185,6 +185,7 @@ class Step2AnalysisController extends BaseStep {
 
   /** Inyecta los datos del informe F1 como userInputs adicionales al pipeline F2. */
   protected override async _generateDocument(extraData?: Record<string, unknown>): Promise<void> {
+    const projectId = wizardStore.getState().projectId;
     const informeData: Record<string, unknown> = {};
 
     if (this._informe) {
@@ -199,7 +200,30 @@ class Step2AnalysisController extends BaseStep {
       informeData['perfilAjustado'] = JSON.stringify(perfilAjustado);
     }
 
-    return super._generateDocument({ ...informeData, ...extraData });
+    // Obtener datos estructurados de F0 y F1
+    let f0Data = null;
+    let f1Data = null;
+    if (projectId) {
+      try {
+        // Nota: usamos los endpoints API existentes
+        const f0Res = await fetch(buildEndpoint(ENDPOINTS.wizard.f0Context(projectId)));
+        const f0Json = await f0Res.json();
+        f0Data = f0Json.data;
+
+        const f1Res = await fetch(buildEndpoint(ENDPOINTS.wizard.fase1Informe(projectId)));
+        const f1Json = await f1Res.json();
+        f1Data = f1Json.data;
+      } catch (err) {
+        console.warn('[Step2Analysis] No se pudieron cargar datos estructurados F0/F1:', err);
+      }
+    }
+
+    return super._generateDocument({
+      ...informeData,
+      f0_estructurado: f0Data ? JSON.stringify(f0Data) : null,
+      f1_estructurado: f1Data ? JSON.stringify(f1Data) : null,
+      ...extraData
+    });
   }
 
   override async mount(container: HTMLElement): Promise<void> {

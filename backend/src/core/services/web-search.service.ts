@@ -1,0 +1,140 @@
+import { tavily, TavilyClient } from '@tavily/core';
+import type { Env } from '../types/env';
+
+/**
+ * Servicio de búsqueda web real usando Tavily API
+ * Diseñado específicamente para LLMs, devuelve resultados estructurados y relevantes
+ */
+export class WebSearchService {
+  private client: TavilyClient;
+  private isProd: boolean;
+  
+  constructor(env: Env) {
+    this.isProd = env.ENVIRONMENT === 'production';
+    
+    if (!env.TAVILY_API_KEY) {
+      console.warn('[WebSearchService] TAVILY_API_KEY no configurada. Las búsquedas fallarán.');
+    }
+    
+    this.client = tavily({ apiKey: env.TAVILY_API_KEY || '' });
+  }
+  
+  /**
+   * Normaliza la query a string
+   */
+  private normalizeQuery(query: any): string | null {
+    if (!query) return null;
+    if (typeof query === 'string') return query.trim();
+    if (typeof query === 'object') {
+      if (typeof query.query === 'string') return query.query.trim();
+      if (typeof query.q === 'string') return query.q.trim();
+      if (typeof query.description === 'string') return query.description.trim();
+    }
+    return null;
+  }
+  
+  /**
+   * Busca información en internet usando Tavily
+   * @param query - Consulta de búsqueda
+   * @param options - Opciones adicionales (maxResults, searchDepth, includeDomains, excludeDomains)
+   * @returns Resultados formateados como string para el LLM
+   */
+  async search(
+    query: any, 
+    options?: {
+      maxResults?: number;
+      searchDepth?: 'basic' | 'advanced';
+      includeDomains?: string[];
+      excludeDomains?: string[];
+    }
+  ): Promise<string> {
+    console.log('[TAVILY] ========== INICIO ==========');
+    console.log('[TAVILY] Query recibida:', JSON.stringify(query, null, 2));
+    
+    const searchTerms = this.normalizeQuery(query);
+    
+    if (!searchTerms || searchTerms.length < 3) {
+      console.log('[TAVILY] Consulta demasiado corta o inválida');
+      return JSON.stringify({
+        error: 'Consulta de búsqueda inválida',
+        results: []
+      });
+    }
+    
+    console.log('[TAVILY] Términos de búsqueda:', searchTerms);
+    
+    try {
+      const response = await this.client.search(searchTerms, {
+        maxResults: options?.maxResults || 5,
+        searchDepth: options?.searchDepth || 'basic',
+        includeDomains: options?.includeDomains,
+        excludeDomains: options?.excludeDomains,
+        includeAnswer: true,
+        includeRawContent: false,
+      });
+      
+      console.log('[TAVILY] Resultados obtenidos:', response.results?.length ?? 0);
+      console.log('[TAVILY] Answer generada:', response.answer ? 'Sí' : 'No');
+      
+      // Construir respuesta estructurada para el LLM
+      const output = {
+        query: searchTerms,
+        answer: response.answer || null,
+        results: response.results.map(r => ({
+          title: r.title,
+          url: r.url,
+          content: r.content,
+          score: r.score
+        }))
+      };
+      
+      const formattedResults = JSON.stringify(output, null, 2);
+      console.log('[TAVILY] Resultado formateado longitud:', formattedResults.length);
+      console.log('[TAVILY] ========== FIN ==========');
+      
+      return formattedResults;
+      
+    } catch (error) {
+      console.error('[TAVILY] Error en búsqueda:', error);
+      
+      // En desarrollo, fallback con error claro
+      if (!this.isProd) {
+        return JSON.stringify({
+          error: `Error en búsqueda Tavily: ${error instanceof Error ? error.message : String(error)}`,
+          query: searchTerms,
+          results: []
+        });
+      }
+      
+      return JSON.stringify({
+        error: 'No se pudo completar la búsqueda',
+        query: searchTerms,
+        results: []
+      });
+    }
+  }
+  
+  /**
+   * Busca información específica para el análisis de sector
+   */
+  async searchSectorInfo(industry: string, topic: string): Promise<string> {
+    const query = `mercado tendencias regulaciones certificaciones industria ${industry} ${topic}`;
+    return this.search(query, { maxResults: 6, searchDepth: 'advanced' });
+  }
+  
+  /**
+   * Busca competidores en plataformas de cursos
+   */
+  async searchCompetitors(topic: string): Promise<string> {
+    const query = `cursos "${topic}" Udemy Coursera Skillshare precios alumnos`;
+    return this.search(query, { maxResults: 8 });
+  }
+  
+  /**
+   * Busca mejores prácticas educativas para el sector
+   */
+  async searchBestPractices(industry: string): Promise<string> {
+    const query = `mejores prácticas cursos en línea diseño instruccional ${industry}`;
+    return this.search(query, { maxResults: 5 });
+  }
+}

@@ -175,6 +175,7 @@ export class PipelineJobsService {
    */
   async getAgentOutput(jobId: string, agentName: string): Promise<string | null> {
     if (!this.supabase) return null;
+    console.log(`[GET_AGENT_OUTPUT] Solicitando output para jobId: ${jobId}, agentName: ${agentName}`);
 
     const { data, error } = await this.supabase
       .from('pipeline_agent_outputs')
@@ -183,8 +184,19 @@ export class PipelineJobsService {
       .eq('agent_name', agentName)
       .maybeSingle();
 
-    if (error || !data) return null;
-    return (data as { output: string }).output;
+    if (error) {
+      console.error(`[GET_AGENT_OUTPUT] Error en BD para ${agentName}:`, error.message);
+      return null;
+    }
+    
+    const output = (data as { output: string })?.output ?? null;
+    console.log(`[GET_AGENT_OUTPUT] Resultado para ${agentName}: ${output ? `OK (${output.length} chars)` : 'VACÍO'}`);
+    
+    if (output && output.length < 500) {
+      console.log(`[GET_AGENT_OUTPUT] Contenido de ${agentName}: ${output}`);
+    }
+
+    return output;
   }
 
   /** Actualiza el progreso en tiempo real de un job. */

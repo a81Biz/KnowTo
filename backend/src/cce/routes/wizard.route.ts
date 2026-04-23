@@ -3,6 +3,7 @@ import { OpenAPIHono, createRoute, z } from '@hono/zod-openapi';
 import { authMiddleware } from '../../core/middleware/auth.middleware';
 import { SupabaseService } from '../services/supabase.service';
 import { AIService } from '../../core/services/ai.service';
+import { OllamaProvider, CloudflareProvider } from '../../core/services/llm.provider';
 import { getPromptRegistry } from '../prompts';
 
 const CCE_SYSTEM_PROMPT =
@@ -11,6 +12,13 @@ const CCE_SYSTEM_PROMPT =
   'Usa formato Markdown estricto con tablas y listas cuando aplique.\n' +
   'No inventes datos. Si no tienes información, indícalo explícitamente.\n' +
   'Responde únicamente con el documento solicitado, sin preámbulos ni explicaciones adicionales.';
+
+function createAIService(env: Env): AIService {
+  const provider = env.ENVIRONMENT === 'production'
+    ? new CloudflareProvider(env.AI, CCE_SYSTEM_PROMPT)
+    : new OllamaProvider(env.OLLAMA_URL || 'http://localhost:11434', env.OLLAMA_MODEL || 'llama3.2:3b');
+  return new AIService(provider, getPromptRegistry(), CCE_SYSTEM_PROMPT, env);
+}
 import { ContextExtractorService } from '../../core/services/context-extractor.service';
 import cceFlowMap from '../prompts/flow-map.json';
 import { UploadService } from '../../core/services/upload.service';
@@ -381,7 +389,7 @@ wizard.openapi(routeExtract, async (c) => {
 wizard.openapi(routeGenerate, async (c) => {
   const body = c.req.valid('json');
   const supabase = new SupabaseService(c.env);
-  const ai = new AIService(c.env, getPromptRegistry(), CCE_SYSTEM_PROMPT);
+  const ai = createAIService(c.env);
 
   console.log(`[CCE/generate] phaseId=${body.phaseId} promptId=${body.promptId} project=${body.projectId}`);
 
@@ -429,7 +437,7 @@ wizard.openapi(routeGenerate, async (c) => {
 
 wizard.openapi(routeGenerateForm, async (c) => {
   const { promptId, context } = c.req.valid('json');
-  const ai = new AIService(c.env, getPromptRegistry(), CCE_SYSTEM_PROMPT);
+  const ai = createAIService(c.env);
 
   const rawJson = await ai.generate({
     promptId: promptId as PromptId,
@@ -476,7 +484,7 @@ wizard.openapi(routeUpload, async (c) => {
 
 wizard.openapi(routeOcr, async (c) => {
   const { base64Content, mimeType } = c.req.valid('json');
-  const ai = new AIService(c.env, getPromptRegistry(), CCE_SYSTEM_PROMPT);
+  const ai = createAIService(c.env);
   const extractedText = await ai.extractTextFromImage({ base64Content, mimeType });
   return c.json({ success: true as const, data: { extractedText }, timestamp: new Date().toISOString() });
 });

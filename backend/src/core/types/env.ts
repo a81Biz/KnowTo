@@ -9,4 +9,5 @@ export interface Env {
   ENVIRONMENT: string;
   OLLAMA_URL?: string;
   OLLAMA_MODEL?: string;
+  TAVILY_API_KEY?: string;
 }

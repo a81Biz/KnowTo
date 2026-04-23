@@ -9,19 +9,22 @@
 //   class CceSupabaseService  extends BaseSupabaseService { ... }
 
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import { PreguntasRepository } from '../repositories/preguntas.repository';
+import { Fase0Repository, type Fase0Estructurado } from '../repositories/fase0.repository';
+import { PreguntasService } from './preguntas.service';
 import type { Env } from '../types/env';
 
 export abstract class BaseSupabaseService {
-  protected client: SupabaseClient | null;
+  public client: SupabaseClient | null;
   protected isDev: boolean;
 
   // ── Nombres de RPC / vistas — sobreescribir en subclases ─────────────────
-  protected readonly spSaveStep:                string = 'sp_save_step';
-  protected readonly spSaveDocument:            string = 'sp_save_document';
-  protected readonly spGetProjectContext:       string = 'sp_get_project_context';
-  protected readonly spSaveExtractedContext:    string = 'sp_save_extracted_context';
-  protected readonly spMarkStepError:           string = 'sp_mark_step_error';
-  protected readonly projectProgressView:       string = 'vw_project_progress';
+  protected readonly spSaveStep: string = 'sp_save_step';
+  protected readonly spSaveDocument: string = 'sp_save_document';
+  protected readonly spGetProjectContext: string = 'sp_get_project_context';
+  protected readonly spSaveExtractedContext: string = 'sp_save_extracted_context';
+  protected readonly spMarkStepError: string = 'sp_mark_step_error';
+  protected readonly projectProgressView: string = 'vw_project_progress';
 
   constructor(protected readonly env: Env) {
     this.isDev = env.ENVIRONMENT !== 'production';
@@ -36,8 +39,8 @@ export abstract class BaseSupabaseService {
 
     this.client = hasRealSupabase
       ? createClient(url, key, {
-          auth: { autoRefreshToken: false, persistSession: false },
-        })
+        auth: { autoRefreshToken: false, persistSession: false },
+      })
       : null;
   }
 
@@ -57,9 +60,9 @@ export abstract class BaseSupabaseService {
     if (!this.client) return { stepId: crypto.randomUUID() };
 
     const { data, error } = await this.client!.rpc(this.spSaveStep, {
-      p_project_id:   params.projectId,
-      p_step_number:  params.stepNumber,
-      p_input_data:   params.inputData,
+      p_project_id: params.projectId,
+      p_step_number: params.stepNumber,
+      p_input_data: params.inputData,
     });
 
     if (error) throw new Error(`${this.spSaveStep} failed: ${error.message}`);
@@ -78,10 +81,10 @@ export abstract class BaseSupabaseService {
 
     const { data, error } = await this.client!.rpc(this.spSaveDocument, {
       p_project_id: params.projectId,
-      p_step_id:    params.stepId,
-      p_phase_id:   params.phaseId,
-      p_title:      params.title,
-      p_content:    params.content,
+      p_step_id: params.stepId,
+      p_phase_id: params.phaseId,
+      p_title: params.title,
+      p_content: params.content,
     });
 
     if (error) throw new Error(`${this.spSaveDocument} failed: ${error.message}`);
@@ -124,12 +127,12 @@ export abstract class BaseSupabaseService {
     if (!this.client) return { extractedContextId: crypto.randomUUID() };
 
     const { data, error } = await this.client!.rpc(this.spSaveExtractedContext, {
-      p_project_id:    params.projectId,
-      p_extractor_id:  params.extractorId,
-      p_from_phases:   params.fromPhases,
-      p_to_phase:      params.toPhase,
-      p_content:       params.content,
-      p_parser_used:   params.parserUsed,
+      p_project_id: params.projectId,
+      p_extractor_id: params.extractorId,
+      p_from_phases: params.fromPhases,
+      p_to_phase: params.toPhase,
+      p_content: params.content,
+      p_parser_used: params.parserUsed,
     });
 
     if (error) throw new Error(`${this.spSaveExtractedContext} failed: ${error.message}`);
@@ -137,10 +140,24 @@ export abstract class BaseSupabaseService {
     return { extractedContextId: data.extracted_context_id };
   }
 
+  // ── Fase 0 Estructurado ───────────────────────────────────────────────────
+
+  async saveFase0Estructurado(data: any): Promise<void> {
+    if (!this.client) return;
+    const repo = new Fase0Repository(this.client);
+    await repo.upsert(data);
+  }
+
+  async getFase0Estructurado(projectId: string): Promise<any> {
+    if (!this.client) return null;
+    const repo = new Fase0Repository(this.client);
+    return repo.findByProjectId(projectId);
+  }
+
   async markStepError(stepId: string, errorMsg: string): Promise<void> {
     if (!this.client) return;
     await this.client!.rpc(this.spMarkStepError, {
-      p_step_id:  stepId,
+      p_step_id: stepId,
       p_error_msg: errorMsg,
     });
   }
@@ -163,6 +180,29 @@ export abstract class BaseSupabaseService {
     if (error) throw new Error(`getExtractedContext failed: ${error.message}`);
     if (!data) return null;
     return { content: (data as { content: string }).content };
+  }
+
+  /**
+   * Guarda el contexto enriquecido con resultados de búsqueda web
+   */
+  async saveEnrichedContext(
+    projectId: string,
+    phaseId: string,
+    enrichedContext: Record<string, unknown>
+  ): Promise<void> {
+    if (!this.client) return;
+
+    const { error } = await this.client
+      .from('pipeline_jobs')
+      .update({ enriched_context: enrichedContext })
+      .eq('project_id', projectId)
+      .eq('phase_id', phaseId)
+      .order('created_at', { ascending: false })
+      .limit(1);
+    
+    if (error) {
+      console.warn('[Supabase] Error saving enriched context:', error);
+    }
   }
 
   /**
@@ -199,14 +239,14 @@ export abstract class BaseSupabaseService {
 
     const rows = outputs as { agent_name: string; output: string }[];
     const preguntasRow = rows.find((r) => r.agent_name === 'seccion_5_preguntas');
-    const gapsRow      = rows.find((r) => r.agent_name === 'seccion_5_gaps');
+    const gapsRow = rows.find((r) => r.agent_name === 'seccion_5_gaps');
 
     // Parsear preguntas: texto plano, una por línea, filtrar las que contienen '?'
     const questions = preguntasRow
       ? preguntasRow.output
-          .split('\n')
-          .map((l) => l.replace(/^[-\d.*)\s]+/, '').replace(/^\*\*|\*\*$/g, '').trim())
-          .filter((l) => l.includes('?'))
+        .split('\n')
+        .map((l) => l.replace(/^[-\d.*)\s]+/, '').replace(/^\*\*|\*\*$/g, '').trim())
+        .filter((l) => l.includes('?'))
       : [];
 
     // Extraer texto de brechas: gap vs mejores prácticas + gap vs competencia
@@ -220,13 +260,13 @@ export abstract class BaseSupabaseService {
   async saveF1Informe(params: {
     projectId: string;
     jobId: string;
-    sintesis_contexto:      string | null;
-    preguntas_respuestas:   unknown | null;
-    brechas_competencia:    unknown | null;
-    declaracion_problema:   string | null;
-    objetivos_aprendizaje:  unknown | null;
-    perfil_participante:    unknown | null;
-    resultados_esperados:   unknown | null;
+    sintesis_contexto: string | null;
+    preguntas_respuestas: unknown | null;
+    brechas_competencia: unknown | null;
+    declaracion_problema: string | null;
+    objetivos_aprendizaje: unknown | null;
+    perfil_participante: unknown | null;
+    resultados_esperados: unknown | null;
     recomendaciones_diseno: unknown | null;
   }): Promise<void> {
     if (!this.client) return;
@@ -234,15 +274,15 @@ export abstract class BaseSupabaseService {
     const { error } = await this.client
       .from('fase1_informe_necesidades')
       .insert({
-        project_id:             params.projectId,
-        job_id:                 params.jobId,
-        sintesis_contexto:      params.sintesis_contexto,
-        preguntas_respuestas:   params.preguntas_respuestas,
-        brechas_competencia:    params.brechas_competencia,
-        declaracion_problema:   params.declaracion_problema,
-        objetivos_aprendizaje:  params.objetivos_aprendizaje,
-        perfil_participante:    params.perfil_participante,
-        resultados_esperados:   params.resultados_esperados,
+        project_id: params.projectId,
+        job_id: params.jobId,
+        sintesis_contexto: params.sintesis_contexto,
+        preguntas_respuestas: params.preguntas_respuestas,
+        brechas_competencia: params.brechas_competencia,
+        declaracion_problema: params.declaracion_problema,
+        objetivos_aprendizaje: params.objetivos_aprendizaje,
+        perfil_participante: params.perfil_participante,
+        resultados_esperados: params.resultados_esperados,
         recomendaciones_diseno: params.recomendaciones_diseno,
       });
 
@@ -250,13 +290,13 @@ export abstract class BaseSupabaseService {
   }
 
   async getF1Informe(projectId: string): Promise<{
-    sintesis_contexto:      string | null;
-    preguntas_respuestas:   Array<{ pregunta: string; respuesta: string }> | null;
-    brechas_competencia:    Array<{ tipo: string; descripcion: string; capacitable: string }> | null;
-    declaracion_problema:   string | null;
-    objetivos_aprendizaje:  Array<{ objetivo: string; nivel_bloom: string; tipo: string }> | null;
-    perfil_participante:    Record<string, string> | null;
-    resultados_esperados:   string[] | null;
+    sintesis_contexto: string | null;
+    preguntas_respuestas: Array<{ pregunta: string; respuesta: string }> | null;
+    brechas_competencia: Array<{ tipo: string; descripcion: string; capacitable: string }> | null;
+    declaracion_problema: string | null;
+    objetivos_aprendizaje: Array<{ objetivo: string; nivel_bloom: string; tipo: string }> | null;
+    perfil_participante: Record<string, string> | null;
+    resultados_esperados: string[] | null;
     recomendaciones_diseno: string[] | null;
   } | null> {
     if (!this.client) return null;
@@ -275,81 +315,43 @@ export abstract class BaseSupabaseService {
     if (error) throw new Error(`getF1Informe failed: ${error.message}`);
     if (!data) return null;
     return data as unknown as {
-      sintesis_contexto:      string | null;
-      preguntas_respuestas:   Array<{ pregunta: string; respuesta: string }> | null;
-      brechas_competencia:    Array<{ tipo: string; descripcion: string; capacitable: string }> | null;
-      declaracion_problema:   string | null;
-      objetivos_aprendizaje:  Array<{ objetivo: string; nivel_bloom: string; tipo: string }> | null;
-      perfil_participante:    Record<string, string> | null;
-      resultados_esperados:   string[] | null;
+      sintesis_contexto: string | null;
+      preguntas_respuestas: Array<{ pregunta: string; respuesta: string }> | null;
+      brechas_competencia: Array<{ tipo: string; descripcion: string; capacitable: string }> | null;
+      declaracion_problema: string | null;
+      objetivos_aprendizaje: Array<{ objetivo: string; nivel_bloom: string; tipo: string }> | null;
+      perfil_participante: Record<string, string> | null;
+      resultados_esperados: string[] | null;
       recomendaciones_diseno: string[] | null;
     };
   }
 
   // ── Preguntas y respuestas entre fases ───────────────────────────────────
 
+  /**
+   * Guarda las preguntas generadas para una fase futura.
+   * IMPORTANTE: Elimina preguntas previas para el mismo proyecto/fase.
+   */
   async saveFaseQuestions(params: {
     projectId: string;
-    jobId: string;
-    faseOrigen: number;
     faseDestino: number;
-    preguntas: Array<{
-      texto: string;
-      objetivo?: string;
-      justificacion?: string;
-      opciones?: string[] | null;
-    }>;
+    preguntas: string[];
   }): Promise<void> {
     if (!this.client) return;
-
-    const rows = params.preguntas.map((p, i) => ({
-      project_id:    params.projectId,
-      job_id:        params.jobId,
-      fase_origen:   params.faseOrigen,
-      fase_destino:  params.faseDestino,
-      texto:         p.texto,
-      objetivo:      p.objetivo ?? null,
-      justificacion: p.justificacion ?? null,
-      opciones:      p.opciones ?? null,
-      orden:         i,
-    }));
-
-    const { error } = await this.client
-      .from('preguntas_fase')
-      .insert(rows);
-
-    if (error) throw new Error(`saveFaseQuestions failed: ${error.message}`);
+    const srv = new PreguntasService(new PreguntasRepository(this.client));
+    await srv.saveFaseQuestions(params.projectId, params.faseDestino, params.preguntas);
   }
 
+  /**
+   * Obtiene las preguntas diagnósticas generadas para una fase.
+   */
   async getFaseQuestions(
     projectId: string,
     faseDestino: number,
-  ): Promise<Array<{
-    id: string;
-    texto: string;
-    objetivo: string | null;
-    justificacion: string | null;
-    opciones: string[] | null;
-    orden: number;
-  }>> {
+  ): Promise<any[]> {
     if (!this.client) return [];
-
-    const { data, error } = await this.client
-      .from('preguntas_fase')
-      .select('id, texto, objetivo, justificacion, opciones, orden')
-      .eq('project_id', projectId)
-      .eq('fase_destino', faseDestino)
-      .order('orden', { ascending: true });
-
-    if (error) throw new Error(`getFaseQuestions failed: ${error.message}`);
-    return (data ?? []) as Array<{
-      id: string;
-      texto: string;
-      objetivo: string | null;
-      justificacion: string | null;
-      opciones: string[] | null;
-      orden: number;
-    }>;
+    const srv = new PreguntasService(new PreguntasRepository(this.client));
+    return srv.getFaseQuestions(projectId, faseDestino);
   }
 
   async saveFaseAnswers(params: {
@@ -360,8 +362,8 @@ export abstract class BaseSupabaseService {
 
     const rows = params.answers.map((a) => ({
       pregunta_id: a.preguntaId,
-      project_id:  params.projectId,
-      respuesta:   a.respuesta,
+      project_id: params.projectId,
+      respuesta: a.respuesta,
     }));
 
     const { error } = await this.client
@@ -402,45 +404,45 @@ export abstract class BaseSupabaseService {
   // ── Análisis estructurado F2 ─────────────────────────────────────────────
 
   async saveF2Analisis(params: {
-    projectId:              string;
-    jobId:                  string;
-    modalidad:              Record<string, string> | null;
-    interactividad:         Record<string, unknown> | null;
-    estructura_tematica:    Array<{ modulo: string; nombre: string; objetivo: string; horas: string }> | null;
-    perfil_ingreso:         Array<{ categoria: string; requisito: string; fuente: string }> | null;
-    estrategias:            Array<{ estrategia: string; descripcion: string; modulos: string; bloom: string }> | null;
+    projectId: string;
+    jobId: string;
+    modalidad: Record<string, string> | null;
+    interactividad: Record<string, unknown> | null;
+    estructura_tematica: Array<{ modulo: string; nombre: string; objetivo: string; horas: string }> | null;
+    perfil_ingreso: Array<{ categoria: string; requisito: string; fuente: string }> | null;
+    estrategias: Array<{ estrategia: string; descripcion: string; modulos: string; bloom: string }> | null;
     supuestos_restricciones: { supuestos: string[]; restricciones: string[] } | null;
-    documento_final:        string;
-    perfil_ajustado:        Record<string, string> | null;
+    documento_final: string;
+    perfil_ajustado: Record<string, string> | null;
   }): Promise<void> {
     if (!this.client) return;
 
     const { error } = await this.client
       .from('fase2_analisis_alcance')
       .insert({
-        project_id:              params.projectId,
-        job_id:                  params.jobId,
-        modalidad:               params.modalidad,
-        interactividad:          params.interactividad,
-        estructura_tematica:     params.estructura_tematica,
-        perfil_ingreso:          params.perfil_ingreso,
-        estrategias:             params.estrategias,
+        project_id: params.projectId,
+        job_id: params.jobId,
+        modalidad: params.modalidad,
+        interactividad: params.interactividad,
+        estructura_tematica: params.estructura_tematica,
+        perfil_ingreso: params.perfil_ingreso,
+        estrategias: params.estrategias,
         supuestos_restricciones: params.supuestos_restricciones,
-        documento_final:         params.documento_final,
-        perfil_ajustado:         params.perfil_ajustado,
+        documento_final: params.documento_final,
+        perfil_ajustado: params.perfil_ajustado,
       });
 
     if (error) throw new Error(`saveF2Analisis failed: ${error.message}`);
   }
 
   async getF2Analisis(projectId: string): Promise<{
-    modalidad:              Record<string, string> | null;
-    interactividad:         Record<string, unknown> | null;
-    estructura_tematica:    Array<{ modulo: string; nombre: string; objetivo: string; horas: string }> | null;
-    perfil_ingreso:         Array<{ categoria: string; requisito: string; fuente: string }> | null;
-    estrategias:            Array<{ estrategia: string; descripcion: string; modulos: string; bloom: string }> | null;
+    modalidad: Record<string, string> | null;
+    interactividad: Record<string, unknown> | null;
+    estructura_tematica: Array<{ modulo: string; nombre: string; objetivo: string; horas: string }> | null;
+    perfil_ingreso: Array<{ categoria: string; requisito: string; fuente: string }> | null;
+    estrategias: Array<{ estrategia: string; descripcion: string; modulos: string; bloom: string }> | null;
     supuestos_restricciones: { supuestos: string[]; restricciones: string[] } | null;
-    perfil_ajustado:        Record<string, string> | null;
+    perfil_ajustado: Record<string, string> | null;
   } | null> {
     if (!this.client) return null;
 
@@ -455,13 +457,13 @@ export abstract class BaseSupabaseService {
     if (error) throw new Error(`getF2Analisis failed: ${error.message}`);
     if (!data) return null;
     return data as unknown as {
-      modalidad:              Record<string, string> | null;
-      interactividad:         Record<string, unknown> | null;
-      estructura_tematica:    Array<{ modulo: string; nombre: string; objetivo: string; horas: string }> | null;
-      perfil_ingreso:         Array<{ categoria: string; requisito: string; fuente: string }> | null;
-      estrategias:            Array<{ estrategia: string; descripcion: string; modulos: string; bloom: string }> | null;
+      modalidad: Record<string, string> | null;
+      interactividad: Record<string, unknown> | null;
+      estructura_tematica: Array<{ modulo: string; nombre: string; objetivo: string; horas: string }> | null;
+      perfil_ingreso: Array<{ categoria: string; requisito: string; fuente: string }> | null;
+      estrategias: Array<{ estrategia: string; descripcion: string; modulos: string; bloom: string }> | null;
       supuestos_restricciones: { supuestos: string[]; restricciones: string[] } | null;
-      perfil_ajustado:        Record<string, string> | null;
+      perfil_ajustado: Record<string, string> | null;
     };
   }
 
@@ -478,11 +480,11 @@ export abstract class BaseSupabaseService {
     const { error } = await this.client
       .from('fase2_resolucion_discrepancias')
       .insert({
-        project_id:    params.projectId,
+        project_id: params.projectId,
         discrepancias: params.discrepancias,
-        resoluciones:  params.resoluciones,
+        resoluciones: params.resoluciones,
         listo_para_f3: params.listoParaF3,
-        resuelto_en:   new Date().toISOString(),
+        resuelto_en: new Date().toISOString(),
       });
 
     if (error) throw new Error(`saveResolucionDiscrepancias failed: ${error.message}`);
@@ -490,7 +492,7 @@ export abstract class BaseSupabaseService {
 
   async getResolucionDiscrepancias(projectId: string): Promise<{
     discrepancias: unknown[];
-    resoluciones:  Array<{ aspecto: string; decision: string; valor_elegido: string }>;
+    resoluciones: Array<{ aspecto: string; decision: string; valor_elegido: string }>;
     listo_para_f3: boolean;
   } | null> {
     if (!this.client) return null;
@@ -507,7 +509,7 @@ export abstract class BaseSupabaseService {
     if (!data) return null;
     return data as unknown as {
       discrepancias: unknown[];
-      resoluciones:  Array<{ aspecto: string; decision: string; valor_elegido: string }>;
+      resoluciones: Array<{ aspecto: string; decision: string; valor_elegido: string }>;
       listo_para_f3: boolean;
     };
   }
@@ -515,38 +517,38 @@ export abstract class BaseSupabaseService {
   // ── Especificaciones estructuradas F3 ────────────────────────────────────
 
   async saveF3Especificaciones(params: {
-    projectId:            string;
-    jobId:                string;
+    projectId: string;
+    jobId: string;
     plataforma_navegador: unknown | null;
-    reporteo:             unknown | null;
-    formatos_multimedia:  unknown | null;
+    reporteo: unknown | null;
+    formatos_multimedia: unknown | null;
     navegacion_identidad: unknown | null;
     criterios_aceptacion: unknown | null;
-    calculo_duracion:     unknown | null;
-    documento_final:      string;
-    borrador_A:           string;
-    borrador_B:           string;
-    juez_decision:        string;
-    juez_similitud:       number;
+    calculo_duracion: unknown | null;
+    documento_final: string;
+    borrador_A: string;
+    borrador_B: string;
+    juez_decision: string;
+    juez_similitud: number;
   }): Promise<void> {
     if (!this.client) return;
 
     const { error } = await this.client
       .from('fase3_especificaciones')
       .insert({
-        project_id:           params.projectId,
-        job_id:               params.jobId,
+        project_id: params.projectId,
+        job_id: params.jobId,
         plataforma_navegador: params.plataforma_navegador,
-        reporteo:             params.reporteo,
-        formatos_multimedia:  params.formatos_multimedia,
+        reporteo: params.reporteo,
+        formatos_multimedia: params.formatos_multimedia,
         navegacion_identidad: params.navegacion_identidad,
         criterios_aceptacion: params.criterios_aceptacion,
-        calculo_duracion:     params.calculo_duracion,
-        documento_final:      params.documento_final,
-        borrador_A:           params.borrador_A,
-        borrador_B:           params.borrador_B,
-        juez_decision:        params.juez_decision,
-        juez_similitud:       params.juez_similitud,
+        calculo_duracion: params.calculo_duracion,
+        documento_final: params.documento_final,
+        borrador_a: params.borrador_A,
+        borrador_b: params.borrador_B,
+        juez_decision: params.juez_decision,
+        juez_similitud: params.juez_similitud,
       });
 
     if (error) throw new Error(`saveF3Especificaciones failed: ${error.message}`);
@@ -554,14 +556,14 @@ export abstract class BaseSupabaseService {
 
   async getF3Especificaciones(projectId: string): Promise<{
     plataforma_navegador: unknown | null;
-    reporteo:             unknown | null;
-    formatos_multimedia:  unknown | null;
+    reporteo: unknown | null;
+    formatos_multimedia: unknown | null;
     navegacion_identidad: unknown | null;
     criterios_aceptacion: unknown | null;
-    calculo_duracion:     unknown | null;
-    documento_final:      string | null;
-    juez_decision:        string | null;
-    juez_similitud:       number | null;
+    calculo_duracion: unknown | null;
+    documento_final: string | null;
+    juez_decision: string | null;
+    juez_similitud: number | null;
   } | null> {
     if (!this.client) return null;
 
@@ -580,101 +582,155 @@ export abstract class BaseSupabaseService {
     if (!data) return null;
     return data as unknown as {
       plataforma_navegador: unknown | null;
-      reporteo:             unknown | null;
-      formatos_multimedia:  unknown | null;
+      reporteo: unknown | null;
+      formatos_multimedia: unknown | null;
       navegacion_identidad: unknown | null;
       criterios_aceptacion: unknown | null;
-      calculo_duracion:     unknown | null;
-      documento_final:      string | null;
-      juez_decision:        string | null;
-      juez_similitud:       number | null;
+      calculo_duracion: unknown | null;
+      documento_final: string | null;
+      juez_decision: string | null;
+      juez_similitud: number | null;
     };
   }
 
   // ── Recomendaciones estructuradas F2.5 ──────────────────────────────────────
 
   async saveF2_5Recomendaciones(params: {
-    projectId:                 string;
-    jobId:                     string;
-    actividades:               unknown | null;
-    metricas:                  unknown | null;
-    frecuencia_revision:       string | null;
-    total_videos:              number | null;
+    projectId: string;
+    jobId: string;
+    actividades: unknown | null;
+    metricas: unknown | null;
+    frecuencia_revision: string | null;
+    total_videos: number | null;
     duracion_promedio_minutos: number | null;
-    documento_final:           string;
-    borrador_A:                string;
-    borrador_B:                string;
-    juez_decision:             string;
+    documento_final: string;
+    borrador_A: string;
+    borrador_B: string;
+    juez_decision: string;
   }): Promise<void> {
     if (!this.client) return;
 
     const { error } = await this.client
       .from('fase2_5_recomendaciones')
       .insert({
-        project_id:                params.projectId,
-        job_id:                    params.jobId,
-        actividades:               params.actividades,
-        metricas:                  params.metricas,
-        frecuencia_revision:       params.frecuencia_revision,
-        total_videos:              params.total_videos,
+        project_id: params.projectId,
+        job_id: params.jobId,
+        actividades: params.actividades,
+        metricas: params.metricas,
+        frecuencia_revision: params.frecuencia_revision,
+        total_videos: params.total_videos,
         duracion_promedio_minutos: params.duracion_promedio_minutos,
-        documento_final:           params.documento_final,
-        borrador_A:                params.borrador_A,
-        borrador_B:                params.borrador_B,
-        juez_decision:             params.juez_decision,
+        documento_final: params.documento_final,
+        borrador_a: params.borrador_A,
+        borrador_b: params.borrador_B,
+        juez_decision: params.juez_decision,
       });
 
     if (error) throw new Error(`saveF2_5Recomendaciones failed: ${error.message}`);
   }
 
-  async getF2_5Recomendaciones(projectId: string): Promise<{
-    actividades:               unknown | null;
-    metricas:                  unknown | null;
-    frecuencia_revision:       string | null;
-    total_videos:              number | null;
-    duracion_promedio_minutos: number | null;
-    documento_final:           string | null;
-    juez_decision:             string | null;
-  } | null> {
+  async saveF2_5EstructuraVideos(jobId: string, estructuraVideos: any): Promise<void> {
+    if (!this.client) return;
+
+    const { error } = await this.client
+      .from('fase2_5_recomendaciones')
+      .update({ estructura_videos: estructuraVideos })
+      .eq('job_id', jobId);
+
+    if (error) throw new Error(`saveF2_5EstructuraVideos failed: ${error.message}`);
+  }
+
+  async saveF2JuezDecision(jobId: string, seccion: string, decision: any): Promise<void> {
+    if (!this.client) return;
+
+    const { error } = await this.client
+      .from('f2_jueces_decisiones')
+      .upsert({
+        job_id: jobId,
+        seccion: seccion,
+        decision: decision,
+        created_at: new Date().toISOString()
+      }, { onConflict: 'job_id,seccion' });
+
+    if (error) throw new Error(`saveF2JuezDecision failed: ${error.message}`);
+  }
+
+  async getF2JuezDecisiones(jobId: string): Promise<Record<string, any>> {
+    if (!this.client) return {};
+
+    const { data, error } = await this.client
+      .from('f2_jueces_decisiones')
+      .select('seccion, decision')
+      .eq('job_id', jobId);
+
+    if (error) throw new Error(`getF2JuezDecisiones failed: ${error.message}`);
+
+    const result: Record<string, any> = {};
+    data.forEach(row => { result[row.seccion] = row.decision; });
+    return result;
+  }
+
+  async saveF0JuezDecision(jobId: string, seccion: string, decision: any): Promise<void> {
+    if (!this.client) return;
+
+    const { error } = await this.client
+      .from('fase0_jueces_decisiones')
+      .upsert({
+        job_id: jobId,
+        seccion: seccion,
+        decision: decision,
+        created_at: new Date().toISOString()
+      }, { onConflict: 'job_id,seccion' });
+
+    if (error) throw new Error(`saveF0JuezDecision failed: ${error.message}`);
+  }
+
+  async getF0JuezDecisiones(jobId: string): Promise<Record<string, any>> {
+    if (!this.client) return {};
+
+    const { data, error } = await this.client
+      .from('fase0_jueces_decisiones')
+      .select('seccion, decision')
+      .eq('job_id', jobId);
+
+    if (error) throw new Error(`getF0JuezDecisiones failed: ${error.message}`);
+
+    const result: Record<string, any> = {};
+    data.forEach(row => { result[row.seccion] = row.decision; });
+    return result;
+  }
+
+  async getF2_5Recomendaciones(projectId: string): Promise<any | null> {
     if (!this.client) return null;
 
     const { data, error } = await this.client
       .from('fase2_5_recomendaciones')
-      .select(
-        'actividades,metricas,frecuencia_revision,total_videos,' +
-        'duracion_promedio_minutos,documento_final,juez_decision',
-      )
+      .select('total_videos, duracion_promedio_minutos, estructura_videos, actividades, metricas')
       .eq('project_id', projectId)
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle();
 
-    if (error) throw new Error(`getF2_5Recomendaciones failed: ${error.message}`);
-    if (!data) return null;
-    return data as unknown as {
-      actividades:               unknown | null;
-      metricas:                  unknown | null;
-      frecuencia_revision:       string | null;
-      total_videos:              number | null;
-      duracion_promedio_minutos: number | null;
-      documento_final:           string | null;
-      juez_decision:             string | null;
-    };
+    if (error) {
+      console.error('getF2_5Recomendaciones failed:', error);
+      return null;
+    }
+    return data;
   }
 
   // ── Productos estructurados F4 ───────────────────────────────────────────
 
   async saveF4Producto(params: {
-    projectId:         string;
-    producto:          string;  // 'P0'..'P7'
-    documentoFinal:    string;
-    borradorA?:        string;
-    borradorB?:        string;
-    juezDecision?:     object;
+    projectId: string;
+    producto: string;  // 'P0'..'P7'
+    documentoFinal: string;
+    borradorA?: string;
+    borradorB?: string;
+    juezDecision?: object;
     validacionEstado?: string;  // 'aprobado' | 'revision_humana' | 'pendiente'
     validacionErrores?: object;
-    datosProducto?:    object;
-    jobId?:            string;
+    datosProducto?: object;
+    jobId?: string;
   }): Promise<{ id: string }> {
     if (!this.client) return { id: crypto.randomUUID() };
 
@@ -689,16 +745,16 @@ export abstract class BaseSupabaseService {
     const { data, error } = await this.client
       .from('fase4_productos')
       .insert({
-        project_id:         params.projectId,
-        producto:           params.producto,
-        documento_final:    params.documentoFinal,
-        borrador_a:         params.borradorA ?? null,
-        borrador_b:         params.borradorB ?? null,
-        juez_decision:      params.juezDecision ?? null,
-        validacion_estado:  params.validacionEstado ?? 'aprobado',
+        project_id: params.projectId,
+        producto: params.producto,
+        documento_final: params.documentoFinal,
+        borrador_a: params.borradorA ?? null,
+        borrador_b: params.borradorB ?? null,
+        juez_decision: params.juezDecision ?? null,
+        validacion_estado: params.validacionEstado ?? 'aprobado',
         validacion_errores: params.validacionErrores ?? null,
-        datos_producto:     params.datosProducto ?? null,
-        job_id:             params.jobId ?? null,
+        datos_producto: params.datosProducto ?? null,
+        job_id: params.jobId ?? null,
       })
       .select('id')
       .single();
@@ -708,15 +764,15 @@ export abstract class BaseSupabaseService {
   }
 
   async getF4Productos(projectId: string): Promise<Array<{
-    id:                 string;
-    producto:           string;
-    documento_final:    string | null;
-    validacion_estado:  string;
+    id: string;
+    producto: string;
+    documento_final: string | null;
+    validacion_estado: string;
     validacion_errores: object | null;
-    datos_producto:     object | null;
-    job_id:             string | null;
-    created_at:         string;
-    approved_at:        string | null;
+    datos_producto: object | null;
+    job_id: string | null;
+    created_at: string;
+    approved_at: string | null;
   }>> {
     if (!this.client) return [];
 
@@ -729,27 +785,33 @@ export abstract class BaseSupabaseService {
 
     if (error) throw new Error(`getF4Productos failed: ${error.message}`);
     return (data ?? []) as Array<{
-      id:                 string;
-      producto:           string;
-      documento_final:    string | null;
-      validacion_estado:  string;
+      id: string;
+      producto: string;
+      documento_final: string | null;
+      validacion_estado: string;
       validacion_errores: object | null;
-      datos_producto:     object | null;
-      job_id:             string | null;
-      created_at:         string;
-      approved_at:        string | null;
+      datos_producto: object | null;
+      job_id: string | null;
+      created_at: string;
+      approved_at: string | null;
     }>;
   }
 
-  private _extractGapsText(raw: string): string {
-    const mpMatch   = raw.match(/#+\s*Gap vs mejores pr[aá]cticas[^\n]*\n([\s\S]*?)(?=\n#|\n---|$)/i);
-    const compMatch = raw.match(/#+\s*Gap vs competencia[^\n]*\n([\s\S]*?)(?=\n#|\n---|$)/i);
-    const parts: string[] = [];
-    const mp   = mpMatch?.[1]?.trim();
-    const comp = compMatch?.[1]?.trim();
-    if (mp   && mp   !== '[texto]') parts.push(`Brecha vs. mejores prácticas:\n${mp}`);
-    if (comp && comp !== '[texto]') parts.push(`Brecha vs. competencia:\n${comp}`);
-    return parts.join('\n\n');
+  private _extractGapsText(markdown: string): string {
+    // Regex flexible: captura desde "Gap vs mejores prácticas" hasta el próximo encabezado o fin
+    const mejorPracticasMatch = markdown.match(/#+\s*Gap vs mejores pr[aá]cticas[^\n]*[:：]?\s*([\s\S]*?)(?=\n#|\n---|\n\*\*|$)/i);
+    const competenciaMatch = markdown.match(/#+\s*Gap vs competencia[^\n]*[:：]?\s*([\s\S]*?)(?=\n#|\n---|\n\*\*|$)/i);
+
+    const mejorPracticas = mejorPracticasMatch?.[1]?.trim() ?? '';
+    const competencia = competenciaMatch?.[1]?.trim() ?? '';
+
+    if (!mejorPracticas && !competencia) return '';
+
+    let result = '';
+    if (mejorPracticas) result += `### Gap vs mejores prácticas\n${mejorPracticas}\n\n`;
+    if (competencia) result += `### Gap vs competencia\n${competencia}`;
+
+    return result;
   }
 
   /**

@@ -15,14 +15,14 @@ import type { PhaseId, PromptId } from '../types/wizard.types';
 // Solo los pasos que necesitan contexto compacto (2 en adelante).
 const EXTRACTOR_FOR_STEP: Record<number, string> = {
   2:  'EXTRACTOR_F2',
-  3:  'EXTRACTOR_F2_5',
-  4:  'EXTRACTOR_F3',
-  5:  'EXTRACTOR_F4',
-  6:  'EXTRACTOR_F5',
-  7:  'EXTRACTOR_F5_2',
-  8:  'EXTRACTOR_F6',
-  9:  'EXTRACTOR_F6_2a',
-  10: 'EXTRACTOR_F6_2b',
+  4:  'EXTRACTOR_F2_5',
+  5:  'EXTRACTOR_F3',
+  6:  'EXTRACTOR_F4',
+  7:  'EXTRACTOR_F5',
+  8:  'EXTRACTOR_F5_2',
+  9:  'EXTRACTOR_F6',
+  10: 'EXTRACTOR_F6_2a',
+  11: 'EXTRACTOR_F6_2b',
 };
 
 // ============================================================================
@@ -470,17 +470,20 @@ export class BaseStep {
 
     let jobId: string;
     try {
+      const payload = {
+        projectId: state.projectId,
+        stepId,
+        phaseId: this._config.phaseId,
+        promptId: this._config.promptId,
+        context,
+        userInputs: formData,
+      };
+
+
       logger.info(`[step${this._config.stepNumber}] Encolando job...`, { projectId: state.projectId, stepId, phaseId: this._config.phaseId });
       const res = await postData<{ jobId: string; status: string }>(
         buildEndpoint(ENDPOINTS.wizard.generateAsync),
-        {
-          projectId:  state.projectId,
-          stepId,
-          phaseId:    this._config.phaseId,
-          promptId:   this._config.promptId,
-          context,
-          userInputs: formData,
-        }
+        payload
       );
       jobId = res.data!.jobId;
       logger.info(`[step${this._config.stepNumber}] Job encolado`, { jobId });

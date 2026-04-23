@@ -7,55 +7,56 @@ pipeline_steps:
 
   # ── Paso 0: Extractor ─────────────────────────────────────────────────────────
   - agent: extractor_f3
+    inputs_from: []
     include_template: false
     task: |
       Extrae y resume SOLO los datos necesarios para las Especificaciones Técnicas (F3).
-
-      DE LOS INPUTS DEL USUARIO (userInputs):
-      - lmsName: nombre de la plataforma LMS indicada por el usuario
-      - lmsUrl: URL del LMS si la proporcionó
-      - scormVersion: versión SCORM indicada (SCORM 1.2, SCORM 2004, xAPI/Tin Can, etc.)
-      - startDate: fecha de inicio del curso si existe
-      - perfilAjustado: JSON con el perfil del participante ajustado por el cliente en F2
-        (campos: perfil_profesional, nivel_educativo_minimo, experiencia_previa,
-         conocimientos_previos_requeridos, rango_de_edad_estimado, motivacion_principal)
-        Si está presente, ÚSALO como perfil definitivo. Si no, usa el perfil de F1.
-
-      DEL CONTEXTO ACUMULADO (context):
-      - Nombre del proyecto y cliente
-      - Sector / industria
-      - De F1: horas semanales disponibles del participante
-      - De F2: número de módulos, horas por módulo, nivel SCORM (1-4), plataforma sugerida
-      - De F2: estrategias instruccionales (tipos de actividades)
-      - De F0 (si existe): referencias bibliográficas sobre duración de videos, LMS recomendados
-      - Valores resueltos de discrepancias F1↔F2 si están presentes en previousData
-
-      DE F2.5 (FUENTE PRIMARIA — MÁXIMA PRIORIDAD si existe en el contexto):
-      Busca la sección de Recomendaciones Pedagógicas (F2.5) en previousData o context.
-      Si existe, extrae y usa OBLIGATORIAMENTE:
-      - total_videos → numVideos (ESTE valor, no numModulos + 1)
-      - duracion_promedio_minutos → duracionVideo (ESTE valor, no el default de 6 min)
-      - frecuencia_revision → frecuenciaReporte (ESTE valor, no "semanal" por default)
-      - horasTotales de F2.5 si difiere de F2 → usar el de F2.5
-      REGLA ABSOLUTA: Si F2.5 existe, sus valores ANULAN cualquier cálculo por defecto.
-
-      FORMATO DE SALIDA — devuelve SOLO esto, sin markdown extra:
-      EXTRACTOR_F3:
-      lmsName: [valor de userInputs o "Por definir"]
-      lmsUrl: [valor de userInputs o "Por definir"]
-      scormVersion: [valor de userInputs o "Por definir"]
-      numModulos: [número de F2]
-      horasTotales: [número de F2.5 si existe, si no de F2]
-      nivelScorm: [1-4 de F2]
-      plataformaSugerida: [valor de F2 si existe]
-      estrategias: [lista breve separada por comas de F2]
-      horasSemanalesParticipante: [valor de F1]
-      sector: [sector del proyecto]
-      refsVideoDuracion: [referencia bibliográfica si existe, o "N/A"]
-      perfilParticipante: [resumen del perfil definitivo, 1-2 oraciones]
-      numVideos: [de F2.5 total_videos; si no hay F2.5: numModulos + 1]
-      duracionVideo: [de F2.5 duracion_promedio_minutos; si no hay F2.5: 6]
-      frecuenciaReporte: [de F2.5 frecuencia_revision; si no hay F2.5: "Semanal"]
+      
+      Los datos estructurados están en:
+      - compactContext.previousData.f2_estructurado (de Fase 2)
+      - compactContext.previousData.f2_5_estructurado (de Fase 2.5)
+      
+      ============================================================
+      DATOS A EXTRAER DE F2 (Especificaciones de Análisis)
+      ============================================================
+      - num_modulos: número de módulos (de f2_estructurado.modulos.length)
+      - perfil_ingreso: las 5 categorías del perfil
+      - estrategias: lista de estrategias instruccionales
+      - modalidad: modalidad del curso (asincrónico/sincrónico/mixto)
+      - plataforma: plataforma LMS sugerida
+      
+      ============================================================
+      DATOS A EXTRAER DE F2.5 (Recomendaciones Pedagógicas)
+      ============================================================
+      - total_videos: número total de videos recomendados
+      - duracion_promedio_video: duración promedio por video (minutos)
+      - metricas: lista de métricas a reportear
+      - frecuencia_reportes: frecuencia de reporteo (semanal, mensual, etc.)
+      - actividades: lista de actividades recomendadas
+      
+      ============================================================
+      INSTRUCCIONES FINALES
+      ============================================================
+      1. Busca estos datos en compactContext.previousData
+      2. Si un dato no está disponible, escribe "No especificado en F2/F2.5"
+      3. NO inventes valores. NO uses placeholders.
+      4. Devuelve SOLO JSON con esta estructura:
+      
+      {
+        "num_modulos": number,
+        "total_videos": number,
+        "duracion_promedio_video": number,
+        "frecuencia_reportes": string,
+        "plataforma": string,
+        "modalidad": string,
+        "perfil_ingreso": {
+          "escolaridad": string,
+          "conocimientos_previos": string,
+          "habilidades_digitales": string,
+          "equipo": string,
+          "conexion": string
+        }
+      }
 
   # ── Paso 1: Plataforma y navegadores ─────────────────────────────────────────
   - agent: agente_plataforma_navegador
@@ -136,44 +137,38 @@ pipeline_steps:
     inputs_from: [extractor_f3]
     include_template: false
     task: |
-      ENTRADAS: Usa SOLO los datos de EXTRACTOR_F3.
-
-      TU ÚNICA TAREA: Definir especificaciones técnicas de multimedia.
-
-      REGLAS:
-      - Número de videos: USA el campo "numVideos" de EXTRACTOR_F3. NO calcules en base a módulos.
-      - Duración por video: USA el campo "duracionVideo" de EXTRACTOR_F3 en minutos. NO uses 5-7 por defecto.
-      - Resolución de video: 1920×1080 Full HD, peso máximo 500 MB por video
-      - Infografías: 1 por módulo
-      - PDFs: resumen por módulo + guía de ejercicios
-      - Audios: SOLO si el sector lo justifica (no incluir por defecto)
-      - NO pongas valores entre corchetes vacíos []. Si no tienes el dato, usa el estándar de la industria.
-
+      Genera la tabla de formatos multimedia usando los datos del extractor_f3.
+      
+      Campos disponibles:
+      - total_videos: número total de videos del curso
+      - duracion_promedio_video: duración promedio por video en minutos
+      
+      SI total_videos NO está disponible o es 0, escribe "No especificado en F2.5".
+      NO inventes valores.
+      
       FORMATO DE SALIDA EXACTO:
 
       ## FORMATOS_MULTIMEDIA
       ### Videos
-      - **Cantidad recomendada:** [N] videos (1 por módulo + 1 introductorio)
-      - **Duración óptima:** 5-7 minutos por video
+      - **Cantidad recomendada:** [total_videos] videos
+      - **Duración óptima:** [duracion_promedio_video] minutos por video
       - **Resolución:** 1920×1080 (Full HD)
       - **Peso máximo:** 500 MB por archivo
       - **Herramientas sugeridas:** Camtasia, OBS Studio
       - **Referencia:** Guo, P. J., Kim, J., & Rubin, R. (2014). How video production affects student engagement.
 
       ### Infografías
-      - **Cantidad:** [N] (1 por módulo)
+      - **Cantidad:** 1 por módulo
       - **Dimensiones:** 1280×720 px mínimo
       - **Formato:** PNG o SVG
-      - **Herramientas sugeridas:** Canva, Adobe Illustrator
 
       ### PDFs descargables
       - **Incluir:** Sí
       - **Contenido:** Resumen de cada módulo + guía de actividades
       - **Especificación:** A4, texto seleccionable, máx. 5 MB
-      - **Herramientas:** LibreOffice Writer, Adobe Acrobat
 
       ### Audios
-      - **Incluir:** [Sí / No — justifica con 1 oración]
+      - **Incluir:** No (a menos que el sector artítico lo requiera para tutoriales específicos)
 
   # ── Paso 4: Navegación e identidad gráfica ────────────────────────────────────
   - agent: agente_navegacion_identidad
@@ -255,125 +250,90 @@ pipeline_steps:
     model: "@cf/meta/llama-3.1-8b-instruct"
     inputs_from: [extractor_f3]
     include_template: false
+    max_input_chars: 3000
     task: |
-      ENTRADAS: Usa SOLO los datos de EXTRACTOR_F3.
-
-      TU ÚNICA TAREA: Calcular duración total del curso con fórmula explícita.
-
-      REGLAS:
-      - Actividades por módulo = 3 (si no hay dato específico de F2)
-      - Evaluación por módulo = 1 (30 minutos cada una)
-      - Tiempo por actividad = 30 minutos
-      - Tiempo por video = la duración de video definida (5-7 min)
-      - La suma DEBE ser consistente con las horasTotales de EXTRACTOR_F3
-      - Si hay discrepancia > 2 horas, usa el promedio y documéntalo
-      - NUNCA dejes campos vacíos o con [N]
-
-      FORMATO DE SALIDA EXACTO:
-
-      ## CALCULO_DURACION
-      **Fórmula:** (Módulos × Actividades × 30min) + (Módulos × 1 evaluación × 30min) + (Videos × duración)
-
-      | Componente | Cantidad | Tiempo unitario | Total |
-      |:---|:---|:---|:---|
-      | Actividades prácticas | [N × módulos] | 30 min | [X] min |
-      | Evaluaciones por módulo | [N módulos] | 30 min | [X] min |
-      | Videos | [N] | [Y] min | [X] min |
-      | Lecturas / PDFs | [N] | 15 min | [X] min |
-      | **TOTAL** | | | **[X] min = [Y] horas** |
-
-      **Duración total:** [N] horas
-      **Distribución semanal:** [N] semanas × [X] horas/semana
-      **Justificación:** [1 oración referenciando disponibilidad de F1 y estructura de F2]
+      Calcula la duración total del curso usando los datos del extractor_f3.
+      
+      REGLAS OBLIGATORIAS:
+      - Si num_modulos NO está disponible, usa 3 como valor por defecto.
+      - Si duracion_promedio_video NO está disponible, usa 5 minutos.
+      - Si total_videos NO está disponible, calcula: (num_modulos × 2) + 2.
+      - Realiza los cálculos aritméticos EXPLÍCITAMENTE (no dejes placeholders como [num_modulos × 30]).
+      - Devuelve SOLO la tabla con valores numéricos concretos.
+      
+      Fórmulas:
+      - Actividades prácticas = num_modulos × 30 minutos
+      - Evaluaciones formativas = num_modulos × 30 minutos
+      - Videos = total_videos × duracion_promedio_video minutos
+      - Duración total = suma de los tres componentes
+      
+      Ejemplo de salida CORRECTA:
+      | Componente | Cantidad | Tiempo unitario | Total (min) |
+      |:---|:---:|:---:|:---:|
+      | Actividades prácticas | 3 | 30 | 90 |
+      | Evaluaciones formativas | 3 | 30 | 90 |
+      | Videos | 8 | 5 | 40 |
+      | **DURACIÓN TOTAL** | | | **220** |
+      
+      **Duración total en horas:** 3.6 horas (aprox)
+      **Distribución semanal:** [total_horas / 4] horas/semana (estimado estándar)
 
   # ── Paso 7: Ensamblador A ─────────────────────────────────────────────────────
   - agent: agente_doble_A_f3
-    model: "@cf/meta/llama-3.1-8b-instruct"
-    inputs_from: [agente_plataforma_navegador, agente_reporteo, agente_formatos_multimedia, agente_navegacion_identidad, agente_criterios_aceptacion, agente_calculo_duracion, extractor_f3]
+    inputs_from: [extractor_f3, agente_plataforma_navegador, agente_reporteo, agente_formatos_multimedia, agente_navegacion_identidad, agente_criterios_aceptacion, agente_calculo_duracion]
     include_template: false
     task: |
-      ENTRADAS: Los 6 bloques de los agentes especializados.
-
-      TU ÚNICA TAREA: Ensamblar el documento F3 completo en formato Markdown.
-
-      REGLAS ABSOLUTAS:
-      1. COPIA los valores de cada agente SIN modificarlos ni reformularlos
-      2. NO añadas secciones nuevas ni omitas ninguna de las 7 secciones requeridas
-      3. NO uses placeholders [texto] — todos los valores ya vienen de los agentes
-      4. Incluye la sección 7 de REFERENCIAS BIBLIOGRÁFICAS siempre
-      5. Usa los datos de EXTRACTOR_F3 para el encabezado del documento
-
-      DOCUMENTO F3 — FORMATO OBLIGATORIO:
-
-      # ESPECIFICACIONES TÉCNICAS DEL CURSO
-      **Proyecto:** [de extractor_f3]
-      **Cliente:** [de extractor_f3]
-      **Fecha:** [fecha actual YYYY-MM-DD]
-
-      ---
-
-      ## 1. PLATAFORMA Y NAVEGADORES
-      [Contenido de AGENTE_PLATAFORMA_NAVEGADOR — copiar exactamente]
-
-      ---
-
-      ## 2. REPORTEO Y SEGUIMIENTO
-      [Contenido de AGENTE_REPORTEO — copiar exactamente]
-
-      ---
-
-      ## 3. FORMATOS MULTIMEDIA
-      [Contenido de AGENTE_FORMATOS_MULTIMEDIA — copiar exactamente]
-
-      ---
-
-      ## 4. NAVEGACIÓN E IDENTIDAD GRÁFICA
-      [Contenido de AGENTE_NAVEGACION_IDENTIDAD — copiar exactamente]
-
-      ---
-
-      ## 5. CRITERIOS DE ACEPTACIÓN
-      [Contenido de AGENTE_CRITERIOS_ACEPTACION — copiar exactamente]
-
-      ---
-
-      ## 6. CÁLCULO DE DURACIÓN DEL CURSO
-      [Contenido de AGENTE_CALCULO_DURACION — copiar exactamente]
-
-      ---
-
-      ## 7. REFERENCIAS BIBLIOGRÁFICAS
-      - Guo, P. J., Kim, J., & Rubin, R. (2014). How video production affects student engagement. *ACM Learning at Scale Conference*.
-      - Mayer, R. E. (2009). *Multimedia Learning* (2nd ed.). Cambridge University Press.
-      - Nielsen, J. (1994). *Usability Engineering*. Academic Press.
-      - Sweller, J. (1988). Cognitive load during problem solving. *Cognitive Science, 12*(2), 257–285.
-      - WCAG 2.1 — Web Content Accessibility Guidelines. W3C Recommendation (2018).
+      Eres el ENSAMBLADOR A. Tu ÚNICA tarea es copiar y pegar las secciones generadas por los agentes especializados.
+      
+      REGLAS ESTRICTAS - VIOLARLAS ES UN ERROR GRAVE:
+      1. COPIA EXACTAMENTE el contenido de cada agente SIN MODIFICAR NADA.
+      2. NO generes contenido nuevo.
+      3. NO combines secciones.
+      4. NO modifiques tablas, textos ni números.
+      5. NO uses información fuera de las secciones provistas.
+      
+      Orden de ensamblaje:
+      1. Pegar contenido de AGENTE_PLATAFORMA_NAVEGADOR
+      2. Pegar contenido de AGENTE_REPORTEO
+      3. Pegar contenido de AGENTE_FORMATOS_MULTIMEDIA
+      4. Pegar contenido de AGENTE_NAVEGACION_IDENTIDAD
+      5. Pegar contenido de AGENTE_CRITERIOS_ACEPTACION
+      6. Pegar contenido de AGENTE_CALCULO_DURACION
+      
+      IMPORTANTE: El extractor_f3 contiene metadatos, NO debe aparecer en el documento final.
 
   # ── Paso 8: Ensamblador B ─────────────────────────────────────────────────────
   - agent: agente_doble_B_f3
     model: "@cf/qwen/qwen2.5-7b-instruct"
-    inputs_from: [agente_plataforma_navegador, agente_reporteo, agente_formatos_multimedia, agente_navegacion_identidad, agente_criterios_aceptacion, agente_calculo_duracion, extractor_f3]
+    inputs_from: [extractor_f3, agente_plataforma_navegador, agente_reporteo, agente_formatos_multimedia, agente_navegacion_identidad, agente_criterios_aceptacion, agente_calculo_duracion]
     include_template: false
+    max_input_chars: 4000
     task: |
-      ENTRADAS: Los 6 bloques de los agentes especializados.
-
-      TU ÚNICA TAREA: Ensamblar el documento F3 completo en formato Markdown.
-      Este es el Borrador B — usa exactamente los mismos datos que el Borrador A pero
-      puedes reordenar levemente los bullets y variar el tono (más formal/más conciso).
-
-      REGLAS ABSOLUTAS:
-      1. MISMAS 7 SECCIONES que el Borrador A — NO omitas ni añadas secciones
-      2. Los valores numéricos (horas, métricas, versiones) deben ser IDÉNTICOS al Borrador A
-      3. NO uses placeholders [texto]
-      4. Incluye referencias bibliográficas en Sección 7
-
-      MISMO FORMATO DE SALIDA que Borrador A (ver instrucciones del agente_doble_A_f3)
+      Eres el ENSAMBLADOR B. Tu ÚNICA tarea es copiar y pegar las secciones generadas por los agentes especializados.
+      
+      REGLAS ESTRICTAS - VIOLARLAS ES UN ERROR GRAVE:
+      1. COPIA EXACTAMENTE el contenido de cada agente SIN MODIFICAR NADA.
+      2. NO generes contenido nuevo.
+      3. NO combines secciones.
+      4. NO modifiques tablas, textos ni números.
+      5. NO uses información fuera de las secciones provistas.
+      
+      Orden de ensamblaje:
+      1. Pegar contenido de AGENTE_PLATAFORMA_NAVEGADOR
+      2. Pegar contenido de AGENTE_REPORTEO
+      3. Pegar contenido de AGENTE_FORMATOS_MULTIMEDIA
+      4. Pegar contenido de AGENTE_NAVEGACION_IDENTIDAD
+      5. Pegar contenido de AGENTE_CRITERIOS_ACEPTACION
+      6. Pegar contenido de AGENTE_CALCULO_DURACION
+      
+      IMPORTANTE: El extractor_f3 contiene metadatos, NO debe aparecer en el documento final.
 
   # ── Paso 9: Juez ─────────────────────────────────────────────────────────────
   - agent: agente_juez_f3
     model: "@cf/meta/llama-3.1-8b-instruct"
     inputs_from: [agente_doble_A_f3, agente_doble_B_f3]
     include_template: false
+    max_input_chars: 3000
     task: |
       ENTRADAS: Borrador A y Borrador B del documento F3.
 

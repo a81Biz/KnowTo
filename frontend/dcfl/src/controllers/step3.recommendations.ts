@@ -44,7 +44,7 @@ class Step3RecommendationsController extends BaseStep {
 
   constructor() {
     super({
-      stepNumber: 3,
+      stepNumber: 4,
       templateId: 'tpl-step3-recommendations',
       phaseId: 'F2.5',
       promptId: 'F2_5',

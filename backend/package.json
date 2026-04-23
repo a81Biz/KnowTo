@@ -17,6 +17,7 @@
     "@hono/zod-validator": "^0.2.1",
     "@scalar/hono-api-reference": "^0.5.184",
     "@supabase/supabase-js": "^2.39.0",
+    "@tavily/core": "^0.7.2",
     "cheerio": "^1.2.0",
     "gray-matter": "^4.0.3",
     "hono": "^4.1.0",

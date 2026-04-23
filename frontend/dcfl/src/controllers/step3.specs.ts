@@ -47,7 +47,7 @@ class Step4SpecsController extends BaseStep {
 
   constructor() {
     super({
-      stepNumber: 4,
+      stepNumber: 5,
       templateId: 'tpl-step3-specs',
       phaseId: 'F3',
       promptId: 'F3',
@@ -110,7 +110,7 @@ class Step4SpecsController extends BaseStep {
     if (!this._dom.form) return;
 
     // No sobreescribir si el usuario ya guardó datos en este paso
-    const savedInputs = wizardStore.getState().steps[4]?.inputData ?? {};
+    const savedInputs = wizardStore.getState().steps[5]?.inputData ?? {};
     if (Object.keys(savedInputs).length > 0) return;
 
     const form = this._dom.form;

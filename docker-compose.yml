@@ -66,12 +66,8 @@ services:
     # En la primera ejecución (volumen vacío) sí se instala.
     command: >
       sh -c "
-        if [ ! -f /app/node_modules/.bin/tsx ]; then
-          echo '[knowto] Instalando dependencias...';
-          npm install;
-        else
-          echo '[knowto] Dependencias ya instaladas, omitiendo npm install.';
-        fi &&
+        echo '[knowto] Verificando e instalando dependencias...';
+        npm install &&
         npm run dev:debug
       "
     healthcheck:
@@ -383,21 +379,25 @@ services:
       - |
         ollama serve &
         sleep 5
+        echo "📦 Descargando modelos..."
         ollama pull llama3.2:3b
-        ollama pull llava:7b
+        ollama pull llama3.1:8b
+        ollama pull qwen2.5:7b
+        ollama pull mistral:7b
+        echo "✅ Modelos listos"
         wait
     networks:
       knowto-network:
         ipv4_address: 172.20.0.20
     restart: unless-stopped
-    # Descomenta si tienes GPU NVIDIA:
-    # deploy:
-    #   resources:
-    #     reservations:
-    #       devices:
-    #         - driver: nvidia
-    #           count: all
-    #           capabilities: [gpu]
+    #Descomenta si tienes GPU NVIDIA:
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
 
 networks:
   knowto-network:

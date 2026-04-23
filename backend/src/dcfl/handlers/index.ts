@@ -1,0 +1,12 @@
+export * from './project.handlers';
+export * from './phase.handlers';
+export * from './discrepancy.handlers';
+export * from './questions.handlers';
+export * from './f0.handlers';
+export * from './f4.handlers';
+export * from './extract.handlers';
+export * from './step.handlers';
+export * from './document.handlers';
+export { handleF0Assembler } from './f0.handler';
+export { handleF2Assembler } from './f2.handler';
+export { handleF2_5Assembler } from './f2_5.handler';
