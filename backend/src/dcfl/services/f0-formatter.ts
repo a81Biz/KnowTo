@@ -13,13 +13,12 @@ export function buildF0Document(
   // Funciones helper con fallbacks
   const getValue = (obj: any, key: string, fallback = '—') => {
     const val = obj?.[key];
-    const invalidValues = ['Hallazgo con fuente', 'Fuente', 'Hallazgo o vacío', 'Fuente o vacío', 'Texto', '', null, undefined];
+    const invalidValues = ['Hallazgo con fuente', 'Fuente', 'Hallazgo o vacío', 'Fuente o vacío', 'Texto', 'webSearchResults', 'webSearchResults.market_size', 'Tavily', '', null, undefined];
     
     if (val && !invalidValues.includes(val) && typeof val === 'string' && val.trim().length > 0) {
       return val;
     }
     
-    // Si el valor es un número o booleano, mostrarlo
     if (val !== undefined && val !== null && typeof val !== 'string') {
       return String(val);
     }
@@ -36,7 +35,7 @@ export function buildF0Document(
 | Tamaño del mercado | ${getValue(sector, 'tamaño')} | ${getValue(sector, 'fuente_tamaño')} |
 | Tendencias principales | ${getValue(sector, 'tendencias')} | ${getValue(sector, 'fuente_tendencias')} |
 | Regulaciones aplicables | ${getValue(sector, 'regulaciones')} | ${getValue(sector, 'fuente_regulaciones')} |
-| Certificaciones obligatorias | ${getValue(sector, 'certificaciones')} | ${getValue(sector, 'fuente_certificaciones')} |
+| Certificaciones obligatorias | ${Array.isArray(sector?.certificaciones) ? sector.certificaciones.map((c: any) => `${c.codigo}: ${c.nombre}`).join(', ') : getValue(sector, 'certificaciones')} | ${getValue(sector, 'fuente_certificaciones')} |
 `;
 
   const desafiosRaw = sector?.desafios;
@@ -99,7 +98,8 @@ ${arrayEstandares.map((e: any) => `| ${getValue(e, 'codigo')} | ${getValue(e, 'n
   const arrayReferencias = getArray(referencias);
   const listReferencias = arrayReferencias.length > 0
     ? arrayReferencias.map((r: any) => `[${getValue(r, 'id')}] ${getValue(r, 'referencia')}`).join('\n')
-    : 'No se encontraron referencias.';
+    : 'No se encontraron fuentes bibliográficas formales para este nicho específico. Las referencias mostradas provienen de los resultados de búsqueda web.';
+
 
   return `# MARCO DE REFERENCIA DEL CLIENTE
 **Proyecto:** ${projectName}

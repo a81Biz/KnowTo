@@ -8,17 +8,22 @@ import type { Env } from '../types/env';
 export class WebSearchService {
   private client: TavilyClient;
   private isProd: boolean;
-  
+
   constructor(env: Env) {
     this.isProd = env.ENVIRONMENT === 'production';
-    
-    if (!env.TAVILY_API_KEY) {
+
+    // Fallback: leer directamente de process.env si env no tiene la key
+    const apiKey = env.TAVILY_API_KEY || process.env.TAVILY_API_KEY;
+
+    if (!apiKey) {
       console.warn('[WebSearchService] TAVILY_API_KEY no configurada. Las búsquedas fallarán.');
+      console.warn('[WebSearchService] env.TAVILY_API_KEY:', env.TAVILY_API_KEY);
+      console.warn('[WebSearchService] process.env.TAVILY_API_KEY:', process.env.TAVILY_API_KEY);
     }
-    
-    this.client = tavily({ apiKey: env.TAVILY_API_KEY || '' });
+
+    this.client = tavily({ apiKey: apiKey || '' });
   }
-  
+
   /**
    * Normaliza la query a string
    */
@@ -32,7 +37,7 @@ export class WebSearchService {
     }
     return null;
   }
-  
+
   /**
    * Busca información en internet usando Tavily
    * @param query - Consulta de búsqueda
@@ -40,42 +45,46 @@ export class WebSearchService {
    * @returns Resultados formateados como string para el LLM
    */
   async search(
-    query: any, 
+    query: any,
     options?: {
       maxResults?: number;
       searchDepth?: 'basic' | 'advanced';
       includeDomains?: string[];
       excludeDomains?: string[];
     }
-  ): Promise<string> {
+  ): Promise<any> {
     console.log('[TAVILY] ========== INICIO ==========');
     console.log('[TAVILY] Query recibida:', JSON.stringify(query, null, 2));
-    
+
     const searchTerms = this.normalizeQuery(query);
-    
+
     if (!searchTerms || searchTerms.length < 3) {
       console.log('[TAVILY] Consulta demasiado corta o inválida');
-      return JSON.stringify({
+      return {
         error: 'Consulta de búsqueda inválida',
         results: []
-      });
+      };
     }
-    
+
     console.log('[TAVILY] Términos de búsqueda:', searchTerms);
-    
+
     try {
-      const response = await this.client.search(searchTerms, {
+      const searchOptions: any = {
         maxResults: options?.maxResults || 5,
-        searchDepth: options?.searchDepth || 'basic',
-        includeDomains: options?.includeDomains,
-        excludeDomains: options?.excludeDomains,
+        searchDepth: options?.searchDepth || 'advanced',
         includeAnswer: true,
         includeRawContent: false,
-      });
-      
+      };
+
+      if (options?.includeDomains) searchOptions.includeDomains = options.includeDomains;
+      if (options?.excludeDomains) searchOptions.excludeDomains = options.excludeDomains;
+
+      const response = await this.client.search(searchTerms, searchOptions);
+
+
       console.log('[TAVILY] Resultados obtenidos:', response.results?.length ?? 0);
       console.log('[TAVILY] Answer generada:', response.answer ? 'Sí' : 'No');
-      
+
       // Construir respuesta estructurada para el LLM
       const output = {
         query: searchTerms,
@@ -87,16 +96,16 @@ export class WebSearchService {
           score: r.score
         }))
       };
-      
-      const formattedResults = JSON.stringify(output, null, 2);
-      console.log('[TAVILY] Resultado formateado longitud:', formattedResults.length);
+
+      console.log('[TAVILY] Resultado obtenido con éxito');
       console.log('[TAVILY] ========== FIN ==========');
-      
-      return formattedResults;
-      
+
+      return output;
+
     } catch (error) {
+
       console.error('[TAVILY] Error en búsqueda:', error);
-      
+
       // En desarrollo, fallback con error claro
       if (!this.isProd) {
         return JSON.stringify({
@@ -105,7 +114,7 @@ export class WebSearchService {
           results: []
         });
       }
-      
+
       return JSON.stringify({
         error: 'No se pudo completar la búsqueda',
         query: searchTerms,
@@ -113,7 +122,7 @@ export class WebSearchService {
       });
     }
   }
-  
+
   /**
    * Busca información específica para el análisis de sector
    */
@@ -121,7 +130,7 @@ export class WebSearchService {
     const query = `mercado tendencias regulaciones certificaciones industria ${industry} ${topic}`;
     return this.search(query, { maxResults: 6, searchDepth: 'advanced' });
   }
-  
+
   /**
    * Busca competidores en plataformas de cursos
    */
@@ -129,7 +138,7 @@ export class WebSearchService {
     const query = `cursos "${topic}" Udemy Coursera Skillshare precios alumnos`;
     return this.search(query, { maxResults: 8 });
   }
-  
+
   /**
    * Busca mejores prácticas educativas para el sector
    */

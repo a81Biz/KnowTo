@@ -112,6 +112,7 @@ export class AIService {
       if (typeof v === 'string') compactContextObj[k] = v;
     }
     if (options.context.previousData) compactContextObj.previousData = options.context.previousData;
+    if (options.context.webSearchResults) compactContextObj.webSearchResults = options.context.webSearchResults;
     if (options.userInputs && Object.keys(options.userInputs).length > 0) {
       compactContextObj.userInputs = options.userInputs;
     }

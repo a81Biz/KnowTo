@@ -4,15 +4,23 @@ import { getPromptRegistry } from '../prompts';
 import { Env } from '../../core/types/env';
 
 const DCFL_SYSTEM_PROMPT =
-  'Eres un experto en diseño instruccional certificado en el estándar EC0366 del CONOCER.\n' +
+  'Eres un asistente experto en diseño instruccional y estándares CONOCER (específicamente EC0366).\n' +
   'Genera documentos profesionales SOLO en español.\n' +
   'Usa formato Markdown estricto con tablas y listas.\n' +
   'No inventes datos. Si no tienes información, indícalo explícitamente.\n' +
   'Responde únicamente con el documento solicitado, sin preámbulos ni explicaciones adicionales.';
 
 export function createAIService(env: Env): AIService {
-  const provider = env.ENVIRONMENT === 'production'
-    ? new CloudflareProvider(env.AI, DCFL_SYSTEM_PROMPT)
-    : new OllamaProvider(env.OLLAMA_URL || 'http://localhost:11434', env.OLLAMA_MODEL || 'llama3.2:3b');
+  // En desarrollo, forzar Ollama con los nuevos parámetros
+  if (env.ENVIRONMENT !== 'production') {
+    const ollamaUrl = env.OLLAMA_URL || 'http://ollama:11434';
+    const ollamaModel = env.OLLAMA_MODEL || 'qwen2.5:14b';
+    const provider = new OllamaProvider(ollamaUrl, ollamaModel);
+    console.log(`[AI Factory] Usando Ollama - URL: ${ollamaUrl}, Modelo: ${ollamaModel}`);
+    return new AIService(provider, getPromptRegistry(), DCFL_SYSTEM_PROMPT, env);
+  }
+
+  // En producción, usar Cloudflare
+  const provider = new CloudflareProvider(env.AI, DCFL_SYSTEM_PROMPT);
   return new AIService(provider, getPromptRegistry(), DCFL_SYSTEM_PROMPT, env);
 }

@@ -48,37 +48,25 @@ function normalizeEstandares(estandares: any): any[] {
   
   let parsed = estandares;
   
-  // Si es string, intentar parsear
   if (typeof estandares === 'string') {
     try {
       parsed = JSON.parse(estandares);
     } catch (e) {
       console.warn('[F0-NORMALIZE] Error parseando estandares:', e);
-      return [{ codigo: 'EC0366', nombre: 'Diseño de cursos de capacitación', proposito: 'Certificar la capacidad para diseñar cursos', aplicabilidad: 'sí' }];
+      return [];
     }
   }
   
-  // Si es array de strings con JSON escapado (caso común)
-  if (Array.isArray(parsed) && parsed.length > 0 && typeof parsed[0] === 'string' && parsed[0].startsWith('{')) {
-    try {
-      parsed = parsed.map((s: string) => JSON.parse(s));
-    } catch (e) {
-      console.warn('[F0-NORMALIZE] Error parseando strings escapadas:', e);
-    }
-  }
-  
-  // Si es array de objetos, validar estructura
   if (Array.isArray(parsed) && parsed.length > 0 && parsed[0].codigo) {
     return parsed;
   }
   
-  // Si es un objeto único, convertirlo a array
   if (parsed && parsed.codigo) {
     return [parsed];
   }
   
-  // Fallback: devolver EC0366 por defecto
-  return [{ codigo: 'EC0366', nombre: 'Diseño de cursos de capacitación', proposito: 'Certificar la capacidad para diseñar cursos', aplicabilidad: 'sí' }];
+  // Si no hay datos válidos, devolver array vacío (sin inventar EC0366)
+  return [];
 }
 
 function normalizeGaps(gaps: any): any {

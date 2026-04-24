@@ -135,7 +135,9 @@ export function parseJsonSafely<T = any>(raw: string, fallback: T): T {
   }
   
   try {
-    const cleaned = cleanJsonResponse(raw);
+    // Limpieza de bloques Markdown JSON antes del parseo
+    const cleanString = raw.replace(/```json\n?|```\n?/g, '').trim();
+    const cleaned = cleanJsonResponse(cleanString);
     const parsed = JSON.parse(cleaned) as T;
     return parsed;
   } catch (error) {

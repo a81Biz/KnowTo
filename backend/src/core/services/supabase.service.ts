@@ -206,6 +206,28 @@ export abstract class BaseSupabaseService {
   }
 
   /**
+   * Obtiene el contexto enriquecido más reciente para un proyecto y fase
+   */
+  async getEnrichedContext(projectId: string, phaseId: string): Promise<any> {
+    if (!this.client) return null;
+
+    const { data, error } = await this.client
+      .from('pipeline_jobs')
+      .select('enriched_context')
+      .eq('project_id', projectId)
+      .eq('phase_id', phaseId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    
+    if (error) {
+      console.warn('[Supabase] Error getting enriched context:', error);
+      return null;
+    }
+    return data?.enriched_context || null;
+  }
+
+  /**
    * Obtiene las preguntas y brechas generadas por el pipeline F0 de un proyecto.
    * Lee los outputs de los agentes 'seccion_5_preguntas' y 'seccion_5_gaps'
    * del job F0 más reciente completado para el proyecto.
