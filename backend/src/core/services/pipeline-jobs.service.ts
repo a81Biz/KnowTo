@@ -199,6 +199,20 @@ export class PipelineJobsService {
     return output;
   }
 
+  /** Marca el job como 'running' y notifica el inicio al frontend. */
+  async startJob(jobId: string, totalSteps = 5): Promise<void> {
+    if (!this.supabase) {
+      const job = _devJobs.get(jobId);
+      if (job) job.status = 'running';
+      return;
+    }
+    const { error } = await this.supabase!
+      .from('pipeline_jobs')
+      .update({ status: 'running', progress: { currentStep: 'Iniciando...', stepIndex: 0, totalSteps } })
+      .eq('id', jobId);
+    if (error) console.error('[pipeline-jobs] startJob failed:', error.message);
+  }
+
   /** Actualiza el progreso en tiempo real de un job. */
   async updateJobProgress(jobId: string, progress: { currentStep: string; stepIndex: number; totalSteps: number }): Promise<void> {
     if (!this.supabase) return;

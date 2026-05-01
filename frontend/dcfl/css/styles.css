@@ -39,11 +39,48 @@
 .document-preview h1 { @apply text-2xl font-bold mb-4 text-gray-900 border-b pb-2; }
 .document-preview h2 { @apply text-xl font-semibold mb-3 mt-6 text-gray-800; }
 .document-preview h3 { @apply text-lg font-medium mb-2 mt-4 text-gray-700; }
-.document-preview table { @apply w-full border-collapse mb-4; }
-.document-preview th { @apply bg-gray-100 border border-gray-300 px-3 py-2 text-left text-sm font-semibold; }
-.document-preview td { @apply border border-gray-300 px-3 py-2 text-sm; }
 .document-preview ul { @apply list-disc list-inside mb-3 space-y-1; }
 .document-preview ol { @apply list-decimal list-inside mb-3 space-y-1; }
 .document-preview p { @apply mb-3 text-gray-700; }
 .document-preview strong { @apply font-semibold text-gray-900; }
 .document-preview hr { @apply border-gray-200 my-6; }
+
+/* Estilos profesionales para Tablas Markdown */
+.document-preview table, #markdown-content table, #product-document-preview table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1.5rem 0;
+  font-size: 0.9rem;
+  text-align: left;
+  border-radius: 0.5rem;
+  overflow: hidden;
+  box-shadow: 0 0 0 1px #e5e7eb; /* Borde sutil exterior */
+}
+
+.document-preview th, .document-preview td,
+#markdown-content th, #markdown-content td,
+#product-document-preview th, #product-document-preview td {
+  border: 1px solid #e5e7eb; /* Líneas divisorias de celdas */
+  padding: 0.75rem 1rem;
+}
+
+.document-preview th, #markdown-content th, #product-document-preview th {
+  background-color: #f3f4f6; /* Fondo gris claro para el encabezado */
+  font-weight: 700;
+  color: #374151;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-size: 0.8rem;
+}
+
+.document-preview tr:nth-child(even),
+#markdown-content tr:nth-child(even),
+#product-document-preview tr:nth-child(even) {
+  background-color: #f9fafb; /* Cebra sutil para filas pares */
+}
+
+.document-preview tr:hover,
+#markdown-content tr:hover,
+#product-document-preview tr:hover {
+  background-color: #f3f4f6; /* Efecto hover */
+}

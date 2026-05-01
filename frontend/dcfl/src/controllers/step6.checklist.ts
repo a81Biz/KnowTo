@@ -3,7 +3,7 @@
 import { createStep } from '../shared/step.factory';
 
 export const Step6Checklist = createStep({
-  stepNumber: 7,
+  stepNumber: 6,
   templateId: 'tpl-step5-checklist',
   phaseId: 'F5.1',
   promptId: 'F5',

@@ -47,7 +47,7 @@ class Step4SpecsController extends BaseStep {
 
   constructor() {
     super({
-      stepNumber: 5,
+      stepNumber: 4,
       templateId: 'tpl-step3-specs',
       phaseId: 'F3',
       promptId: 'F3',

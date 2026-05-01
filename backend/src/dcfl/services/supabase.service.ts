@@ -65,6 +65,59 @@ export class SupabaseService extends BaseSupabaseService {
     }
   }
 
+  async getFase0Estructurado(projectId: string): Promise<any> {
+    if (!this.client) return {};
+    
+    const { data, error } = await this.client
+      .from('fase0_componentes')
+      .select('sector, practicas, competencia, gaps, preguntas, recomendaciones, referencias')
+      .eq('project_id', projectId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+      
+    if (error || !data) {
+      console.warn(`[supabase] getFase0Estructurado: not found for project ${projectId}`);
+      return {};
+    }
+    
+    // Normalizar nulls a strings vacíos para evitar errores en prompt render
+    return Object.fromEntries(
+      Object.entries(data).map(([k, v]) => [k, v ?? ''])
+    );
+  }
+
+  async getFaseAnswersDetailed(projectId: string, faseDestino: number): Promise<Array<{ pregunta: string; respuesta: string }>> {
+    if (!this.client) return [];
+    
+    // 1. Obtener preguntas de preguntas_fase
+    const { data: preguntas, error: errP } = await this.client
+      .from('preguntas_fase')
+      .select('id, texto, orden')
+      .eq('project_id', projectId)
+      .eq('fase_destino', faseDestino)
+      .order('orden', { ascending: true });
+      
+    if (errP || !preguntas?.length) return [];
+    
+    // 2. Obtener respuestas de respuestas_preguntas_fase
+    const preguntaIds = preguntas.map(p => p.id);
+    const { data: respuestas, error: errR } = await this.client
+      .from('respuestas_preguntas_fase')
+      .select('pregunta_id, respuesta')
+      .in('pregunta_id', preguntaIds);
+      
+    if (errR) return preguntas.map(p => ({ pregunta: p.texto, respuesta: '' }));
+    
+    // 3. Unir preguntas + respuestas
+    const respuestasMap = new Map(respuestas?.map(r => [r.pregunta_id, r.respuesta]) || []);
+    
+    return preguntas.map(p => ({
+      pregunta: p.texto,
+      respuesta: respuestasMap.get(p.id) || ''
+    }));
+  }
+
   async getF0Componentes(projectId: string) {
     if (!this.client) return null;
     const { data, error } = await this.client

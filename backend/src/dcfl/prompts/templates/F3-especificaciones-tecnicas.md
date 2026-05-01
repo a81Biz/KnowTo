@@ -43,18 +43,18 @@ pipeline_steps:
       4. Devuelve SOLO JSON con esta estructura:
       
       {
-        "num_modulos": number,
-        "total_videos": number,
-        "duracion_promedio_video": number,
-        "frecuencia_reportes": string,
-        "plataforma": string,
-        "modalidad": string,
+        "num_modulos": 0,
+        "total_videos": 0,
+        "duracion_promedio_video": 0,
+        "frecuencia_reportes": "string",
+        "plataforma": "string",
+        "modalidad": "string",
         "perfil_ingreso": {
-          "escolaridad": string,
-          "conocimientos_previos": string,
-          "habilidades_digitales": string,
-          "equipo": string,
-          "conexion": string
+          "escolaridad": "string",
+          "conocimientos_previos": "string",
+          "habilidades_digitales": "string",
+          "equipo": "string",
+          "conexion": "string"
         }
       }
 
@@ -66,35 +66,27 @@ pipeline_steps:
     task: |
       ENTRADAS: Usa SOLO los datos de EXTRACTOR_F3.
 
-      TU ÚNICA TAREA: Definir plataforma LMS y navegadores compatibles.
+      TU ÚNICA TAREA: Definir plataforma LMS y navegadores compatibles en formato JSON estricto.
 
       REGLAS ABSOLUTAS:
       1. Si lmsName tiene un valor real (no "Por definir"), USA ESE NOMBRE EXACTO. NO sugieras cambios.
       2. Si lmsName es "Por definir", recomienda Moodle 4.x por defecto.
       3. Especifica versiones mínimas de navegadores reales y actuales.
       4. NO inventes URLs, versiones de LMS, ni caracterísicas que no existan.
+      5. PROHÍBE EL MARKDOWN. Devuelve SOLO tu fragmento JSON.
 
-      FORMATO DE SALIDA EXACTO (markdown, sin texto adicional):
-
-      ## PLATAFORMA_NAVEGADOR
-      **Plataforma:** [nombre exacto del LMS — usa lmsName de EXTRACTOR_F3]
-      **Versión mínima:** [versión mínima del LMS]
-      **Versión SCORM:** [scormVersion de EXTRACTOR_F3 — ej: SCORM 1.2, SCORM 2004, xAPI]
-      **Justificación:** [1-2 oraciones basadas en sector y nivel SCORM]
-
-      **Navegadores soportados:**
-      - Chrome 90+
-      - Firefox 88+
-      - Edge 90+
-      [añade Safari si es relevante para el sector]
-
-      **Navegadores no soportados:**
-      - Internet Explorer (todas las versiones)
-
-      **Dispositivos:**
-      - Desktop (Windows/macOS)
-      - Tablet (responsive)
-      - Móvil (responsive, solo lectura)
+      FORMATO DE SALIDA EXACTO:
+      {
+        "plataforma_navegador": {
+          "plataforma": "nombre exacto del LMS",
+          "version_minima": "versión mínima del LMS",
+          "version_scorm": "ej: SCORM 1.2, SCORM 2004, xAPI",
+          "justificacion": "1-2 oraciones basadas en sector y nivel SCORM",
+          "navegadores_soportados": ["Chrome 90+", "Firefox 88+", "Edge 90+"],
+          "navegadores_no_soportados": ["Internet Explorer (todas las versiones)"],
+          "dispositivos": ["Desktop (Windows/macOS)", "Tablet (responsive)", "Móvil (responsive, solo lectura)"]
+        }
+      }
 
   # ── Paso 2: Reporteo y seguimiento ───────────────────────────────────────────
   - agent: agente_reporteo
@@ -104,7 +96,7 @@ pipeline_steps:
     task: |
       ENTRADAS: Usa SOLO los datos de EXTRACTOR_F3.
 
-      TU ÚNICA TAREA: Definir métricas de reporteo según el nivel SCORM.
+      TU ÚNICA TAREA: Definir métricas de reporteo según el nivel SCORM en JSON estricto.
 
       REGLAS:
       - SCORM nivel 1 (Pasivo): solo tiempo y progreso
@@ -112,24 +104,21 @@ pipeline_steps:
       - SCORM nivel 3 (Moderado): + intentos y fechas
       - SCORM nivel 4 (Robusto): + métricas detalladas por actividad
       - USA el campo "frecuenciaReporte" de EXTRACTOR_F3 para la frecuencia del reporte automático.
-        NO uses "semanal" por defecto si EXTRACTOR_F3 tiene otro valor.
-      - Los destinatarios SIEMPRE incluyen Participante, Instructor y Administrador.
+      - PROHÍBE EL MARKDOWN. Devuelve SOLO tu fragmento JSON.
 
       FORMATO DE SALIDA EXACTO:
-
-      ## REPORTEO
-      | Métrica | Formato | Frecuencia |
-      |:---|:---|:---|
-      | Progreso por módulo | Porcentaje (%) | Por módulo completado |
-      | Tiempo invertido | Minutos acumulados | Continuo |
-      | Calificación en evaluaciones | Puntos / Porcentaje | Por evaluación |
-      | Intentos por evaluación | Número entero | Por intento |
-      | Fecha de inicio y fin | Fecha ISO | Al entrar/salir |
-
-      **Frecuencia de reporte automático:** [semanal / mensual]
-      **Formato de entrega:** PDF + Dashboard en LMS
-      **Destinatarios:** Participante, Instructor, Administrador
-      **Justificación:** [1 oración basada en nivel SCORM y duración del curso]
+      {
+        "reporteo": {
+          "metricas": [
+            { "metrica": "Progreso por módulo", "formato": "Porcentaje (%)", "frecuencia": "Por módulo completado" },
+            { "metrica": "Tiempo invertido", "formato": "Minutos acumulados", "frecuencia": "Continuo" }
+          ],
+          "frecuencia_reporte_automatico": "semanal / mensual",
+          "formato_entrega": "PDF + Dashboard en LMS",
+          "destinatarios": ["Participante", "Instructor", "Administrador"],
+          "justificacion": "1 oración basada en nivel SCORM y duración del curso"
+        }
+      }
 
   # ── Paso 3: Formatos multimedia ───────────────────────────────────────────────
   - agent: agente_formatos_multimedia
@@ -137,38 +126,40 @@ pipeline_steps:
     inputs_from: [extractor_f3]
     include_template: false
     task: |
-      Genera la tabla de formatos multimedia usando los datos del extractor_f3.
+      Genera los formatos multimedia en JSON estricto usando los datos del extractor_f3.
       
-      Campos disponibles:
+      Campos disponibles en EXTRACTOR_F3:
       - total_videos: número total de videos del curso
       - duracion_promedio_video: duración promedio por video en minutos
       
-      SI total_videos NO está disponible o es 0, escribe "No especificado en F2.5".
-      NO inventes valores.
-      
+      PROHÍBE EL MARKDOWN. Devuelve SOLO tu fragmento JSON:
+
       FORMATO DE SALIDA EXACTO:
-
-      ## FORMATOS_MULTIMEDIA
-      ### Videos
-      - **Cantidad recomendada:** [total_videos] videos
-      - **Duración óptima:** [duracion_promedio_video] minutos por video
-      - **Resolución:** 1920×1080 (Full HD)
-      - **Peso máximo:** 500 MB por archivo
-      - **Herramientas sugeridas:** Camtasia, OBS Studio
-      - **Referencia:** Guo, P. J., Kim, J., & Rubin, R. (2014). How video production affects student engagement.
-
-      ### Infografías
-      - **Cantidad:** 1 por módulo
-      - **Dimensiones:** 1280×720 px mínimo
-      - **Formato:** PNG o SVG
-
-      ### PDFs descargables
-      - **Incluir:** Sí
-      - **Contenido:** Resumen de cada módulo + guía de actividades
-      - **Especificación:** A4, texto seleccionable, máx. 5 MB
-
-      ### Audios
-      - **Incluir:** No (a menos que el sector artítico lo requiera para tutoriales específicos)
+      {
+        "formatos_multimedia": {
+          "videos": {
+            "cantidad_recomendada": 0,
+            "duracion_optima_minutos": 0,
+            "resolucion": "1920x1080 (Full HD)",
+            "peso_maximo_mb": 500,
+            "herramientas_sugeridas": ["Camtasia", "OBS Studio"],
+            "referencia": "Guo, P. J., Kim, J., & Rubin, R. (2014). How video production affects student engagement."
+          },
+          "infografias": {
+            "cantidad": "1 por módulo",
+            "dimensiones": "1280x720 px mínimo",
+            "formato": "PNG o SVG"
+          },
+          "pdfs_descargables": {
+            "incluir": true,
+            "contenido": "Resumen de cada módulo + guía de actividades",
+            "especificacion": "A4, texto seleccionable, máx. 5 MB"
+          },
+          "audios": {
+            "incluir": false
+          }
+        }
+      }
 
   # ── Paso 4: Navegación e identidad gráfica ────────────────────────────────────
   - agent: agente_navegacion_identidad
@@ -178,30 +169,31 @@ pipeline_steps:
     task: |
       ENTRADAS: Usa SOLO los datos de EXTRACTOR_F3.
 
-      TU ÚNICA TAREA: Definir estructura de navegación y lineamientos gráficos.
+      TU ÚNICA TAREA: Definir estructura de navegación y lineamientos gráficos en JSON estricto.
 
       REGLAS:
-      - La navegación para cursos EC0366 debe ser lineal (módulos secuenciales)
-      - Permitir saltar módulos solo si el curso es de repaso (no aplica por defecto)
-      - La paleta de colores debe ser sobria y profesional (no saturada)
-      - Botones principales: siempre incluir Anterior, Siguiente, Índice, Ayuda
-      - NO inventar logo del cliente
+      - La navegación para cursos EC0366 debe ser lineal.
+      - Botones principales: siempre incluir Anterior, Siguiente, Índice, Ayuda.
+      - PROHÍBE EL MARKDOWN. Devuelve SOLO tu fragmento JSON.
 
       FORMATO DE SALIDA EXACTO:
-
-      ## NAVEGACION_IDENTIDAD
-      ### Navegación
-      - **Tipo:** Lineal con ramificaciones controladas
-      - **Permite saltar módulos:** No (secuencial obligatorio)
-      - **Barra de progreso visible:** Sí
-      - **Botones principales:** Anterior, Siguiente, Índice, Ayuda, Cerrar sesión
-      - **Mapa de navegación:** Módulo 1 → Módulo 2 → ... → Módulo [N] → Evaluación final
-
-      ### Identidad gráfica
-      - **Paleta sugerida:** Azul corporativo (#2C3E50), Acento (#3498DB), Fondo claro (#ECF0F1)
-      - **Tipografía:** Sans-serif — Arial 14px (cuerpo), Roboto 18px (títulos)
-      - **Requiere logo del cliente:** Sí (insertar en encabezado y portada)
-      - **Justificación:** Principios de usabilidad para contenido técnico/profesional (Nielsen, 1994)
+      {
+        "navegacion_identidad": {
+          "navegacion": {
+            "tipo": "Lineal con ramificaciones controladas",
+            "permite_saltar_modulos": false,
+            "barra_progreso_visible": true,
+            "botones_principales": ["Anterior", "Siguiente", "Índice", "Ayuda", "Cerrar sesión"],
+            "mapa_navegacion": "Módulo 1 -> Módulo 2 -> ... -> Módulo N -> Evaluación final"
+          },
+          "identidad_grafica": {
+            "paleta_sugerida": ["Azul corporativo (#2C3E50)", "Acento (#3498DB)", "Fondo claro (#ECF0F1)"],
+            "tipografia": "Sans-serif — Arial 14px (cuerpo), Roboto 18px (títulos)",
+            "requiere_logo_cliente": true,
+            "justificacion": "Principios de usabilidad para contenido técnico/profesional (Nielsen, 1994)"
+          }
+        }
+      }
 
   # ── Paso 5: Criterios de aceptación ──────────────────────────────────────────
   - agent: agente_criterios_aceptacion
@@ -211,39 +203,39 @@ pipeline_steps:
     task: |
       ENTRADAS: Usa SOLO los datos de EXTRACTOR_F3.
 
-      TU ÚNICA TAREA: Definir criterios de calidad y aceptación para el curso.
+      TU ÚNICA TAREA: Definir criterios de calidad y aceptación en JSON estricto.
 
       REGLAS:
-      - Cada criterio debe ser VERIFICABLE (sí/no o tiene una métrica)
-      - Incluir criterios de contenido, técnico, pedagógico y accesibilidad
-      - Los criterios pedagógicos deben referenciar EC0366
-      - Incluir al menos: "El curso carga en menos de 5 segundos en conexión de 5 Mbps"
-      - Accesibilidad: mínimo WCAG 2.1 Nivel AA
-      - NO escribas criterios vagos como "el curso debe ser bueno"
+      - Cada criterio debe ser VERIFICABLE.
+      - Accesibilidad: mínimo WCAG 2.1 Nivel AA.
+      - PROHÍBE EL MARKDOWN. Devuelve SOLO tu fragmento JSON.
 
       FORMATO DE SALIDA EXACTO:
-
-      ## CRITERIOS_ACEPTACION
-      ### Criterios de contenido
-      - Sin errores ortográficos ni gramaticales en el 100% del material
-      - Todos los conceptos del sector [sector] están definidos con ejemplos
-      - Los objetivos de aprendizaje del EC0366 están cubiertos al 100%
-
-      ### Criterios técnicos
-      - El curso carga en menos de 5 segundos en conexión de 5 Mbps
-      - Compatible con los 3 navegadores especificados
-      - Los reportes SCORM se generan correctamente en el LMS indicado
-      - Los videos reproducen sin buffering en 5 Mbps
-
-      ### Criterios pedagógicos
-      - Los participantes alcanzan ≥80% en las evaluaciones sumativas
-      - La tasa de completitud del curso es ≥70% al final del período
-      - Cada módulo tiene al menos una actividad de práctica (EC0366 §4.2)
-
-      ### Criterios de accesibilidad
-      - Cumple WCAG 2.1 Nivel AA
-      - Los videos tienen subtítulos en español
-      - Contraste de texto ≥4.5:1
+      {
+        "criterios_aceptacion": {
+          "criterios_contenido": [
+            "Sin errores ortográficos ni gramaticales en el 100% del material",
+            "Todos los conceptos del sector están definidos con ejemplos",
+            "Los objetivos de aprendizaje del EC0366 están cubiertos al 100%"
+          ],
+          "criterios_tecnicos": [
+            "El curso carga en menos de 5 segundos en conexión de 5 Mbps",
+            "Compatible con los navegadores especificados",
+            "Los reportes SCORM se generan correctamente en el LMS indicado",
+            "Los videos reproducen sin buffering en 5 Mbps"
+          ],
+          "criterios_pedagogicos": [
+            "Los participantes alcanzan ≥80% en las evaluaciones sumativas",
+            "La tasa de completitud del curso es ≥70% al final del período",
+            "Cada módulo tiene al menos una actividad de práctica (EC0366 §4.2)"
+          ],
+          "criterios_accesibilidad": [
+            "Cumple WCAG 2.1 Nivel AA",
+            "Los videos tienen subtítulos en español",
+            "Contraste de texto ≥4.5:1"
+          ]
+        }
+      }
 
   # ── Paso 6: Cálculo de duración ───────────────────────────────────────────────
   - agent: agente_calculo_duracion
@@ -255,120 +247,57 @@ pipeline_steps:
       Calcula la duración total del curso usando los datos del extractor_f3.
       
       REGLAS OBLIGATORIAS:
-      - Si num_modulos NO está disponible, usa 3 como valor por defecto.
-      - Si duracion_promedio_video NO está disponible, usa 5 minutos.
-      - Si total_videos NO está disponible, calcula: (num_modulos × 2) + 2.
-      - Realiza los cálculos aritméticos EXPLÍCITAMENTE (no dejes placeholders como [num_modulos × 30]).
-      - Devuelve SOLO la tabla con valores numéricos concretos.
+      - Realiza los cálculos aritméticos EXPLÍCITAMENTE.
+      - PROHÍBE EL MARKDOWN. Devuelve SOLO tu fragmento JSON.
       
-      Fórmulas:
-      - Actividades prácticas = num_modulos × 30 minutos
-      - Evaluaciones formativas = num_modulos × 30 minutos
-      - Videos = total_videos × duracion_promedio_video minutos
-      - Duración total = suma de los tres componentes
-      
-      Ejemplo de salida CORRECTA:
-      | Componente | Cantidad | Tiempo unitario | Total (min) |
-      |:---|:---:|:---:|:---:|
-      | Actividades prácticas | 3 | 30 | 90 |
-      | Evaluaciones formativas | 3 | 30 | 90 |
-      | Videos | 8 | 5 | 40 |
-      | **DURACIÓN TOTAL** | | | **220** |
-      
-      **Duración total en horas:** 3.6 horas (aprox)
-      **Distribución semanal:** [total_horas / 4] horas/semana (estimado estándar)
+      FORMATO DE SALIDA EXACTO:
+      {
+        "calculo_duracion": {
+          "desglose": [
+            { "componente": "Actividades prácticas", "cantidad": 3, "tiempo_unitario_min": 30, "total_min": 90 },
+            { "componente": "Evaluaciones formativas", "cantidad": 3, "tiempo_unitario_min": 30, "total_min": 90 },
+            { "componente": "Videos", "cantidad": 8, "tiempo_unitario_min": 5, "total_min": 40 }
+          ],
+          "duracion_total_minutos": 220,
+          "duracion_total_horas_aprox": 3.6,
+          "distribucion_semanal_horas": 0.9
+        }
+      }
 
   # ── Paso 7: Ensamblador A ─────────────────────────────────────────────────────
   - agent: agente_doble_A_f3
-    inputs_from: [extractor_f3, agente_plataforma_navegador, agente_reporteo, agente_formatos_multimedia, agente_navegacion_identidad, agente_criterios_aceptacion, agente_calculo_duracion]
+    inputs_from: [agente_plataforma_navegador, agente_reporteo, agente_formatos_multimedia, agente_navegacion_identidad, agente_criterios_aceptacion, agente_calculo_duracion]
     include_template: false
     task: |
-      Eres el ENSAMBLADOR A. Tu ÚNICA tarea es copiar y pegar las secciones generadas por los agentes especializados.
-      
-      REGLAS ESTRICTAS - VIOLARLAS ES UN ERROR GRAVE:
-      1. COPIA EXACTAMENTE el contenido de cada agente SIN MODIFICAR NADA.
-      2. NO generes contenido nuevo.
-      3. NO combines secciones.
-      4. NO modifiques tablas, textos ni números.
-      5. NO uses información fuera de las secciones provistas.
-      
-      Orden de ensamblaje:
-      1. Pegar contenido de AGENTE_PLATAFORMA_NAVEGADOR
-      2. Pegar contenido de AGENTE_REPORTEO
-      3. Pegar contenido de AGENTE_FORMATOS_MULTIMEDIA
-      4. Pegar contenido de AGENTE_NAVEGACION_IDENTIDAD
-      5. Pegar contenido de AGENTE_CRITERIOS_ACEPTACION
-      6. Pegar contenido de AGENTE_CALCULO_DURACION
-      
-      IMPORTANTE: El extractor_f3 contiene metadatos, NO debe aparecer en el documento final.
+      Toma los fragmentos JSON de los agentes anteriores y únelos en un solo objeto JSON unificado llamado 'especificaciones_tecnicas'. 
+      Puedes optimizar la coherencia entre ellos, pero la salida DEBE ser estrictamente este objeto JSON gigante.
+      NO DEVUELVAS MARKDOWN. NO USES ```json. SOLO EL OBJETO.
 
   # ── Paso 8: Ensamblador B ─────────────────────────────────────────────────────
   - agent: agente_doble_B_f3
     model: "@cf/qwen/qwen2.5-7b-instruct"
-    inputs_from: [extractor_f3, agente_plataforma_navegador, agente_reporteo, agente_formatos_multimedia, agente_navegacion_identidad, agente_criterios_aceptacion, agente_calculo_duracion]
+    inputs_from: [agente_plataforma_navegador, agente_reporteo, agente_formatos_multimedia, agente_navegacion_identidad, agente_criterios_aceptacion, agente_calculo_duracion]
     include_template: false
     max_input_chars: 4000
     task: |
-      Eres el ENSAMBLADOR B. Tu ÚNICA tarea es copiar y pegar las secciones generadas por los agentes especializados.
-      
-      REGLAS ESTRICTAS - VIOLARLAS ES UN ERROR GRAVE:
-      1. COPIA EXACTAMENTE el contenido de cada agente SIN MODIFICAR NADA.
-      2. NO generes contenido nuevo.
-      3. NO combines secciones.
-      4. NO modifiques tablas, textos ni números.
-      5. NO uses información fuera de las secciones provistas.
-      
-      Orden de ensamblaje:
-      1. Pegar contenido de AGENTE_PLATAFORMA_NAVEGADOR
-      2. Pegar contenido de AGENTE_REPORTEO
-      3. Pegar contenido de AGENTE_FORMATOS_MULTIMEDIA
-      4. Pegar contenido de AGENTE_NAVEGACION_IDENTIDAD
-      5. Pegar contenido de AGENTE_CRITERIOS_ACEPTACION
-      6. Pegar contenido de AGENTE_CALCULO_DURACION
-      
-      IMPORTANTE: El extractor_f3 contiene metadatos, NO debe aparecer en el documento final.
+      Toma los fragmentos JSON de los agentes anteriores y únelos en un solo objeto JSON unificado llamado 'especificaciones_tecnicas'. 
+      Puedes optimizar la coherencia entre ellos, pero la salida DEBE ser estrictamente este objeto JSON gigante.
+      NO DEVUELVAS MARKDOWN. NO USES ```json. SOLO EL OBJETO.
 
   # ── Paso 9: Juez ─────────────────────────────────────────────────────────────
   - agent: agente_juez_f3
     model: "@cf/meta/llama-3.1-8b-instruct"
     inputs_from: [agente_doble_A_f3, agente_doble_B_f3]
     include_template: false
-    max_input_chars: 3000
+    max_input_chars: 5000
     task: |
-      ENTRADAS: Borrador A y Borrador B del documento F3.
+      ENTRADAS: Borrador A y Borrador B del documento F3 (ambos en JSON).
 
-      TU ÚNICA TAREA: Comparar y validar ambos borradores.
-
-      CRITERIOS DE VALIDACIÓN:
-      1. ¿Ambos tienen exactamente 7 secciones numeradas (1-7)?
-      2. ¿La duración total en sección 6 es consistente con la suma del desglose?
-      3. ¿Los navegadores especificados son coherentes con la plataforma LMS?
-      4. ¿Las métricas de reporteo tienen frecuencia definida?
-      5. ¿La sección 7 tiene al menos 3 referencias bibliográficas reales?
-      6. ¿Hay placeholders sin resolver como [N], [X], [texto]?
-
-      DECISIÓN:
-      - "ok": ambos borradores son válidos, elige el más completo
-      - "revisar": hay inconsistencias menores corregibles
-      - "humano": hay contradicciones graves o datos inventados
-
-      FORMATO DE SALIDA — devuelve SOLO este JSON (sin markdown, sin texto adicional):
-      {
-        "similitud_general": [0-100],
-        "borrador_elegido": "A" o "B",
-        "secciones_ok": ["plataforma", "reporteo", "multimedia", "navegacion", "criterios", "duracion", "referencias"],
-        "secciones_con_problema": [],
-        "discrepancias": [
-          {"aspecto": "...", "borrador_A": "...", "borrador_B": "...", "decision": "usar A/B porque..."}
-        ],
-        "decision": "ok",
-        "justificacion": "..."
-      }
+      TU ÚNICA TAREA: Evalúa qué JSON tiene mayor rigor técnico según EC0366 y coherencia.
+      
+      REGLA ABSOLUTA: Devuelve ÚNICAMENTE el objeto JSON ganador en su totalidad. No respondas con justificaciones ni atributos extra fuera del JSON final unificado que servirá de payload al backend.
 
   # ── Paso 10: Validador F3 (código, sin IA) ───────────────────────────────────
-  # Detecta placeholders [Y], [N], [X] en los borradores. Si el borrador elegido
-  # tiene más placeholders que el alternativo, cambia la elección del juez.
-  # También verifica consistencia de duración y videos contra extractor_f3.
   - agent: validador_f3
     inputs_from: [agente_juez_f3]
 

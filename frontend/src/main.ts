@@ -78,6 +78,7 @@ async function initDashboard(): Promise<void> {
 
   try {
     const res = await getData<unknown[]>(buildEndpoint(ENDPOINTS.wizard.listProjects));
+    console.log('[DEBUG-FRONT-DATA] Proyectos recibidos:', res.data);
     renderDashboard(res.data ?? []);
   } catch {
     renderDashboard([]);
@@ -85,19 +86,26 @@ async function initDashboard(): Promise<void> {
 }
 
 function renderDashboard(projects: unknown[]): void {
-  const rows = (projects as Record<string, unknown>[]).map((p) => `
-    <div class="bg-white rounded-xl border border-gray-100 shadow-sm p-6 hover:shadow-md transition-shadow cursor-pointer project-card"
-      data-project-id="${p['project_id']}">
-      <div class="font-semibold text-gray-900 text-lg mb-1">${p['name']}</div>
-      <div class="text-gray-500 text-sm mb-4">${p['client_name']}</div>
-      <div class="flex items-center gap-2">
-        <div class="flex-1 bg-gray-100 rounded-full h-2">
-          <div class="bg-blue-900 rounded-full h-2 transition-all" style="width:${p['progress_pct'] ?? 0}%"></div>
+  const rows = (projects as Record<string, unknown>[]).map((p) => {
+    // LOG DE SEGURIDAD: Auditoría de identidad
+    if (!p['id']) {
+      console.error('Error: Proyecto detectado sin ID real', p);
+    }
+
+    return `
+      <div class="bg-white rounded-xl border border-gray-100 shadow-sm p-6 hover:shadow-md transition-shadow cursor-pointer project-card"
+        data-project-id="${p['id']}">
+        <div class="font-semibold text-gray-900 text-lg mb-1">${p['name']}</div>
+        <div class="text-gray-500 text-sm mb-4">${p['client_name']}</div>
+        <div class="flex items-center gap-2">
+          <div class="flex-1 bg-gray-100 rounded-full h-2">
+            <div class="bg-blue-900 rounded-full h-2 transition-all" style="width:${p['progress_pct'] ?? 0}%"></div>
+          </div>
+          <span class="text-xs text-gray-500">${p['progress_pct'] ?? 0}%</span>
         </div>
-        <span class="text-xs text-gray-500">${p['progress_pct'] ?? 0}%</span>
       </div>
-    </div>
-  `).join('');
+    `;
+  }).join('');
 
   dashboardContainer.innerHTML = `
     <div class="mb-8 flex items-center justify-between">
@@ -137,6 +145,10 @@ async function startNewProject(): Promise<void> {
 }
 
 async function resumeProject(projectId: string): Promise<void> {
+  if (!projectId || projectId === 'undefined') {
+    console.error('[ID-FATAL-ERROR] Se intentó cargar un proyecto sin ID definido.');
+    return;
+  }
   try {
     showLoading('Cargando proyecto...');
     const res = await getData<Record<string, unknown>>(

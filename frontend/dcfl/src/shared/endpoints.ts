@@ -43,7 +43,8 @@ const API_BASE = resolveApiBase();
 export const ENDPOINTS = {
   wizard: {
     createProject: '/wizard/project',
-    saveStep:      '/wizard/step',
+    saveStep:       '/wizard/step',
+    completeStep:   '/wizard/step/complete',
     generate:      '/wizard/generate',
     generateAsync: '/wizard/generate-async',
     generateForm:  '/wizard/generate-form',

@@ -16,7 +16,15 @@ async function request<T>(url: string, options: RequestOptions): Promise<ApiResp
   };
 
   const token = localStorage.getItem('knowto_auth_token');
-  if (token) headers['Authorization'] = `Bearer ${token}`;
+  if (token && token.trim() !== '') {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  if (url.includes('undefined')) {
+    console.error('[URL-CRITICAL-UNDEFINED] Se detectó "undefined" en la URL:', url);
+  }
+  
+  console.log('[HTTP-DEBUG] Request URL:', url);
 
   const response = await fetch(url, {
     method: options.method,

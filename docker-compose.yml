@@ -368,19 +368,20 @@ services:
   # ---------------------------------------------------------------------------
   ollama:
     image: ollama/ollama:latest
-    container_name: knowto-ollama-1
+    container_name: knowto-ollama
     ports:
       - "11434:11434"
     volumes:
       - ollama_data:/root/.ollama
     environment:
       - OLLAMA_CONTEXT_LENGTH=16384
+    entrypoint: /bin/sh
     command: >
-      sh -c "ollama serve &
-             sleep 10 &&
-             ollama pull qwen2.5:14b &&
-             ollama pull gemma2:27b &&
-             wait"
+      -c "ollama serve &
+      sleep 10 &&
+      ollama pull qwen2.5:14b &&
+      ollama pull gemma2:27b &&
+      wait"
     networks:
       knowto-network:
         ipv4_address: 172.20.0.20

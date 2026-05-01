@@ -13,97 +13,110 @@ export async function handleF2Assembler(params: {
   borradorB: string;
   parsed: any;
 }): Promise<string> {
-  const { jobId, projectId, projectName, pipelineService, supabase, borradorA, borradorB, parsed } = params;
+  const { jobId, projectId, pipelineService, supabase, borradorA, borradorB } = params;
   
-  console.log(`[pipeline] Iniciando ensamblaje F2 granular...`);
+  console.log(`[pipeline] Iniciando ensamblaje F2 estructurado (JSON Unificado)...`);
   
-  const decisiones = await supabase.getF2JuezDecisiones(jobId);
-  
-  const secciones = [
-    { key: 'modalidad',  titulo: '1. DECISIÓN DE MODALIDAD' },
-    { key: 'scorm',      titulo: '2. NIVEL DE INTERACTIVIDAD (SCORM)' },
-    { key: 'estructura', titulo: '3. ESTRUCTURA TEMÁTICA PRELIMINAR' },
-    { key: 'perfil',     titulo: '4. PERFIL DE INGRESO' },
-    { key: 'estrategias', titulo: '5. ESTRATEGIAS INSTRUCCIONALES' },
-    { key: 'supuestos',  titulo: '6. SUPUESTOS Y RESTRICCIONES' }
-  ];
-  
-  let documentoFinal = getF2Header(projectName);
-  const seccionesAgregadas = new Set<string>();
-  
-  for (const s of secciones) {
-    const headerKey = s.titulo.match(/^\d+/)?.[0] ?? s.key;
-    if (seccionesAgregadas.has(headerKey)) continue;
-    seccionesAgregadas.add(headerKey);
+  // 1. Determinar el borrador ganador
+  const juezTemarioOutput = await pipelineService.getAgentOutput(jobId, 'juez_temario');
+  let ganador = 'A';
+  if (juezTemarioOutput) {
+    try {
+      const decisionObj = JSON.parse(juezTemarioOutput);
+      if (decisionObj.seleccion === 'B') ganador = 'B';
+    } catch {
+      if (juezTemarioOutput.includes('"seleccion": "B"') || juezTemarioOutput.includes("'seleccion': 'B'")) {
+        ganador = 'B';
+      }
+    }
+  }
 
-    const d = decisiones[s.key];
-    const elegido = d?.seleccion === 'B' ? 'B' : 'A';
-    const source = elegido === 'B' ? borradorB : borradorA;
+  // 2. Extraer JSON unificado del especialista ganador
+  const rawOutput = ganador === 'B' ? borradorB : borradorA;
+  let f2Payload: any = {};
+  
+  try {
+    // 2.1 Extraer solo el bloque JSON (ignora texto previo o posterior)
+    const jsonMatch = rawOutput.match(/\{[\s\S]*\}/);
+    let cleanJsonString = jsonMatch ? jsonMatch[0] : rawOutput;
+
+    try {
+      f2Payload = JSON.parse(cleanJsonString);
+    } catch (parseError) {
+      // 2.2 Intento de rescate si el LLM cortó el JSON al final
+      console.warn("[F2] Parseo estricto falló, intentando reparar JSON...");
+      const trimmed = cleanJsonString.trim();
+      if (!trimmed.endsWith('}')) {
+          cleanJsonString = trimmed + '}';
+      }
+      f2Payload = JSON.parse(cleanJsonString);
+    }
+  } catch (error) {
+    console.error("[F2] Error irrecuperable al parsear JSON unificado:", error);
+    // 2.3 Fallback de emergencia para que el sistema no se caiga
+    f2Payload = {
+        modalidad_curso: { seleccion: "Error de formato", justificacion: "El sistema no pudo procesar la respuesta estructurada de la IA." },
+        grado_interactividad: { nivel: "Medio", justificacion: "Fallback por error de parseo" },
+        estructura_tematica: [],
+        perfil_ingreso_ec0366: {}
+    };
+  }
+
+  // 3. Generar Markdown determinístico para el frontend
+  let documentoFinal = `# ESPECIFICACIONES DE ANÁLISIS Y DISEÑO (EC0366)\n\n`;
+  
+  if (f2Payload.perfil_ingreso_ec0366) {
+    documentoFinal += `## 1. PERFIL DE INGRESO EC0366\n`;
+    const p = f2Payload.perfil_ingreso_ec0366;
+    if (p.escolaridad_minima) documentoFinal += `- **Escolaridad mínima**: ${p.escolaridad_minima.requisito} (${p.escolaridad_minima.justificacion})\n`;
+    if (p.conocimientos_previos) documentoFinal += `- **Conocimientos previos**: ${p.conocimientos_previos.requisito} (${p.conocimientos_previos.justificacion})\n`;
+    if (p.habilidades_digitales) documentoFinal += `- **Habilidades digitales**: ${p.habilidades_digitales.requisito} (${p.habilidades_digitales.justificacion})\n`;
+    if (p.equipo_computo) documentoFinal += `- **Equipo de cómputo**: ${p.equipo_computo.requisito} (${p.equipo_computo.justificacion})\n`;
+    if (p.conexion_internet) documentoFinal += `- **Conexión a internet**: ${p.conexion_internet.requisito} (${p.conexion_internet.justificacion})\n`;
+    if (p.software_requerido) documentoFinal += `- **Software requerido**: ${p.software_requerido.requisito} (${p.software_requerido.justificacion})\n`;
+    if (p.disponibilidad_sugerida) documentoFinal += `- **Disponibilidad**: ${p.disponibilidad_sugerida.requisito} (${p.disponibilidad_sugerida.justificacion})\n`;
+    documentoFinal += `\n`;
+    if (f2Payload.validacion_perfil) {
+      documentoFinal += `> **Validación de Realidad:** ${f2Payload.validacion_perfil.es_realista ? 'Viable' : 'Requiere ajuste'} - ${f2Payload.validacion_perfil.razon_o_ajuste}\n\n`;
+    }
+  }
+  
+  if (f2Payload.modalidad_curso) {
+    documentoFinal += `## 2. DECISIÓN DE MODALIDAD E INTERACTIVIDAD\n`;
+    documentoFinal += `- **Modalidad**: ${f2Payload.modalidad_curso.seleccion}\n`;
+    documentoFinal += `  *Justificación: ${f2Payload.modalidad_curso.justificacion}*\n`;
+    if (f2Payload.grado_interactividad) {
+      documentoFinal += `- **Nivel de Interactividad**: ${f2Payload.grado_interactividad.nivel}\n`;
+      documentoFinal += `  *Justificación: ${f2Payload.grado_interactividad.justificacion}*\n`;
+    }
+    documentoFinal += `\n`;
+  }
+
+  if (f2Payload.estructura_tematica && Array.isArray(f2Payload.estructura_tematica) && f2Payload.estructura_tematica.length > 0) {
+    documentoFinal += `## 3. ESTRUCTURA TEMÁTICA PRELIMINAR\n`;
+    documentoFinal += `| Módulo | Nombre | Objetivo | Duración |\n`;
+    documentoFinal += `|:---|:---|:---|:---|\n`;
     
-    let contenido = extractF2Section(source, s.titulo);
-    contenido = cleanAgentOutput(contenido);
-
-    if (s.key === 'perfil') {
-      const rows = contenido.match(/\|.*\|.*\|.*\|/g);
-      if (rows && rows.length >= 5) {
-        contenido = '| Categoría | Requisito | Fuente |\n|:---|:---|:---|\n' + 
-                   rows.filter(r => !r.includes('Categoría') && !r.includes(':---')).slice(0, 5).join('\n');
-      } else {
-        console.warn(`[F2] Perfil de ingreso con filas insuficientes (${rows?.length ?? 0}) en Borrador ${elegido}`);
-      }
-    }
-
-    documentoFinal += `\n\n---\n\n## ${s.titulo}\n\n${contenido}`;
-    console.log(`[ensamblador_f2] Sección '${s.key}' [${headerKey}] tomada de Borrador ${elegido}`);
+    f2Payload.estructura_tematica.forEach((mod: any) => {
+      documentoFinal += `| ${mod.modulo || '-'} | ${mod.nombre || '-'} | ${mod.objetivo || '-'} | ${mod.duracion_estimada_horas ? `${mod.duracion_estimada_horas} hrs` : '-'} |\n`;
+    });
+    documentoFinal += `\n`;
   }
-  
-  // Limpieza final de encabezados duplicados
-  const lines = documentoFinal.split('\n');
-  const finalSeenHeaders = new Set<string>();
-  const filteredLines = [];
-  let skipping = false;
 
-  for (const line of lines) {
-    const headerMatch = line.match(/^## (\d+\.[^#\n]+)/);
-    if (headerMatch) {
-      const header = headerMatch[1]!;
-      if (finalSeenHeaders.has(header)) {
-        skipping = true;
-        continue;
-      }
-      finalSeenHeaders.add(header);
-      skipping = false;
-    }
-    if (!skipping) filteredLines.push(line);
-  }
-  documentoFinal = filteredLines.join('\n');
-  
-  const interactividadRecord = parsed.interactividad 
-    ? (Array.isArray(parsed.interactividad) 
-        ? Object.fromEntries(parsed.interactividad.map((item: any, idx: number) => [`item_${idx}`, item]))
-        : parsed.interactividad as Record<string, unknown>)
-    : null;
-
-  const estrategiasNormalizadas = (parsed.estrategias as any[])?.map((e: any) => ({
-    estrategia: e.estrategia,
-    descripcion: e.descripcion,
-    modulos: e.modulos || e.modulo,
-    bloom: e.bloom
-  })) ?? null;
-
+  // 4. Guardar en Base de Datos
   await supabase.saveF2Analisis({
     projectId,
     jobId,
     documento_final: documentoFinal,
-    modalidad: parsed.modalidad ?? null,
-    interactividad: interactividadRecord,
-    estructura_tematica: parsed.estructura_tematica ?? null,
-    perfil_ingreso: parsed.perfil_ingreso ?? null,
-    estrategias: estrategiasNormalizadas,
-    supuestos_restricciones: parsed.supuestos_restricciones ?? null,
-    perfil_ajustado: parsed.perfil_ajustado ?? null
+    modalidad: f2Payload.modalidad_curso?.seleccion || null,
+    estructura_tematica: f2Payload.estructura_tematica || null,
+    perfil_ingreso: f2Payload.perfil_ingreso_ec0366 || null,
+    interactividad: f2Payload.grado_interactividad || null,
+    estrategias: null,
+    supuestos_restricciones: null,
+    perfil_ajustado: f2Payload.validacion_perfil || null
   });
   
-  console.log(`[pipeline] sintetizador_final_f2 F2 → Ensamblado granular completado`);
+  console.log(`[pipeline] sintetizador_final_f2 F2 → Ensamblado estructurado (JSON Unificado) completado usando borrador ${ganador}`);
   return documentoFinal;
 }

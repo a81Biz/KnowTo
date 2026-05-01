@@ -113,6 +113,8 @@ export class AIService {
     }
     if (options.context.previousData) compactContextObj.previousData = options.context.previousData;
     if (options.context.webSearchResults) compactContextObj.webSearchResults = options.context.webSearchResults;
+    // Incluir fase3 (objeto, no string) para pipelines F4 que usan inputs_from + task
+    if (options.context.fase3) compactContextObj.fase3 = options.context.fase3;
     if (options.userInputs && Object.keys(options.userInputs).length > 0) {
       compactContextObj.userInputs = options.userInputs;
     }
@@ -167,7 +169,15 @@ export class AIService {
         promptText = this._buildGenericPrompt(step, out, template);
       }
 
-      const rendered = this.registry.render(promptText, params);
+      let rendered = this.registry.render(promptText, params);
+      
+      // Interpolación manual de variables anidadas (Handlebars falla con strings JSON)
+      if (options.userInputs) {
+        rendered = rendered.replace(/\{\{\s*userInputs\.perfil\s*\}\}/g, JSON.stringify(options.userInputs.perfil || {}, null, 2));
+        rendered = rendered.replace(/\{\{\s*userInputs\.objetivosAprobados\s*\}\}/g, JSON.stringify(options.userInputs.objetivosAprobados || [], null, 2));
+        rendered = rendered.replace(/\{\{\s*userInputs\.notas\s*\}\}/g, String(options.userInputs.notas || 'Ninguna'));
+      }
+
       console.log(`[PIPELINE] Ejecutando agente: ${step.agent} (Step ${stepIndex + 1}/${totalSteps})`);
       console.log(`[PIPELINE] Prompt size: ${rendered.length} chars. Preview: ${rendered.substring(0, 300)}...`);
 
@@ -200,7 +210,17 @@ export class AIService {
           out[step.agent] = override;
         }
       }
+
       stepIndex++;
+      
+      // Notificar progreso intermedio (Paso N completado)
+      if (options.onProgress) {
+        await options.onProgress({ 
+          currentStep: `${step.agent} (finalizado)`, 
+          stepIndex, 
+          totalSteps 
+        }).catch(() => { });
+      }
     }
 
     const lastStep = steps[steps.length - 1];
@@ -209,7 +229,12 @@ export class AIService {
   }
 
   private _isAssemblyAgent(name: string): boolean {
-    return ['sintetizador_final_f2', 'sintetizador_final_f2_5', 'sintetizador_final_f3', 'sintetizador_final_f4', 'ensamblador', 'qa_tabla_builder'].includes(name) || name.startsWith('validador_');
+    return (
+      ['ensamblador', 'qa_tabla_builder'].includes(name) ||
+      name.startsWith('ensamblador_') ||
+      name.startsWith('sintetizador_final') ||
+      name.startsWith('validador_')
+    );
   }
 
   private async _handleAssemblyAgent(name: string, out: Record<string, string>, step: any, options: GenerateOptions, template: string): Promise<string> {

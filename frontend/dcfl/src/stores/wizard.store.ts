@@ -14,7 +14,7 @@ const STEP_DEFINITIONS: Omit<WizardStep, 'status' | 'inputData'>[] = [
   { stepNumber: 2,  phaseId: 'F2',    promptId: 'F2',    label: 'Análisis',               icon: 'architecture' },
   { stepNumber: 3,  phaseId: 'F2.5',  promptId: 'F2_5',  label: 'Recomendaciones',        icon: 'lightbulb' },
   { stepNumber: 4,  phaseId: 'F3',    promptId: 'F3',    label: 'Especificaciones',       icon: 'settings' },
-  { stepNumber: 5,  phaseId: 'F4',    promptId: 'F4_P0', label: 'Producción',             icon: 'construction' },
+  { stepNumber: 5,  phaseId: 'F4',    promptId: 'F4_P1', label: 'Producción',             icon: 'construction' },
   { stepNumber: 6,  phaseId: 'F5.1',  promptId: 'F5',    label: 'Verificación',           icon: 'fact_check' },
   { stepNumber: 7,  phaseId: 'F5.2',  promptId: 'F5_2',  label: 'Evidencias',             icon: 'photo_library' },
   { stepNumber: 8,  phaseId: 'F6.1',  promptId: 'F6',    label: 'Ajustes',                icon: 'tune' },
@@ -30,6 +30,7 @@ const initialState: WizardState = {
     clientName: '', projectName: '', industry: '', email: '',
     experienceLevel: '', budget: '', targetAudience: '', courseDuration: ''
   },
+  formCache: {},
   needsData: null,
   analysisData: null,
   specsData: null,
@@ -92,6 +93,11 @@ class WizardStoreClass {
   setClientData(data: Partial<ClientData>): void {
     this.state.clientData = { ...this.state.clientData, ...data };
     this.saveToLocalStorage(); this.notify();
+  }
+  setFormCache(data: Record<string, unknown>): void {
+    this.state.formCache = { ...this.state.formCache, ...data };
+    this.saveToLocalStorage();
+    this.notify();
   }
 
   setStepData(stepId: number, data: unknown): void {

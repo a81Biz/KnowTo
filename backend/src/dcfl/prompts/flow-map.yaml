@@ -223,53 +223,53 @@ pipelines:
         fallthrough_on_error: true
 
   # ─────────────────────────────────────────────────────────────────────────
-  # F4_P0: Cronograma de Desarrollo (Producto #1 del sub-wizard E1219)
+  # F4_P8: Cronograma de Desarrollo (Producto #1 del sub-wizard E1219)
   # ─────────────────────────────────────────────────────────────────────────
-  F4_P0:
+  F4_P8:
     description: "Cronograma detallado del desarrollo del curso (E1219 Producto 1)"
     stages:
-      - id: extractor_f4_p0
+      - id: extractor_f4_p8
         agent: extractor
-        prompt_id: DCFL_F4_P0_EXTRACTOR
+        prompt_id: DCFL_F4_P8_EXTRACTOR
         inputs:
           - f3_final
           - userInputs
-        output_guard: f4_p0_extracted
-        next: specialist_a_f4_p0
+        output_guard: f4_p8_extracted
+        next: specialist_a_f4_p8
 
-      - id: specialist_a_f4_p0
+      - id: specialist_a_f4_p8
         agent: specialist_a
-        prompt_id: DCFL_F4_P0_SPECIALIST_A
+        prompt_id: DCFL_F4_P8_SPECIALIST_A
         inputs:
-          - f4_p0_extracted
+          - f4_p8_extracted
           - userInputs
-        output_guard: f4_p0_draft_a
-        parallel_with: specialist_b_f4_p0
+        output_guard: f4_p8_draft_a
+        parallel_with: specialist_b_f4_p8
 
-      - id: specialist_b_f4_p0
+      - id: specialist_b_f4_p8
         agent: specialist_b
-        prompt_id: DCFL_F4_P0_SPECIALIST_B
+        prompt_id: DCFL_F4_P8_SPECIALIST_B
         inputs:
-          - f4_p0_extracted
+          - f4_p8_extracted
           - userInputs
-        output_guard: f4_p0_draft_b
-        next: synthesizer_f4_p0
+        output_guard: f4_p8_draft_b
+        next: synthesizer_f4_p8
 
-      - id: synthesizer_f4_p0
+      - id: synthesizer_f4_p8
         agent: synthesizer
-        prompt_id: DCFL_F4_P0_SYNTHESIZER
+        prompt_id: DCFL_F4_P8_SYNTHESIZER
         inputs:
-          - f4_p0_draft_a
-          - f4_p0_draft_b
-        output_guard: f4_p0_synthesized
-        next: judge_f4_p0
+          - f4_p8_draft_a
+          - f4_p8_draft_b
+        output_guard: f4_p8_synthesized
+        next: judge_f4_p8
 
-      - id: judge_f4_p0
+      - id: judge_f4_p8
         agent: judge
-        prompt_id: DCFL_F4_P0_JUDGE
+        prompt_id: DCFL_F4_P8_JUDGE
         inputs:
-          - f4_p0_synthesized
-        output_guard: f4_p0_final
+          - f4_p8_synthesized
+        output_guard: f4_p8_final
         retry_on_reject: true
         max_retries: 2
         fallthrough_on_error: true

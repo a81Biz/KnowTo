@@ -2,9 +2,7 @@
 // HTML en: /templates/tpl-step4-production.html
 //
 // Sub-wizard de F4: genera los 8 productos EC0366 de forma secuencial.
-// Cada producto usa su propio promptId (F4_P0 ... F4_P7).
-// El usuario aprueba cada producto antes de continuar al siguiente.
-// Todos los productos se acumulan en wizardStore como documentos separados.
+// AHORA CON FORMULARIOS DINÁMICOS GENERADOS POR IA
 
 import { BaseStep } from '../shared/step.base';
 import { postData, getData } from '@core/http.client';
@@ -12,38 +10,38 @@ import { ENDPOINTS, buildEndpoint } from '../shared/endpoints';
 import { showLoading, hideLoading, showError, renderMarkdown, printDocument } from '@core/ui';
 import { wizardStore } from '../stores/wizard.store';
 import type { PromptId } from '../types/wizard.types';
-import { subscribeToJob } from '../shared/supabase.realtime';
+import { subscribeToJob, type JobSubscription } from '../shared/supabase.realtime';
 
 interface F4ProductoBD {
   id: string;
-  producto: string;          // 'P0'..'P7'
+  producto: string;
   documento_final: string | null;
-  validacion_estado: string; // 'aprobado' | 'revision_humana' | 'pendiente'
+  validacion_estado: string;
   validacion_errores: Record<string, unknown> | null;
   job_id: string | null;
 }
 
-const STEP_NUMBER = 6;
+const STEP_NUMBER = 5;
 
-const PRODUCTS: Array<{ promptId: PromptId; label: string; elementoEC: string }> = [
-  { promptId: 'F4_P0', label: 'Cronograma de Desarrollo',         elementoEC: 'E1219 — Producto #1' },
-  { promptId: 'F4_P1', label: 'Documento de Información General',  elementoEC: 'E1219 — Producto #2' },
-  { promptId: 'F4_P2', label: 'Guías de Actividades por Módulo',   elementoEC: 'E1220 — Producto #1' },
-  { promptId: 'F4_P3', label: 'Calendario General de Actividades', elementoEC: 'E1220 — Producto #2' },
-  { promptId: 'F4_P4', label: 'Documentos de Texto',               elementoEC: 'E1220 — Producto #3' },
-  { promptId: 'F4_P5', label: 'Presentación Electrónica',          elementoEC: 'E1220 — Producto #4' },
-  { promptId: 'F4_P6', label: 'Guiones de Material Multimedia',    elementoEC: 'E1220 — Producto #5' },
-  { promptId: 'F4_P7', label: 'Instrumentos de Evaluación',        elementoEC: 'E1220 — Producto #6' },
+const PRODUCTS: Array<{ promptId: PromptId; productCode: string; label: string; elementoEC: string }> = [
+  { promptId: 'F4_P1_GENERATE_DOCUMENT' as PromptId, productCode: 'P1', label: '1 Instrumentos de Evaluación', elementoEC: 'Producto #1' },
+  { promptId: 'F4_P2_GENERATE_DOCUMENT' as PromptId, productCode: 'P2', label: '2 Presentación Electrónica', elementoEC: 'Producto #2' },
+  { promptId: 'F4_P3_GENERATE_DOCUMENT' as PromptId, productCode: 'P3', label: '3 Guiones Multimedia', elementoEC: 'Producto #3' },
+  { promptId: 'F4_P4_GENERATE_DOCUMENT' as PromptId, productCode: 'P4', label: '4 Manual del Participante', elementoEC: 'Producto #4' },
+  { promptId: 'F4_P5_GENERATE_DOCUMENT' as PromptId, productCode: 'P5', label: '5 Guías de Actividades', elementoEC: 'Producto #5' },
+  { promptId: 'F4_P6_GENERATE_DOCUMENT' as PromptId, productCode: 'P6', label: '6 Calendario General', elementoEC: 'Producto #6' },
+  { promptId: 'F4_P7_GENERATE_DOCUMENT' as PromptId, productCode: 'P7', label: '7 Documento de Información', elementoEC: 'Producto #7' },
+  { promptId: 'F4_P8_GENERATE_DOCUMENT' as PromptId, productCode: 'P8', label: '8 Cronograma de Desarrollo', elementoEC: 'Producto #8' },
 ];
 
 class Step5ProductionController extends BaseStep {
   private _currentProductIndex = 0;
   private _approvedProducts: Map<number, { content: string; documentId: string }> = new Map();
   private _sharedFormData: Record<string, unknown> = {};
-  /** Índices de productos con validacion_estado = 'revision_humana' (requieren revisión manual) */
   private _validationWarnings: Set<number> = new Set();
+  private _currentSchema: any = null;
+  private _schemaSubscription: JobSubscription | null = null;
 
-  // DOM específico del sub-wizard
   private _subDom: {
     productIndicators?: HTMLElement;
     productElementLabel?: HTMLElement;
@@ -63,25 +61,284 @@ class Step5ProductionController extends BaseStep {
       stepNumber: STEP_NUMBER,
       templateId: 'tpl-step4-production',
       phaseId: 'F4',
-      promptId: 'F4_P0',
+      promptId: 'F4_P1',
       uiConfig: {
         loadingText: 'Generando producto...',
-        helpText: 'Genera los 8 productos obligatorios del EC0366 de forma secuencial. Cada producto se revisa y aprueba antes de continuar al siguiente. Los productos aprobados quedan guardados en tu expediente.',
+        helpText: 'Genera los 8 productos obligatorios del EC0366 de forma secuencial.',
       },
     });
   }
 
+  // ==============================================
+  // FORMULARIOS DINÁMICOS - NÚCLEO DEL SISTEMA
+  // ==============================================
+
+  /**
+   * Carga el esquema del formulario desde el backend (generado por IA)
+   * El backend ejecuta el pipeline F4_GENERATE_FORM_SCHEMA con dos agentes y un juez
+   */
+  private async _loadFormSchema(producto: string): Promise<any> {
+    const projectId = wizardStore.getState().projectId;
+    if (!projectId) return null;
+
+    const url = buildEndpoint(`/api/form-schema/${projectId}/${producto}`);
+    console.log('[F4] Fetching form schema from:', url);
+
+    try {
+      const result = await getData<any>(url) as any;
+      console.log('[F4] Response data:', result);
+
+      if (result.status === 'ready') {
+        this._currentSchema = result;
+        return result;
+      }
+
+      if (result.status === 'generating' && result.jobId) {
+        this._showGeneratingStatus();
+        return new Promise<any>((resolve) => {
+          this._schemaSubscription?.cancel();
+          this._schemaSubscription = subscribeToJob(
+            result.jobId,
+            async () => {
+              try {
+                const ready = await getData<any>(url) as any;
+                this._currentSchema = ready.status === 'ready' ? ready : null;
+                resolve(this._currentSchema);
+              } catch {
+                resolve(null);
+              }
+            },
+            (error) => {
+              console.error('[F4] Schema generation failed:', error);
+              this._showErrorForm();
+              resolve(null);
+            },
+            (job) => {
+              if (job.progress?.currentStep) {
+                this._showGeneratingStatus(job.progress.currentStep);
+              }
+            }
+          );
+        });
+      }
+    } catch (err) {
+      console.error('[F4] Error loading schema:', err);
+      this._showErrorForm();
+    }
+
+    return null;
+  }
+
+  /**
+   * Muestra estado de generación del formulario con el agente actual si está disponible
+   */
+  private _showGeneratingStatus(currentStep?: string): void {
+    const formContainer = document.getElementById('form-step6');
+    if (!formContainer) return;
+    const stepLine = currentStep
+      ? `<p class="text-purple-700 text-xs font-mono mt-2 bg-purple-100 rounded px-2 py-1 inline-block">${this._escapeHtml(currentStep)}</p>`
+      : `<p class="text-purple-600 text-sm mt-2">La IA está analizando tu curso para crear el formulario adecuado.</p>`;
+    formContainer.innerHTML = `
+      <div class="bg-purple-50 p-6 rounded-lg text-center border border-purple-200">
+        <div class="text-4xl mb-3">🤖</div>
+        <p class="text-purple-800 font-medium">Generando formulario inteligente...</p>
+        ${stepLine}
+        <div class="mt-3 flex justify-center">
+          <div class="animate-pulse flex space-x-1">
+            <div class="w-2 h-2 bg-purple-400 rounded-full"></div>
+            <div class="w-2 h-2 bg-purple-500 rounded-full"></div>
+            <div class="w-2 h-2 bg-purple-600 rounded-full"></div>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  /**
+   * Renderiza el formulario usando el esquema generado por IA
+   * NO hay código hardcodeado - todo viene del backend
+   */
+  private async _renderDynamicForm(): Promise<void> {
+    console.log('[F4] _renderDynamicForm called for index:', this._currentProductIndex);
+    const product = PRODUCTS[this._currentProductIndex];
+    const productoNum = product.productCode;
+    const formContainer = document.getElementById('form-step6');
+
+    if (!formContainer) return;
+
+    console.log(`[F4] Cargando formulario dinámico para ${productoNum}`);
+
+    // Mostrar loading
+    formContainer.innerHTML = `
+      <div class="bg-gray-50 p-4 rounded-lg text-center">
+        <p class="text-gray-500">🔄 Cargando formulario inteligente...</p>
+      </div>
+    `;
+
+    const schemaData = await this._loadFormSchema(productoNum);
+
+    if (!schemaData || schemaData.status !== 'ready') {
+      this._showErrorForm();
+      return;
+    }
+
+    const { schema, valores_sugeridos, valores_usuario } = schemaData;
+    const fields = schema.fields || [];
+
+    if (fields.length === 0) {
+      this._showErrorForm();
+      return;
+    }
+
+    // Construir HTML dinámicamente desde el esquema
+    let html = `
+      <div class="bg-blue-50 p-4 rounded-lg mb-4 border border-blue-200">
+        <p class="text-sm text-blue-800">${this._escapeHtml(schema.description || 'Confirma los datos para generar el producto:')}</p>
+      </div>
+    `;
+
+    for (const field of fields) {
+      const savedValue = valores_usuario?.[field.name];
+      const suggestedValue = valores_sugeridos?.[field.name] || field.suggested_value || '';
+      const value = (savedValue !== undefined && savedValue !== '') ? savedValue : suggestedValue;
+
+      const required = field.required ? '<span class="text-red-500">*</span>' : '';
+
+      html += `<div class="group mb-4">`;
+      html += `<label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">${this._escapeHtml(field.label)} ${required}</label>`;
+
+      if (field.type === 'textarea') {
+        html += `<textarea 
+          id="input-${field.name}" 
+          name="${field.name}" 
+          rows="${field.rows || 4}"
+          placeholder="${this._escapeHtml(field.placeholder || '')}"
+          class="input-field w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500">${this._escapeHtml(String(value))}</textarea>`;
+      } else if (field.type === 'select' && field.options?.length) {
+        html += `<select 
+          id="input-${field.name}" 
+          name="${field.name}"
+          class="input-field w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500">`;
+        for (const opt of field.options) {
+          html += `<option value="${this._escapeHtml(opt)}" ${value === opt ? 'selected' : ''}>${this._escapeHtml(opt)}</option>`;
+        }
+        html += `</select>`;
+      } else if (field.type === 'date') {
+        html += `<input 
+          id="input-${field.name}" 
+          name="${field.name}" 
+          type="date"
+          value="${this._escapeHtml(String(value))}"
+          class="input-field w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500">`;
+      } else {
+        html += `<input 
+          id="input-${field.name}" 
+          name="${field.name}" 
+          type="${field.type || 'text'}"
+          placeholder="${this._escapeHtml(field.placeholder || '')}"
+          value="${this._escapeHtml(String(value))}"
+          class="input-field w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500">`;
+      }
+
+      if (field.hint) {
+        html += `<p class="text-xs text-gray-400 mt-1">${this._escapeHtml(field.hint)}</p>`;
+      }
+
+      html += `</div>`;
+    }
+
+    formContainer.innerHTML = html;
+
+    // Guardar valores cuando cambien
+    this._bindFormAutoSave();
+  }
+
+  /**
+   * Auto-guarda los valores del formulario cuando el usuario cambia algo
+   */
+  private _bindFormAutoSave(): void {
+    const formContainer = document.getElementById('form-step6');
+    if (!formContainer) return;
+
+    const inputs = formContainer.querySelectorAll('input, textarea, select');
+    inputs.forEach(input => {
+      input.removeEventListener('change', this._saveFormValuesBound);
+      input.addEventListener('change', this._saveFormValuesBound);
+    });
+  }
+
+  private _saveFormValuesBound = () => this._saveFormValues();
+
+  private async _saveFormValues(): Promise<void> {
+    const projectId = wizardStore.getState().projectId;
+    const productoNum = PRODUCTS[this._currentProductIndex].productCode;
+    const formContainer = document.getElementById('form-step6');
+
+    if (!formContainer || !projectId) return;
+
+    const values: Record<string, any> = {};
+    const inputs = formContainer.querySelectorAll('input, textarea, select');
+
+    inputs.forEach((input: any) => {
+      if (input.name) {
+        values[input.name] = input.value;
+      }
+    });
+
+    try {
+      await postData(buildEndpoint(`/api/form-schema/${projectId}/${productoNum}`), { valores_usuario: values });
+      console.log(`[F4] Valores guardados para ${productoNum}`);
+    } catch (err) {
+      console.error('[F4] Error saving form values:', err);
+    }
+  }
+
+  /**
+   * Muestra error si no se puede cargar el formulario dinámico
+   */
+  private _showErrorForm(): void {
+    const formContainer = document.getElementById('form-step6');
+    if (formContainer) {
+      formContainer.innerHTML = `
+        <div class="bg-red-50 p-4 rounded-lg border border-red-200">
+          <p class="text-red-800">❌ Error al cargar el formulario dinámico</p>
+          <p class="text-red-600 text-sm mt-1">Intenta regenerar el formulario o contacta soporte.</p>
+          <button id="btn-retry-form" class="mt-3 px-4 py-2 bg-red-600 text-white rounded-lg text-sm">Reintentar</button>
+        </div>
+      `;
+
+      const retryBtn = document.getElementById('btn-retry-form');
+      if (retryBtn) {
+        retryBtn.addEventListener('click', () => this._renderDynamicForm());
+      }
+    }
+  }
+
+  private _escapeHtml(str: string): string {
+    if (!str) return '';
+    return str.replace(/[&<>]/g, (m) => {
+      if (m === '&') return '&amp;';
+      if (m === '<') return '&lt;';
+      if (m === '>') return '&gt;';
+      return m;
+    });
+  }
+
+  // ==============================================
+  // MÉTODOS EXISTENTES (adaptados)
+  // ==============================================
+
   private _cacheSubDom(): void {
-    this._subDom.productIndicators       = this._container.querySelector('#product-indicators') ?? undefined;
-    this._subDom.productElementLabel     = this._container.querySelector('#product-element-label') ?? undefined;
-    this._subDom.productTitle            = this._container.querySelector('#product-title') ?? undefined;
-    this._subDom.productCounter          = this._container.querySelector('#product-counter') ?? undefined;
-    this._subDom.productNotStarted       = this._container.querySelector('#product-not-started') ?? undefined;
-    this._subDom.productPreviewArea      = this._container.querySelector('#product-preview-area') ?? undefined;
-    this._subDom.productDocumentPreview  = this._container.querySelector('#product-document-preview') ?? undefined;
-    this._subDom.productGenerateArea     = this._container.querySelector('#product-generate-area') ?? undefined;
-    this._subDom.btnApproveProduct       = this._container.querySelector('#btn-approve-product') ?? undefined;
-    this._subDom.btnPrintProduct         = this._container.querySelector('#btn-print-product') ?? undefined;
+    this._subDom.productIndicators = this._container.querySelector('#product-indicators') ?? undefined;
+    this._subDom.productElementLabel = this._container.querySelector('#product-element-label') ?? undefined;
+    this._subDom.productTitle = this._container.querySelector('#product-title') ?? undefined;
+    this._subDom.productCounter = this._container.querySelector('#product-counter') ?? undefined;
+    this._subDom.productNotStarted = this._container.querySelector('#product-not-started') ?? undefined;
+    this._subDom.productPreviewArea = this._container.querySelector('#product-preview-area') ?? undefined;
+    this._subDom.productDocumentPreview = this._container.querySelector('#product-document-preview') ?? undefined;
+    this._subDom.productGenerateArea = this._container.querySelector('#product-generate-area') ?? undefined;
+    this._subDom.btnApproveProduct = this._container.querySelector('#btn-approve-product') ?? undefined;
+    this._subDom.btnPrintProduct = this._container.querySelector('#btn-print-product') ?? undefined;
     this._subDom.productionFormContainer = this._container.querySelector('#production-form-container') ?? undefined;
   }
 
@@ -93,41 +350,34 @@ class Step5ProductionController extends BaseStep {
       const isCurrent = i === this._currentProductIndex;
       const cls = approved
         ? hasWarning
-          ? 'bg-yellow-100 text-yellow-800 border border-yellow-400'
-          : 'bg-green-100 text-green-800 border border-green-300'
+          ? 'bg-yellow-100 text-yellow-800 border border-yellow-400 cursor-pointer hover:bg-yellow-200'
+          : 'bg-green-100 text-green-800 border border-green-300 cursor-pointer hover:bg-green-200'
         : isCurrent
-          ? 'bg-blue-100 text-blue-800 border border-blue-500 font-semibold'
-          : 'bg-gray-100 text-gray-400 border border-gray-200';
-      const icon = approved ? (hasWarning ? '⚠' : '✓') : String(i);
-      return `<span class="px-2 py-1 rounded text-xs ${cls}" title="${p.label}${hasWarning ? ' — Requiere revisión manual' : ''}">
+          ? 'bg-blue-100 text-blue-800 border border-blue-500 font-semibold cursor-pointer hover:bg-blue-200'
+          : 'bg-gray-100 text-gray-400 border border-gray-200 opacity-50';
+      const icon = approved ? (hasWarning ? '⚠' : '✓') : String(i + 1);
+      return `<span data-index="${i}" class="product-tab px-2 py-1 rounded text-xs transition-colors ${cls}" title="${p.label}${hasWarning ? ' — Requiere revisión manual' : ''}">
         ${icon} ${p.label.split(' ').slice(0, 2).join(' ')}
       </span>`;
     }).join('');
+
+    const tabs = this._subDom.productIndicators.querySelectorAll('.product-tab');
+    tabs.forEach(tab => {
+      tab.addEventListener('click', (e) => {
+        const target = e.currentTarget as HTMLElement;
+        const index = parseInt(target.getAttribute('data-index') || '-1', 10);
+        if (index >= 0 && this._approvedProducts.has(index)) {
+          this._currentProductIndex = index;
+          this._config.promptId = PRODUCTS[index].promptId;
+          this._updateProductHeader();
+          this._renderProductIndicators();
+          const prod = this._approvedProducts.get(index);
+          if (prod) this._showProductPreview(prod.content);
+        }
+      });
+    });
   }
 
-  /** Muestra u oculta el badge de advertencia de validación sobre el botón Aprobar */
-  private _updateValidationBadge(): void {
-    const hasWarning = this._validationWarnings.has(this._currentProductIndex);
-    const existing = this._subDom.productPreviewArea?.querySelector('#validation-warning-badge');
-    if (hasWarning && !existing && this._subDom.btnApproveProduct) {
-      const badge = document.createElement('div');
-      badge.id = 'validation-warning-badge';
-      badge.className = 'mb-3 p-3 bg-yellow-50 border border-yellow-300 rounded text-yellow-800 text-sm';
-      badge.innerHTML = `
-        <strong>⚠ Revisión recomendada</strong><br>
-        El validador automático detectó que este producto puede tener campos incompletos.
-        Revisa el contenido antes de aprobar o regenera para obtener una versión mejor.
-      `;
-      this._subDom.btnApproveProduct.insertAdjacentElement('beforebegin', badge);
-    } else if (!hasWarning && existing) {
-      existing.remove();
-    }
-  }
-
-  /**
-   * Carga productos ya generados desde BD (GET /fase4/productos).
-   * Permite reanudar el sub-wizard en una sesión interrumpida.
-   */
   private async _loadProductsFromBD(projectId: string): Promise<void> {
     try {
       const res = await getData<{ productos: F4ProductoBD[] }>(
@@ -138,32 +388,24 @@ class Step5ProductionController extends BaseStep {
 
       let maxApprovedIndex = -1;
       for (const p of productos) {
-        const idx = parseInt(p.producto.replace('P', ''), 10);
-        if (isNaN(idx) || !p.documento_final) continue;
-
+        const productNumber = parseInt(p.producto.replace('P', ''), 10);
+        if (isNaN(productNumber) || productNumber === 0) continue;
+        const idx = productNumber - 1;
+        if (!p.documento_final) continue;
         this._approvedProducts.set(idx, {
           content: p.documento_final,
           documentId: p.job_id ?? '',
         });
-
         if (p.validacion_estado === 'revision_humana') {
           this._validationWarnings.add(idx);
         }
-
         if (idx > maxApprovedIndex) maxApprovedIndex = idx;
       }
-
       if (maxApprovedIndex >= 0) {
-        // Avanzar al siguiente producto no aprobado
-        this._currentProductIndex = Math.min(maxApprovedIndex + 1, PRODUCTS.length - 1);
-        // Si el último ya fue aprobado, quedarse en él para ver el resumen
-        if (maxApprovedIndex === PRODUCTS.length - 1) {
-          this._currentProductIndex = PRODUCTS.length - 1;
-        }
-        console.log(`[F4] Restaurados ${this._approvedProducts.size} producto(s) desde BD. Continuando desde P${this._currentProductIndex}.`);
+        this._currentProductIndex = maxApprovedIndex;
+        console.log(`[F4] Restaurados ${this._approvedProducts.size} producto(s) desde BD.`);
       }
     } catch (err) {
-      // No abortar si falla la carga — se inicia fresh
       console.warn('[F4] No se pudieron cargar productos desde BD:', err);
     }
   }
@@ -172,7 +414,7 @@ class Step5ProductionController extends BaseStep {
     const product = PRODUCTS[this._currentProductIndex];
     if (!product) return;
     if (this._subDom.productElementLabel) this._subDom.productElementLabel.textContent = product.elementoEC;
-    if (this._subDom.productTitle) this._subDom.productTitle.textContent = `Producto ${this._currentProductIndex}: ${product.label}`;
+    if (this._subDom.productTitle) this._subDom.productTitle.textContent = `Producto ${this._currentProductIndex + 1}: ${product.label}`;
     if (this._subDom.productCounter) this._subDom.productCounter.textContent = `${this._approvedProducts.size} / ${PRODUCTS.length}`;
   }
 
@@ -183,13 +425,51 @@ class Step5ProductionController extends BaseStep {
     if (this._subDom.productDocumentPreview) {
       this._subDom.productDocumentPreview.innerHTML = renderMarkdown(content);
     }
-    this._updateValidationBadge();
+    if (this._subDom.btnApproveProduct) {
+      this._subDom.btnApproveProduct.style.display = 'none';
+    }
+
+    // Botón de aprobar
+    if (this._subDom.productPreviewArea) {
+      let approveBtn = this._subDom.productPreviewArea.querySelector('#btn-approve-continue') as HTMLButtonElement;
+      if (!approveBtn) {
+        approveBtn = document.createElement('button');
+        approveBtn.id = 'btn-approve-continue';
+        approveBtn.className = 'mt-6 bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-lg w-full transition-colors';
+        approveBtn.innerText = '✨ Aprobar y Continuar al Siguiente Producto';
+        this._subDom.productPreviewArea.appendChild(approveBtn);
+      }
+      const newApproveBtn = approveBtn.cloneNode(true) as HTMLButtonElement;
+      approveBtn.parentNode?.replaceChild(newApproveBtn, approveBtn);
+      newApproveBtn.addEventListener('click', () => {
+        if (this._currentProductIndex < PRODUCTS.length - 1) {
+          this._currentProductIndex++;
+          this._config.promptId = PRODUCTS[this._currentProductIndex].promptId;
+          this._updateProductHeader();
+          this._showGenerateArea();
+          this._renderProductIndicators();
+        } else {
+          alert('¡Todos los productos han sido generados y aprobados!');
+          this._approveCurrentProduct();
+        }
+      });
+    }
   }
 
   private _showGenerateArea(): void {
+    console.log('[F4] _showGenerateArea Front called');
+    this._schemaSubscription?.cancel();
+    this._schemaSubscription = null;
     if (this._subDom.productNotStarted) this._subDom.productNotStarted.classList.add('hidden');
     if (this._subDom.productPreviewArea) this._subDom.productPreviewArea.classList.add('hidden');
     if (this._subDom.productGenerateArea) this._subDom.productGenerateArea.classList.remove('hidden');
+    if (this._subDom.productDocumentPreview) {
+      this._subDom.productDocumentPreview.innerHTML = '';
+    }
+    if (this._subDom.productionFormContainer) {
+      this._subDom.productionFormContainer.classList.remove('hidden');
+    }
+    this._renderDynamicForm();
   }
 
   private async _generateCurrentProduct(): Promise<void> {
@@ -199,15 +479,20 @@ class Step5ProductionController extends BaseStep {
     const state = wizardStore.getState();
     if (!state.projectId) { showError('No hay proyecto activo.'); return; }
 
-    // Registrar step si no tiene ID
+    // Recolectar valores actuales del formulario
+    await this._saveFormValues();
+
+    // Cargar esquema para obtener los valores_usuario guardados
+    const productoNum = product.productCode;
+    const schemaData = await this._loadFormSchema(productoNum);
+    const userInputs = { ...(schemaData?.valores_usuario || this._sharedFormData), _producto: productoNum };
+
     let stepId = state.steps[STEP_NUMBER]?.stepId;
     if (!stepId) {
       try {
-        const formData = this._collectFormData();
-        this._sharedFormData = { ...this._sharedFormData, ...formData };
         const res = await postData<{ stepId: string }>(
           buildEndpoint(ENDPOINTS.wizard.saveStep),
-          { projectId: state.projectId, stepNumber: STEP_NUMBER, inputData: this._sharedFormData }
+          { projectId: state.projectId, stepNumber: STEP_NUMBER, inputData: userInputs }
         );
         if (res.data?.stepId) {
           stepId = res.data.stepId;
@@ -215,21 +500,13 @@ class Step5ProductionController extends BaseStep {
         }
       } catch { /* continuar */ }
     }
-    if (!stepId) { showError('No se pudo registrar el paso. Intenta de nuevo.'); return; }
-
-    // Ocultar formulario de datos compartidos después del primer producto
-    if (this._currentProductIndex > 0 && this._subDom.productionFormContainer) {
-      this._subDom.productionFormContainer.classList.add('hidden');
-    }
+    if (!stepId) { showError('No se pudo registrar el paso.'); return; }
 
     this._setLoading(true);
-    showLoading(`⏳ Generando ${product.label}... \nIniciando proceso concurrente en background...`);
+    showLoading(`⏳ Generando ${product.label}...`);
 
     try {
-      const context = wizardStore.buildContext(STEP_NUMBER) as {
-        projectName: string; clientName: string; industry?: string; email?: string; previousData?: Record<string, unknown>;
-      };
-      const userInputs = { ...this._sharedFormData, currentProductIndex: this._currentProductIndex };
+      const context = wizardStore.buildContext(STEP_NUMBER) as any;
 
       const res = await postData<{ jobId: string; status: string }>(
         buildEndpoint(ENDPOINTS.wizard.generateAsync),
@@ -245,25 +522,28 @@ class Step5ProductionController extends BaseStep {
 
       if (res.data && res.data.jobId) {
         const jobId = res.data.jobId;
-
-        // Limpiar suscripción previa si hubiere
         this._jobSubscription?.cancel();
-
         this._jobSubscription = subscribeToJob(
           jobId,
-          (result) => {
+          async (result) => {
             const idx = this._currentProductIndex;
-            this._approvedProducts.set(idx, {
-              content: result.content as string,
-              documentId: result.documentId as string,
-            });
-            // Detectar si el backend marcó este producto como revisión_humana
-            // (el job result puede incluir metadata de validación si la ruta la expone)
-            const meta = result as Record<string, unknown>;
+            if (state.projectId) {
+              await this._loadProductsFromBD(state.projectId);
+            }
+            this._currentProductIndex = idx;
+            const prod = this._approvedProducts.get(idx);
+            const content = prod ? prod.content : (result.content as string);
+            if (!prod) {
+              this._approvedProducts.set(idx, {
+                content: result.content as string,
+                documentId: result.documentId as string,
+              });
+            }
+            const meta = result as unknown as Record<string, unknown>;
             if (meta.validacion_estado === 'revision_humana') {
               this._validationWarnings.add(idx);
             }
-            this._showProductPreview(result.content as string);
+            this._showProductPreview(content);
             this._renderProductIndicators();
             this._setLoading(false);
             hideLoading();
@@ -275,10 +555,7 @@ class Step5ProductionController extends BaseStep {
           },
           (job) => {
             if (job.progress?.currentStep) {
-              const { currentStep, stepIndex, totalSteps } = job.progress;
-              showLoading(`⏳ Generando ${product.label}... \n(${currentStep} - paso ${stepIndex + 1}/${totalSteps})`);
-            } else {
-              showLoading(`⏳ Generando ${product.label}... \nPuedes seguir el progreso detallado en el backend.`);
+              showLoading(`⏳ Generando ${product.label}... (${job.progress.currentStep})`);
             }
           }
         );
@@ -291,28 +568,29 @@ class Step5ProductionController extends BaseStep {
   }
 
   private _approveCurrentProduct(): void {
-    // Ya fue guardado en el store local durante la generación — avanzar al siguiente producto
     if (this._currentProductIndex < PRODUCTS.length - 1) {
       this._currentProductIndex++;
+      this._config.promptId = PRODUCTS[this._currentProductIndex].promptId;
       this._updateProductHeader();
       this._showGenerateArea();
       this._renderProductIndicators();
     } else {
-      // Todos aprobados — marcar el step como completado con contenido concatenado
       const allContent = PRODUCTS.map((p, i) => {
         const prod = this._approvedProducts.get(i);
-        return prod ? `---\n# PRODUCTO ${i}: ${p.label}\n\n${prod.content}` : '';
+        return prod ? `---\n# PRODUCTO ${i + 1}: ${p.label}\n\n${prod.content}` : '';
       }).filter(Boolean).join('\n\n');
-
       wizardStore.setStepDocument(STEP_NUMBER, allContent, 'multi-product');
-      wizardStore.setStepStatus(STEP_NUMBER, 'completed');
+      if (this._approvedProducts.size === PRODUCTS.length) {
+        wizardStore.setStepStatus(STEP_NUMBER, 'completed');
+        // Persist completion to DB so resumeProject() advances past step 5 on next load
+        const stepId = wizardStore.getState().steps[STEP_NUMBER]?.stepId;
+        if (stepId) {
+          postData(buildEndpoint(ENDPOINTS.wizard.completeStep), { stepId }).catch(() => {});
+        }
+      }
       this._renderProductIndicators();
-
       if (this._subDom.productCounter) {
         this._subDom.productCounter.textContent = `${PRODUCTS.length} / ${PRODUCTS.length} ✓`;
-      }
-      if (this._subDom.productTitle) {
-        this._subDom.productTitle.textContent = '¡Todos los productos completados!';
       }
       if (this._subDom.productGenerateArea) {
         this._subDom.productGenerateArea.classList.add('hidden');
@@ -324,22 +602,15 @@ class Step5ProductionController extends BaseStep {
   }
 
   override _bindEvents(): void {
-    // Solo eventos sobre _dom (disponibles antes del cacheSubDom).
-    // Los eventos de _subDom se enlazan en mount() tras _cacheSubDom().
-    this._dom.form?.addEventListener('submit', (e) => {
+    // Use the actual form element (form-step6), not this._dom.form which looks for
+    // form-step5 (stepNumber=5) and would be null, causing e.preventDefault() to be skipped.
+    const form = this._container.querySelector<HTMLFormElement>('#form-step6');
+    form?.addEventListener('submit', (e) => {
       e.preventDefault();
-      this._sharedFormData = this._collectFormData();
       void this._generateCurrentProduct();
     });
-
-    // Fallback: el HTML5 form="form-step5" debería lanzar submit, pero si falla:
     this._dom.btnSubmit?.addEventListener('click', (e) => {
-      if (!this._dom.form?.checkValidity()) {
-        this._dom.form?.reportValidity();
-        return;
-      }
       e.preventDefault();
-      this._sharedFormData = this._collectFormData();
       void this._generateCurrentProduct();
     });
   }
@@ -348,16 +619,12 @@ class Step5ProductionController extends BaseStep {
     this._subDom.btnApproveProduct?.addEventListener('click', () => {
       this._approveCurrentProduct();
     });
-
     this._dom.btnCopy?.addEventListener('click', () => {
       const prod = this._approvedProducts.get(this._currentProductIndex);
       if (prod) {
-        navigator.clipboard.writeText(prod.content)
-          .then(() => { /* éxito silencioso */ })
-          .catch(() => showError('No se pudo copiar al portapapeles.'));
+        navigator.clipboard.writeText(prod.content).catch(() => showError('No se pudo copiar.'));
       }
     });
-
     this._subDom.btnPrintProduct?.addEventListener('click', () => {
       const prod = this._approvedProducts.get(this._currentProductIndex);
       if (prod) {
@@ -365,7 +632,6 @@ class Step5ProductionController extends BaseStep {
         printDocument(prod.content, productData?.label ?? 'Documento');
       }
     });
-
     this._dom.btnRegenerate?.addEventListener('click', () => {
       void this._generateCurrentProduct();
     });
@@ -386,38 +652,29 @@ class Step5ProductionController extends BaseStep {
     await super.mount(container);
     this._cacheSubDom();
 
-    // Restaurar datos del formulario compartido si existen
     const stepData = wizardStore.getState().steps[STEP_NUMBER];
-    if (stepData?.inputData) {
-      this._sharedFormData = stepData.inputData;
-    }
+    const formCache = wizardStore.getState().formCache || {};
+    this._sharedFormData = { ...stepData?.inputData, ...formCache };
 
-    // Intentar reanudar desde BD (carga productos ya generados en sesiones anteriores)
     const projectId = wizardStore.getState().projectId;
     if (projectId) {
       await this._loadProductsFromBD(projectId);
     }
 
+    this._config.promptId = PRODUCTS[this._currentProductIndex].promptId;
+
     this._bindSubDomEvents();
     this._updateProductHeader();
     this._renderProductIndicators();
 
-    // Si el producto actual ya fue aprobado (reanudando sesión), mostrar su preview
     const existingProduct = this._approvedProducts.get(this._currentProductIndex);
     if (existingProduct) {
       this._showProductPreview(existingProduct.content);
     } else {
       this._showGenerateArea();
     }
-
-    // Ocultar formulario de datos si ya pasamos del primer producto
-    if (this._currentProductIndex > 0 && this._subDom.productionFormContainer) {
-      this._subDom.productionFormContainer.classList.add('hidden');
-    }
   }
 }
-
-// ── Exportación ──────────────────────────────────────────────────────────────
 
 const _instance = new Step5ProductionController();
 

@@ -317,6 +317,7 @@ export abstract class BaseSupabaseService {
     brechas_competencia: Array<{ tipo: string; descripcion: string; capacitable: string }> | null;
     declaracion_problema: string | null;
     objetivos_aprendizaje: Array<{ objetivo: string; nivel_bloom: string; tipo: string }> | null;
+    objetivos_especificos: Array<{ objetivo: string; nivel_bloom: string; dominio: string }> | null;
     perfil_participante: Record<string, string> | null;
     resultados_esperados: string[] | null;
     recomendaciones_diseno: string[] | null;
@@ -327,7 +328,7 @@ export abstract class BaseSupabaseService {
       .from('fase1_informe_necesidades')
       .select(
         'sintesis_contexto, preguntas_respuestas, brechas_competencia, declaracion_problema, ' +
-        'objetivos_aprendizaje, perfil_participante, resultados_esperados, recomendaciones_diseno',
+        'objetivos_aprendizaje, objetivos_especificos, perfil_participante, resultados_esperados, recomendaciones_diseno',
       )
       .eq('project_id', projectId)
       .order('created_at', { ascending: false })
@@ -342,6 +343,7 @@ export abstract class BaseSupabaseService {
       brechas_competencia: Array<{ tipo: string; descripcion: string; capacitable: string }> | null;
       declaracion_problema: string | null;
       objetivos_aprendizaje: Array<{ objetivo: string; nivel_bloom: string; tipo: string }> | null;
+      objetivos_especificos: Array<{ objetivo: string; nivel_bloom: string; dominio: string }> | null;
       perfil_participante: Record<string, string> | null;
       resultados_esperados: string[] | null;
       recomendaciones_diseno: string[] | null;

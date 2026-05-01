@@ -96,7 +96,7 @@ pipeline_steps:
       }
 
   - agent: juez_sector
-    model: "gemma2:27b"
+    model: "qwen2.5:14b"
     inputs_from: [agente_sector_A, agente_sector_B]
     include_template: false
     task: |
@@ -170,7 +170,7 @@ pipeline_steps:
 
 
   - agent: juez_practicas
-    model: "gemma2:27b"
+    model: "qwen2.5:14b"
     inputs_from: [agente_practicas_A, agente_practicas_B]
     include_template: false
     task: |
@@ -234,7 +234,7 @@ pipeline_steps:
 
 
   - agent: juez_competencia
-    model: "gemma2:27b"
+    model: "qwen2.5:14b"
     inputs_from: [agente_competencia_A, agente_competencia_B]
     include_template: false
     task: |
@@ -318,7 +318,7 @@ pipeline_steps:
 
 
   - agent: juez_estandares
-    model: "gemma2:27b"
+    model: "qwen2.5:14b"
     inputs_from: [agente_estandares_A, agente_estandares_B]
     include_template: false
     task: |
@@ -379,7 +379,7 @@ pipeline_steps:
 
 
   - agent: juez_gaps
-    model: "gemma2:27b"
+    model: "qwen2.5:14b"
     inputs_from: [agente_gaps_A, agente_gaps_B]
     include_template: false
     task: |
@@ -435,7 +435,7 @@ pipeline_steps:
 
 
   - agent: juez_preguntas
-    model: "gemma2:27b"
+    model: "qwen2.5:14b"
     inputs_from: [agente_preguntas_A, agente_preguntas_B]
 
     include_template: false
@@ -499,7 +499,7 @@ pipeline_steps:
 
 
   - agent: juez_recomendaciones
-    model: "gemma2:27b"
+    model: "qwen2.5:14b"
     inputs_from: [agente_recomendaciones_A, agente_recomendaciones_B]
     include_template: false
     task: |
@@ -554,7 +554,7 @@ pipeline_steps:
 
 
   - agent: juez_referencias
-    model: "gemma2:27b"
+    model: "qwen2.5:14b"
     inputs_from: [agente_referencias_A, agente_referencias_B]
     include_template: false
     task: |

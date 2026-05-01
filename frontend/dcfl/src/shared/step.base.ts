@@ -15,14 +15,14 @@ import type { PhaseId, PromptId } from '../types/wizard.types';
 // Solo los pasos que necesitan contexto compacto (2 en adelante).
 const EXTRACTOR_FOR_STEP: Record<number, string> = {
   2:  'EXTRACTOR_F2',
-  4:  'EXTRACTOR_F2_5',
-  5:  'EXTRACTOR_F3',
-  6:  'EXTRACTOR_F4',
-  7:  'EXTRACTOR_F5',
-  8:  'EXTRACTOR_F5_2',
-  9:  'EXTRACTOR_F6',
-  10: 'EXTRACTOR_F6_2a',
-  11: 'EXTRACTOR_F6_2b',
+  3:  'EXTRACTOR_F2_5',
+  4:  'EXTRACTOR_F3',
+  5:  'EXTRACTOR_F4',
+  6:  'EXTRACTOR_F5',
+  7:  'EXTRACTOR_F5_2',
+  8:  'EXTRACTOR_F6',
+  9:  'EXTRACTOR_F6_2a',
+  10: 'EXTRACTOR_F6_2b',
 };
 
 // ============================================================================
@@ -365,6 +365,9 @@ export class BaseStep {
       return this._generateDocument(extraData);
     }
 
+    // Ensure context is extracted even when regenerating a completed step
+    await this._ensureExtractedContext();
+
     const timerLabel = `step${this._config.stepNumber}:${this._config.promptId}`;
     logger.time(timerLabel);
     logger.info(`[step${this._config.stepNumber}] Iniciando generación async`, { promptId: this._config.promptId });
@@ -619,9 +622,11 @@ export class BaseStep {
     this._injectSummaryDiv();
     this._injectManualOverride();
 
-    await this._ensureExtractedContext();
-
     const step = wizardStore.getState().steps[this._config.stepNumber];
+    if (step?.status !== 'completed') {
+      await this._ensureExtractedContext();
+    }
+
     if (step?.documentContent) {
       this._renderPreview(step.documentContent);
     }

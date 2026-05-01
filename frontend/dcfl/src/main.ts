@@ -154,6 +154,14 @@ async function resumeProject(projectId: string): Promise<void> {
         email: String(project['email'] ?? ''),
       });
 
+      // Reset all steps to pending before hydrating from DB so stale localStorage
+      // state doesn't bleed through for steps that are pending in the DB.
+      for (let i = 0; i <= 11; i++) {
+        wizardStore.setStepStatus(i, 'pending');
+      }
+
+      let maxCompleted = -1;
+
       if (steps) {
         for (const apiStep of steps) {
           const stepNumber = Number(apiStep['step_number']);
@@ -167,14 +175,36 @@ async function resumeProject(projectId: string): Promise<void> {
               : apiStep['input_data'];
             wizardStore.setStepInputData(stepNumber, parsedInput);
           }
-          if (status === 'completed' && outputText) {
-            wizardStore.setStepDocument(stepNumber, outputText, stepId);
+          if (status === 'completed') {
+            maxCompleted = Math.max(maxCompleted, stepNumber);
+            if (outputText) {
+              wizardStore.setStepDocument(stepNumber, outputText, stepId);
+            } else {
+              wizardStore.setStepStatus(stepNumber, 'completed');
+            }
           }
           if (stepId) wizardStore.setStepId(stepNumber, stepId);
         }
+        // Reparación de hidratación: Si un paso superior está completado, 
+        // los pasos inferiores (aunque fuesen saltados) se marcan visualmente como completados.
+        // Opcional: Esto ya no debería ser necesario si iteramos buscando el primer incompleto.
+        // for (let i = 0; i < maxCompleted; i++) {
+        //    if (wizardStore.getState().steps[i].status !== 'completed') {
+        //       wizardStore.setStepStatus(i, 'completed');
+        //    }
+        // }
       }
 
-      wizardStore.goToStep(Number(project['current_step'] ?? 0));
+      // Calcular nextStep como el PRIMER paso que devuelva status !== 'completed'
+      let nextStep = 11;
+      const storeSteps = wizardStore.getState().steps;
+      for (let i = 0; i <= 11; i++) {
+        if (storeSteps[i].status !== 'completed') {
+          nextStep = i;
+          break;
+        }
+      }
+      wizardStore.goToStep(nextStep);
     }
     dashboardContainer.classList.add('hidden');
     wizardContainer.classList.remove('hidden');

@@ -1,5 +1,4 @@
 import { OpenAPIHono } from '@hono/zod-openapi';
-import { authMiddleware } from '../../core/middleware/auth.middleware';
 import { Env } from '../../core/types/env';
 import {
   routeCreateProject,
@@ -60,6 +59,7 @@ import {
 
 import {
   handleSaveStep,
+  handleCompleteStep,
 } from '../handlers/step.handlers';
 
 import {
@@ -81,12 +81,12 @@ wizard.onError((err, c) => {
   return c.json({ success: false, error: message, timestamp: new Date().toISOString() }, 500);
 });
 
-wizard.use('*', authMiddleware);
+// wizard.use('*', authMiddleware);
 
 // Proyectos
 wizard.openapi(routeCreateProject, handleCreateProject);
 wizard.openapi(routeGetProject, handleGetProject);
-wizard.openapi(routeListProjects, handleListProjects);
+wizard.get('/projects', handleListProjects);
 
 // Fases
 wizard.openapi(routeGetF1Informe, handleGetF1Informe);
@@ -113,6 +113,7 @@ wizard.get('/project/:projectId/fase1/preguntas-respuestas', handleGetFase1Pregu
 
 // Pasos
 wizard.openapi(routeSaveStep, handleSaveStep);
+wizard.post('/step/complete', handleCompleteStep);
 
 // Extracción
 wizard.openapi(routeExtract, handleExtract);

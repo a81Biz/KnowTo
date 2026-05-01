@@ -1,3 +1,15 @@
+import { Agent, setGlobalDispatcher } from 'undici';
+
+// Configurar agente global para peticiones de larga duración (Ollama 27B)
+// Esto anula los timeouts de socket por defecto de Node.js (5 min)
+const globalDispatcher = new Agent({
+  connect: { timeout: 900000 },
+  headersTimeout: 900000,
+  bodyTimeout: 900000,
+  keepAliveTimeout: 900000,
+});
+setGlobalDispatcher(globalDispatcher);
+
 export interface ILLMProvider {
   generate(prompt: string, model?: string, systemPrompt?: string): Promise<string>;
   generateVision(prompt: string, imageBase64: string, mimeType: string): Promise<string>;
@@ -12,13 +24,8 @@ export class OllamaProvider implements ILLMProvider {
   private url: string;
   private defaultModel: string;
 
-  // Mapeo de modelos Cloudflare a modelos Ollama
-  private readonly modelMapping: Record<string, string> = {
-    '@cf/meta/llama-3.1-8b-instruct': 'llama3.1:8b',
-    '@cf/meta/llama-3.2-3b-instruct': 'llama3.2:3b',
-    '@cf/qwen/qwen2.5-7b-instruct':   'qwen2.5:7b',
-    '@cf/mistral/mistral-7b-instruct-v0.2': 'mistral:7b',
-  };
+
+  private readonly OLLAMA_TIMEOUT = 15 * 60 * 1000; // 15 minutos
 
   constructor(url: string, defaultModel: string) {
     this.url = url.replace(/\/$/, '');
@@ -26,18 +33,13 @@ export class OllamaProvider implements ILLMProvider {
   }
 
   async generate(prompt: string, model?: string, systemPrompt?: string): Promise<string> {
-    // Mapear modelo Cloudflare a Ollama si es necesario
-    let finalModel = model ?? this.defaultModel;
+    const requestedModel = model ?? this.defaultModel;
+    const defaultLocalModel = process.env.OLLAMA_DEFAULT_MODEL || this.defaultModel || 'qwen2.5:14b';
     
-    if (finalModel.startsWith('@cf/')) {
-      const mapped = this.modelMapping[finalModel];
-      if (mapped) {
-        console.log(`[Ollama] Mapeando modelo Cloudflare '${finalModel}' → '${mapped}'`);
-        finalModel = mapped;
-      } else {
-        console.warn(`[Ollama] Modelo Cloudflare '${finalModel}' no tiene mapeo, usando default '${this.defaultModel}'`);
-        finalModel = this.defaultModel;
-      }
+    let finalModel = requestedModel;
+    if (requestedModel.startsWith('@cf/')) {
+      console.log(`[Ollama] Mapeando modelo de producción '${requestedModel}' → modelo local '${defaultLocalModel}'`);
+      finalModel = defaultLocalModel;
     }
 
     const base = this.url;
@@ -49,7 +51,7 @@ export class OllamaProvider implements ILLMProvider {
     console.log(`[Ollama] Prompt preview: ${prompt.substring(0, 200)}...`);
     
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 10 * 60 * 1000);
+    const timeout = setTimeout(() => controller.abort(), this.OLLAMA_TIMEOUT);
     
     let res: Response;
     try {
@@ -88,19 +90,30 @@ export class OllamaProvider implements ILLMProvider {
   }
 
   async generateVision(prompt: string, imageBase64: string, mimeType: string): Promise<string> {
-    // Ollama Vision usa el modelo llava por defecto en dev
-    const res = await fetch(`${this.url}/api/generate`, {
-      method: 'POST',
-      body: JSON.stringify({
-        model: 'llava',
-        prompt,
-        images: [imageBase64],
-        stream: false,
-      }),
-    });
-    if (!res.ok) throw new Error(`Ollama Vision error: ${res.statusText}`);
-    const data = (await res.json()) as { response: string };
-    return data.response;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), this.OLLAMA_TIMEOUT);
+
+    try {
+      // Ollama Vision usa el modelo llava por defecto en dev
+      const res = await fetch(`${this.url}/api/generate`, {
+        method: 'POST',
+        body: JSON.stringify({
+          model: 'llava',
+          prompt,
+          images: [imageBase64],
+          stream: false,
+        }),
+        signal: controller.signal,
+      });
+      if (!res.ok) throw new Error(`Ollama Vision error: ${res.statusText}`);
+      const data = (await res.json()) as { response: string };
+      return data.response;
+    } catch (err) {
+      clearTimeout(timeout);
+      throw err;
+    } finally {
+      clearTimeout(timeout);
+    }
   }
 
   /**
@@ -131,7 +144,7 @@ export class OllamaProvider implements ILLMProvider {
     }
     
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 30000);
+    const timeout = setTimeout(() => controller.abort(), this.OLLAMA_TIMEOUT);
     
     try {
       const res = await fetch(`${base}/api/chat`, {

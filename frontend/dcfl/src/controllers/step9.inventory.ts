@@ -3,7 +3,7 @@
 import { createStep } from '../shared/step.factory';
 
 export const Step9Inventory = createStep({
-  stepNumber: 10,
+  stepNumber: 9,
   templateId: 'tpl-step8-payment',
   phaseId: 'F6.2a',
   promptId: 'F6_2a',

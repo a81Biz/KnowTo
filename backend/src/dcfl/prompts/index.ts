@@ -10,17 +10,34 @@ import type { PromptId } from '../types/wizard.types';
 // Importar todos los prompts como texto estático (compatible con Workers)
 import F0     from './templates/F0-marco-referencia.md';
 import F1     from './templates/F1-informe-necesidades.md';
-import F2     from './templates/F2-especificaciones-analisis.md';
+import F2     from './templates/F2-estructuracion-temario.md';
 import F2_5   from './templates/F2_5-recomendaciones.md';
 import F3     from './templates/F3-especificaciones-tecnicas.md';
-import F4_P0  from './templates/F4_P0-cronograma.md';
-import F4_P1  from './templates/F4_P1-info-general.md';
-import F4_P2  from './templates/F4_P2-guias-actividades.md';
-import F4_P3  from './templates/F4_P3-calendario.md';
-import F4_P4  from './templates/F4_P4-documentos-texto.md';
-import F4_P5  from './templates/F4_P5-presentacion.md';
-import F4_P6  from './templates/F4_P6-guion-video.md';
-import F4_P7  from './templates/F4_P7-instrumentos-evaluacion.md';
+import F4_P1  from './templates/F4_P1-instrumentos-evaluacion.md';
+import F4_P2  from './templates/F4_P2-presentacion-electronica.md';
+import F4_P3  from './templates/F4_P3-guiones-multimedia.md';
+import F4_P4  from './templates/F4_P4-manual-participante.md';
+import F4_P5  from './templates/F4_P5-guias-actividades.md';
+import F4_P6  from './templates/F4_P6-calendario-general.md';
+import F4_P7  from './templates/F4_P7-info-general.md';
+import F4_P8  from './templates/F4_P8-cronograma-desarrollo.md';
+import F4_GENERATE_FORM_SCHEMA from './templates/F4_GENERATE_FORM_SCHEMA.md';
+import F4_P1_FORM_SCHEMA from './templates/F4_P1_FORM_SCHEMA.md';
+import F4_P1_GENERATE_DOCUMENT from './templates/F4_P1_GENERATE_DOCUMENT.md';
+import F4_P2_FORM_SCHEMA from './templates/F4_P2_FORM_SCHEMA.md';
+import F4_P3_FORM_SCHEMA from './templates/F4_P3_FORM_SCHEMA.md';
+import F4_P4_FORM_SCHEMA from './templates/F4_P4_FORM_SCHEMA.md';
+import F4_P5_FORM_SCHEMA from './templates/F4_P5_FORM_SCHEMA.md';
+import F4_P6_FORM_SCHEMA from './templates/F4_P6_FORM_SCHEMA.md';
+import F4_P7_FORM_SCHEMA from './templates/F4_P7_FORM_SCHEMA.md';
+import F4_P8_FORM_SCHEMA from './templates/F4_P8_FORM_SCHEMA.md';
+import F4_P2_GENERATE_DOCUMENT from './templates/F4_P2_GENERATE_DOCUMENT.md';
+import F4_P3_GENERATE_DOCUMENT from './templates/F4_P3_GENERATE_DOCUMENT.md';
+import F4_P4_GENERATE_DOCUMENT from './templates/F4_P4_GENERATE_DOCUMENT.md';
+import F4_P5_GENERATE_DOCUMENT from './templates/F4_P5_GENERATE_DOCUMENT.md';
+import F4_P6_GENERATE_DOCUMENT from './templates/F4_P6_GENERATE_DOCUMENT.md';
+import F4_P7_GENERATE_DOCUMENT from './templates/F4_P7_GENERATE_DOCUMENT.md';
+import F4_P8_GENERATE_DOCUMENT from './templates/F4_P8_GENERATE_DOCUMENT.md';
 import F5     from './templates/F5-verificacion.md';
 import F5_2   from './templates/F5_2-evidencias.md';
 import F6     from './templates/F6-ajustes.md';
@@ -52,7 +69,6 @@ export const DCFL_PROMPT_MAP: Record<PromptId, string> = {
   F2,
   F2_5,
   F3,
-  F4_P0,
   F4_P1,
   F4_P2,
   F4_P3,
@@ -60,6 +76,24 @@ export const DCFL_PROMPT_MAP: Record<PromptId, string> = {
   F4_P5,
   F4_P6,
   F4_P7,
+  F4_P8,
+  F4_GENERATE_FORM_SCHEMA,
+  F4_P1_FORM_SCHEMA,
+  F4_P1_GENERATE_DOCUMENT,
+  F4_P2_FORM_SCHEMA,
+  F4_P3_FORM_SCHEMA,
+  F4_P4_FORM_SCHEMA,
+  F4_P5_FORM_SCHEMA,
+  F4_P6_FORM_SCHEMA,
+  F4_P7_FORM_SCHEMA,
+  F4_P8_FORM_SCHEMA,
+  F4_P2_GENERATE_DOCUMENT,
+  F4_P3_GENERATE_DOCUMENT,
+  F4_P4_GENERATE_DOCUMENT,
+  F4_P5_GENERATE_DOCUMENT,
+  F4_P6_GENERATE_DOCUMENT,
+  F4_P7_GENERATE_DOCUMENT,
+  F4_P8_GENERATE_DOCUMENT,
   F5,
   F5_2,
   F6,

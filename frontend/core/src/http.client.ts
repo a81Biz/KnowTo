@@ -22,7 +22,9 @@ async function request<T>(url: string, options: RequestOptions): Promise<ApiResp
   };
 
   const token = localStorage.getItem('knowto_auth_token');
-  if (token) headers['Authorization'] = `Bearer ${token}`;
+  if (token && token.trim() !== '') {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
 
   const response = await fetch(url, {
     method: options.method,

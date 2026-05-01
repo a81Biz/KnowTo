@@ -5,7 +5,7 @@
 // Regla: una discrepancia se genera SOLO si ambos documentos tienen valor Y difieren.
 
 import type { InformeF1Parsed } from './informe.parser';
-import type { AnalisisF2Parsed } from './informe.parser.f2';
+// import type { AnalisisF2Parsed } from './informe.parser.f2'; // Usamos any para el nuevo JSON
 
 // ── Tipos públicos ────────────────────────────────────────────────────────────
 
@@ -48,23 +48,22 @@ function _extractHours(text: string): number | null {
 }
 
 // Suma horas de los módulos de F2
-function _sumF2Hours(estructura: AnalisisF2Parsed['estructura_tematica']): number | null {
-  if (!estructura || estructura.length === 0) return null;
+function _sumF2Hours(estructura: any[] | undefined): number | null {
+  if (!estructura || !Array.isArray(estructura) || estructura.length === 0) return null;
   let total = 0;
   for (const mod of estructura) {
-    const h = _extractHours(mod.horas ?? '');
-    if (h === null) return null; // si alguno es ambiguo, no sumamos
+    const h = mod.duracion_estimada_horas !== undefined ? Number(mod.duracion_estimada_horas) : _extractHours(String(mod.horas || mod.duracion || ''));
+    if (h === null || isNaN(h)) return null;
     total += h;
   }
   return total > 0 ? total : null;
 }
 
 // Extrae horas semanales de perfil F1 (campo libre)
-function _extractF1HorasSemanales(f1: InformeF1Parsed): string | null {
-  // Buscar en preguntas_respuestas
-  if (f1.preguntas_respuestas) {
+function _extractF1HorasSemanales(f1: any): string | null {
+  if (f1.preguntas_respuestas && Array.isArray(f1.preguntas_respuestas)) {
     for (const qa of f1.preguntas_respuestas) {
-      if (/hora|tiempo|dedicar|semana/i.test(qa.pregunta)) {
+      if (/(hora|tiempo|dedicar|semana)/i.test(qa.pregunta || '')) {
         return qa.respuesta || null;
       }
     }
@@ -73,41 +72,51 @@ function _extractF1HorasSemanales(f1: InformeF1Parsed): string | null {
 }
 
 // Extrae escolaridad mínima de F1 (perfil_participante)
-function _extractF1Escolaridad(f1: InformeF1Parsed): string | null {
-  const p = f1.perfil_participante;
+function _extractF1Escolaridad(f1: any): string | null {
+  const p = f1.perfil_participante || f1.perfil;
   if (!p) return null;
   return p['nivel_educativo_minimo'] ?? p['escolaridad'] ?? p['nivel_educativo'] ?? null;
 }
 
-// Extrae escolaridad de F2 (perfil_ingreso, fila Escolaridad mínima)
-function _extractF2Escolaridad(f2: AnalisisF2Parsed): string | null {
-  if (!f2.perfil_ingreso) return null;
-  const row = f2.perfil_ingreso.find((r) =>
-    /escolaridad|educaci[oó]n|nivel.*m[ií]nimo/i.test(r.categoria),
-  );
-  return row?.requisito ?? null;
+// Extrae escolaridad de F2 (perfil_ingreso_ec0366)
+function _extractF2Escolaridad(f2: any): string | null {
+  const p = f2.perfil_ingreso_ec0366 || f2.perfil_ingreso;
+  if (!p) return null;
+  
+  if (p.escolaridad_minima?.requisito) {
+    return p.escolaridad_minima.requisito;
+  }
+  
+  // Soporte legacy array
+  if (Array.isArray(p)) {
+    const row = p.find((r) => /escolaridad|educaci[oó]n|nivel.*m[ií]nimo/i.test(r.categoria));
+    return row?.requisito ?? null;
+  }
+  
+  return null;
 }
 
 // Extrae número de módulos de F1 (objetivos_aprendizaje como proxy)
-function _extractF1NumModulos(f1: InformeF1Parsed): number | null {
-  if (!f1.objetivos_aprendizaje || f1.objetivos_aprendizaje.length === 0) return null;
-  // Si hay 3+ objetivos distintos, estimamos módulos ~ objetivos
-  return f1.objetivos_aprendizaje.length;
+function _extractF1NumModulos(f1: any): number | null {
+  if (f1.objetivos_aprendizaje && Array.isArray(f1.objetivos_aprendizaje) && f1.objetivos_aprendizaje.length > 0) {
+    return f1.objetivos_aprendizaje.length;
+  }
+  return null;
 }
 
 // ── Detector principal ────────────────────────────────────────────────────────
 
 export function detectDiscrepancias(
-  f1: InformeF1Parsed,
-  f2: AnalisisF2Parsed,
+  f1: any,
+  f2: any,
 ): Discrepancia[] {
   const discrepancias: Discrepancia[] = [];
 
   // ── 1. MODALIDAD ─────────────────────────────────────────────────────────────
-  const modalidadF2 = f2.modalidad?.['modalidad'] ?? f2.modalidad?.['modalidad_de_entrega'] ?? null;
+  const modalidadF2 = f2.modalidad_curso?.seleccion ?? f2.modalidad?.modalidad ?? f2.modalidad?.modalidad_de_entrega ?? null;
   if (modalidadF2) {
     // F1 infiere modalidad de recomendaciones_diseno
-    const recF1 = f1.recomendaciones_diseno?.join(' ') ?? '';
+    const recF1 = (f1.recomendaciones_diseno || []).join(' ') || '';
     let modalidadF1: string | null = null;
     if (/en l[ií]nea|online|virtual/i.test(recF1)) modalidadF1 = 'En línea (online)';
     else if (/presencial/i.test(recF1)) modalidadF1 = 'Presencial';
@@ -120,7 +129,7 @@ export function detectDiscrepancias(
         valor_f1: modalidadF1,
         justificacion_f1: 'Inferido de las recomendaciones de diseño del Informe de Necesidades (F1)',
         valor_f2: modalidadF2,
-        justificacion_f2: 'Definido en la Sección 1 de las Especificaciones de Análisis (F2)',
+        justificacion_f2: 'Definido en la Sección de Modalidad e Interactividad (F2)',
         opciones: [
           { id: 'f1', label: `Usar F1: ${modalidadF1}`, valor: modalidadF1 },
           { id: 'f2', label: `Usar F2: ${modalidadF2}`, valor: modalidadF2 },
@@ -130,7 +139,7 @@ export function detectDiscrepancias(
   }
 
   // ── 2. NÚMERO DE MÓDULOS ──────────────────────────────────────────────────────
-  const numModulosF2 = f2.estructura_tematica?.length ?? null;
+  const numModulosF2 = Array.isArray(f2.estructura_tematica) ? f2.estructura_tematica.length : null;
   const numModulosF1 = _extractF1NumModulos(f1);
   if (numModulosF1 !== null && numModulosF2 !== null && numModulosF1 !== numModulosF2) {
     discrepancias.push({
@@ -139,7 +148,7 @@ export function detectDiscrepancias(
       valor_f1: `${numModulosF1} módulos (estimado por número de objetivos de aprendizaje)`,
       justificacion_f1: `F1 tiene ${numModulosF1} objetivos de aprendizaje declarados, que sugieren la misma cantidad de módulos`,
       valor_f2: `${numModulosF2} módulos`,
-      justificacion_f2: `F2 define explícitamente ${numModulosF2} módulos en la estructura temática (Sección 3)`,
+      justificacion_f2: `F2 define explícitamente ${numModulosF2} módulos en la estructura temática`,
       opciones: [
         { id: 'f1', label: `${numModulosF1} módulos (basado en F1)`, valor: String(numModulosF1) },
         { id: 'f2', label: `${numModulosF2} módulos (basado en F2)`, valor: String(numModulosF2) },
@@ -155,8 +164,6 @@ export function detectDiscrepancias(
   const horasF2Total = _sumF2Hours(f2.estructura_tematica);
   if (horasF1Raw && horasF2Total !== null) {
     const horasF1Num = _extractHours(horasF1Raw);
-    // Solo comparamos si F1 indica horas semanales y F2 suma difiere significativamente
-    // F1 puede ser "2-3 horas semanales" → estimamos 8-12 horas en 4 semanas
     if (horasF1Num !== null) {
       const estimadoF1_4semanas = horasF1Num * 4;
       const diff = Math.abs(estimadoF1_4semanas - horasF2Total);
@@ -192,7 +199,7 @@ export function detectDiscrepancias(
       valor_f1: escolaridadF1,
       justificacion_f1: 'Definido en el perfil del participante del Informe de Necesidades (F1)',
       valor_f2: escolaridadF2,
-      justificacion_f2: 'Definido en la categoría "Escolaridad mínima" del Perfil de Ingreso (F2, Sección 4)',
+      justificacion_f2: 'Definido en la categoría "Escolaridad mínima" del Perfil de Ingreso (F2)',
       opciones: [
         { id: 'f1', label: `Usar F1: ${escolaridadF1}`, valor: escolaridadF1 },
         { id: 'f2', label: `Usar F2: ${escolaridadF2}`, valor: escolaridadF2 },
@@ -200,22 +207,34 @@ export function detectDiscrepancias(
     });
   }
 
-  // ── 5. NÚMERO DE ESTRATEGIAS ──────────────────────────────────────────────────
-  const numEstrategias = f2.estrategias?.length ?? null;
-  const numObjetivos = f1.objetivos_aprendizaje?.length ?? null;
-  // Regla: se espera al menos 1 estrategia por objetivo; si hay menos de la mitad, es discrepancia
-  if (numEstrategias !== null && numObjetivos !== null && numEstrategias < Math.ceil(numObjetivos / 2)) {
+  // ── 5. ALINEACIÓN DE OBJETIVOS (NUEVO) ────────────────────────────────────────
+  // Verifica si F2 cubrió el mismo número de objetivos principales o inventó módulos.
+  const numObjetivos = _extractF1NumModulos(f1);
+  if (numObjetivos !== null && numModulosF2 !== null && numModulosF2 > numObjetivos) {
     discrepancias.push({
-      aspecto: 'estrategias_instruccionales',
-      descripcion: 'Número de estrategias instruccionales',
-      valor_f1: `${numObjetivos} objetivos de aprendizaje → sugiere ${numObjetivos}+ estrategias`,
-      justificacion_f1: `F1 declara ${numObjetivos} objetivos; cada objetivo debería tener al menos una estrategia instruccional`,
-      valor_f2: `${numEstrategias} estrategias definidas`,
-      justificacion_f2: `F2 define ${numEstrategias} estrategias instruccionales en la Sección 5`,
+      aspecto: 'alcance_excedido',
+      descripcion: 'Módulos excedentes detectados',
+      valor_f1: `${numObjetivos} objetivos`,
+      justificacion_f1: `F1 delimitó un alcance estricto de ${numObjetivos} objetivos principales de aprendizaje.`,
+      valor_f2: `${numModulosF2} módulos`,
+      justificacion_f2: `F2 propone ${numModulosF2} módulos, excediendo el alcance pactado en F1.`,
       opciones: [
-        { id: 'f2', label: `Mantener ${numEstrategias} estrategias (F2)`, valor: String(numEstrategias) },
-        { id: 'f1', label: `Ampliar a ${numObjetivos} estrategias (una por objetivo)`, valor: String(numObjetivos) },
-      ],
+        { id: 'f1', label: `Ajustar temario a ${numObjetivos} módulos (F1)`, valor: String(numObjetivos) },
+        { id: 'f2', label: `Aprobar ${numModulosF2} módulos (F2)`, valor: String(numModulosF2) },
+      ]
+    });
+  } else if (numObjetivos !== null && numModulosF2 !== null && numModulosF2 < numObjetivos) {
+    discrepancias.push({
+      aspecto: 'alcance_incompleto',
+      descripcion: 'Objetivos sin módulo asignado',
+      valor_f1: `${numObjetivos} objetivos`,
+      justificacion_f1: `F1 delimitó un alcance de ${numObjetivos} objetivos principales.`,
+      valor_f2: `${numModulosF2} módulos`,
+      justificacion_f2: `F2 solo desarrolla ${numModulosF2} módulos, dejando contenido fuera.`,
+      opciones: [
+        { id: 'f1', label: `Expandir temario a ${numObjetivos} módulos (F1)`, valor: String(numObjetivos) },
+        { id: 'f2', label: `Aprobar versión resumida de ${numModulosF2} módulos (F2)`, valor: String(numModulosF2) },
+      ]
     });
   }
 

@@ -11,7 +11,7 @@ import { showLoading, hideLoading, showError } from '@core/ui';
 import { wizardStore } from '../stores/wizard.store';
 import type { DynamicFormField, DynamicFormSchema } from '../types/wizard.types';
 
-const STEP_NUMBER = 9;
+const STEP_NUMBER = 8;
 
 class Step8AdjustmentsController extends BaseStep {
   private _adjDom: {

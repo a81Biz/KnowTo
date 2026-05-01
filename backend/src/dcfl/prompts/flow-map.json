@@ -339,9 +339,9 @@
     "tipo": "fase-subwizard",
     "step": 5,
     "label": "Producción de Contenidos EC0366",
-    "descripcion": "Sub-wizard de 8 productos. Cada producto se genera con su propio prompt (F4_P0 a F4_P7) y se aprueba antes de continuar al siguiente.",
+    "descripcion": "Sub-wizard de 8 productos. Cada producto se genera con su propio prompt (F4_P8 a F4_P7) y se aprueba antes de continuar al siguiente.",
     "productos": [
-      { "index": 0, "promptId": "F4_P0", "label": "Cronograma de Desarrollo",         "elementoEC": "E1219 - Producto #1" },
+      { "index": 0, "promptId": "F4_P8", "label": "Cronograma de Desarrollo",         "elementoEC": "E1219 - Producto #1" },
       { "index": 1, "promptId": "F4_P1", "label": "Documento de Información General",  "elementoEC": "E1219 - Producto #2" },
       { "index": 2, "promptId": "F4_P2", "label": "Guías de Actividades por Módulo",   "elementoEC": "E1220 - Producto #1" },
       { "index": 3, "promptId": "F4_P3", "label": "Calendario General de Actividades", "elementoEC": "E1220 - Producto #2" },
@@ -360,7 +360,7 @@
       "contexto": "EXTRACTOR_F4.salida"
     },
     "salida": {
-      "P0_cronograma":             { "promptId": "F4_P0", "patron": "# PRODUCTO 0" },
+      "P8_cronograma":             { "promptId": "F4_P8", "patron": "# PRODUCTO 8" },
       "P1_info_general":           { "promptId": "F4_P1", "patron": "# PRODUCTO 1" },
       "P2_guias_actividades":      { "promptId": "F4_P2", "patron": "# PRODUCTO 2" },
       "P3_calendario":             { "promptId": "F4_P3", "patron": "# PRODUCTO 3" },
@@ -386,7 +386,7 @@
       {
         "fase": "F4",
         "campos": [
-          "P0_cronograma",
+          "P8_cronograma",
           "P1_info_general",
           "P7_instrumentos_evaluacion"
         ]

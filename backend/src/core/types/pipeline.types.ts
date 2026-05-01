@@ -71,10 +71,9 @@ export interface PipelineStep {
   // F1 code handlers
   | 'qa_tabla_builder'
   // F4 extractores (uno por producto)
-  | 'extractor_f4_p0' | 'extractor_f4_p1' | 'extractor_f4_p2' | 'extractor_f4_p3'
-  | 'extractor_f4_p4' | 'extractor_f4_p5' | 'extractor_f4_p6' | 'extractor_f4_p7'
+  | 'extractor_f4_p1' | 'extractor_f4_p2' | 'extractor_f4_p3' | 'extractor_f4_p4'
+  | 'extractor_f4_p5' | 'extractor_f4_p6' | 'extractor_f4_p7' | 'extractor_f4_p8'
   // F4 agentes A y B (uno por producto)
-  | 'agente_a_p0' | 'agente_b_p0'
   | 'agente_a_p1' | 'agente_b_p1'
   | 'agente_a_p2' | 'agente_b_p2'
   | 'agente_a_p3' | 'agente_b_p3'
@@ -82,12 +81,19 @@ export interface PipelineStep {
   | 'agente_a_p5' | 'agente_b_p5'
   | 'agente_a_p6' | 'agente_b_p6'
   | 'agente_a_p7' | 'agente_b_p7'
+  | 'agente_a_p8' | 'agente_b_p8'
+  // F4 Ensambladores de producto
+  | 'ensamblador_p1' | 'ensamblador_p2' | 'ensamblador_p3' | 'ensamblador_p4'
+  | 'ensamblador_p5' | 'ensamblador_p6' | 'ensamblador_p7' | 'ensamblador_p8'
   // F4 jueces (uno por producto)
-  | 'juez_p0' | 'juez_p1' | 'juez_p2' | 'juez_p3'
-  | 'juez_p4' | 'juez_p5' | 'juez_p6' | 'juez_p7'
+  | 'juez_p1' | 'juez_p2' | 'juez_p3' | 'juez_p4'
+  | 'juez_p5' | 'juez_p6' | 'juez_p7' | 'juez_p8'
+  // F4 Redactores Finales
+  | 'redactor_final_p1' | 'redactor_final_p2' | 'redactor_final_p3' | 'redactor_final_p4'
+  | 'redactor_final_p5' | 'redactor_final_p6' | 'redactor_final_p7' | 'redactor_final_p8'
   // F4 validadores (código puro, sin IA)
-  | 'validador_p0' | 'validador_p1' | 'validador_p2' | 'validador_p3'
-  | 'validador_p4' | 'validador_p5' | 'validador_p6' | 'validador_p7'
+  | 'validador_p1' | 'validador_p2' | 'validador_p3' | 'validador_p4'
+  | 'validador_p5' | 'validador_p6' | 'validador_p7' | 'validador_p8'
   // F4 sintetizador final compartido (código puro, sin IA)
   | 'sintetizador_final_f4'
   | string;

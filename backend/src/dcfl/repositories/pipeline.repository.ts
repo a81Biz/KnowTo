@@ -27,12 +27,15 @@ export class PipelineRepository extends BaseRepository<PipelineJob> {
   }
   
   async saveAgentOutput(jobId: string, agentName: string, output: string): Promise<void> {
-    await this.client
+    const { error } = await this.client
       .from('pipeline_agent_outputs')
       .upsert({
         job_id: jobId,
         agent_name: agentName,
         output: output
       }, { onConflict: 'job_id,agent_name' });
+    if (error) {
+      console.error(`[pipeline-repo] saveAgentOutput failed (${agentName}):`, error.message);
+    }
   }
 }
