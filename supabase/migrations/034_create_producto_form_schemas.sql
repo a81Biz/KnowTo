@@ -39,34 +39,61 @@ CREATE TRIGGER trigger_update_producto_form_schemas_updated_at
 
 ALTER TABLE producto_form_schemas ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Users can read their own form schemas" ON producto_form_schemas
-  FOR SELECT USING (
-    auth.role() = 'authenticated' 
-    AND project_id IN (SELECT id FROM projects WHERE user_id = auth.uid())
-  );
+-- Policies wrapped in DO block: auth.role() may not exist during docker-entrypoint-initdb.d
+-- (auth schema initializes after PostgreSQL). Safe to skip on fresh init; applied later by GoTrue.
+DO $$
+BEGIN
+  CREATE POLICY "Users can read their own form schemas" ON producto_form_schemas
+    FOR SELECT USING (
+      auth.role() = 'authenticated'
+      AND project_id IN (SELECT id FROM projects WHERE user_id = auth.uid())
+    );
+EXCEPTION WHEN undefined_function OR undefined_schema THEN
+  RAISE WARNING 'producto_form_schemas: auth.role() not available during init, skipping SELECT policy';
+END $$;
 
-CREATE POLICY "Users can insert their own form schemas" ON producto_form_schemas
-  FOR INSERT WITH CHECK (
-    auth.role() = 'authenticated' 
-    AND project_id IN (SELECT id FROM projects WHERE user_id = auth.uid())
-  );
+DO $$
+BEGIN
+  CREATE POLICY "Users can insert their own form schemas" ON producto_form_schemas
+    FOR INSERT WITH CHECK (
+      auth.role() = 'authenticated'
+      AND project_id IN (SELECT id FROM projects WHERE user_id = auth.uid())
+    );
+EXCEPTION WHEN undefined_function OR undefined_schema THEN
+  RAISE WARNING 'producto_form_schemas: auth.role() not available during init, skipping INSERT policy';
+END $$;
 
-CREATE POLICY "Users can update their own form schemas" ON producto_form_schemas
-  FOR UPDATE USING (
-    auth.role() = 'authenticated' 
-    AND project_id IN (SELECT id FROM projects WHERE user_id = auth.uid())
-  );
+DO $$
+BEGIN
+  CREATE POLICY "Users can update their own form schemas" ON producto_form_schemas
+    FOR UPDATE USING (
+      auth.role() = 'authenticated'
+      AND project_id IN (SELECT id FROM projects WHERE user_id = auth.uid())
+    );
+EXCEPTION WHEN undefined_function OR undefined_schema THEN
+  RAISE WARNING 'producto_form_schemas: auth.role() not available during init, skipping UPDATE policy';
+END $$;
 
-CREATE POLICY "Users can delete their own form schemas" ON producto_form_schemas
-  FOR DELETE USING (
-    auth.role() = 'authenticated'
-    AND project_id IN (SELECT id FROM projects WHERE user_id = auth.uid())
-  );
+DO $$
+BEGIN
+  CREATE POLICY "Users can delete their own form schemas" ON producto_form_schemas
+    FOR DELETE USING (
+      auth.role() = 'authenticated'
+      AND project_id IN (SELECT id FROM projects WHERE user_id = auth.uid())
+    );
+EXCEPTION WHEN undefined_function OR undefined_schema THEN
+  RAISE WARNING 'producto_form_schemas: auth.role() not available during init, skipping DELETE policy';
+END $$;
 
 -- service_role bypasa RLS por convención de Supabase, pero el policy explícito
 -- garantiza acceso también en entornos self-hosted donde el bypass no esté activo.
-CREATE POLICY "Service role full access" ON producto_form_schemas
-  FOR ALL USING (auth.role() = 'service_role');
+DO $$
+BEGIN
+  CREATE POLICY "Service role full access" ON producto_form_schemas
+    FOR ALL USING (auth.role() = 'service_role');
+EXCEPTION WHEN undefined_function OR undefined_schema THEN
+  RAISE WARNING 'producto_form_schemas: auth.role() not available during init, skipping service_role policy';
+END $$;
 
 -- Permisos a nivel de tabla para los roles de PostgREST
 GRANT ALL ON producto_form_schemas TO supabase_admin;

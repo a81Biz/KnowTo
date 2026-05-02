@@ -62,6 +62,25 @@ DO $$ BEGIN
       AS 'SELECT NULL::uuid';
     $func$;
   END IF;
+
+  -- auth.role() stub para RLS policies que requieren verificar el rol JWT.
+  -- GoTrue la reemplazará con su implementación real al arrancar.
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_proc p
+    JOIN pg_namespace n ON n.oid = p.pronamespace
+    WHERE n.nspname = 'auth' AND p.proname = 'role'
+  ) THEN
+    EXECUTE $func$
+      CREATE FUNCTION auth.role() RETURNS text
+      LANGUAGE sql STABLE
+      AS $$
+        SELECT coalesce(
+          current_setting('request.jwt.claim.role', true),
+          (current_setting('request.jwt.claims', true)::jsonb ->> 'role')
+        )::text
+      $$;
+    $func$;
+  END IF;
 END $$;
 
 
