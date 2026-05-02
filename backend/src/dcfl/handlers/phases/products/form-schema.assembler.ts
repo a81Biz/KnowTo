@@ -42,13 +42,20 @@ export async function handleFormSchemaAssembler(context: ProductContext): Promis
   console.log(`[DIALECTIC-TEAM] Selección del Juez: ${seleccion} (${decisionJuez?.razon?.slice(0, 80) || 'sin razón'})`);
 
   // 4. ENSAMBLADO E INMUTABILIDAD: Cabecera EC0366 Determinista
+  const criteriosValue = unidades.length > 0
+    ? unidades.map((u: any, i: number) => {
+        const nombre = u.nombre || u.titulo || `Unidad ${i + 1}`;
+        return `${i + 1}. ${nombre}: acciones físicas observables y verificables`;
+      }).join('\n')
+    : "1. [Criterio específico de la unidad 1]\n2. [Criterio específico de la unidad 2]";
+
   const fields = [
     {
       name: "criterios_evaluacion_global",
       label: "Criterios de Evaluación Globales (EC0366)",
       type: "textarea",
       required: true,
-      suggested_value: "1. Rigor técnico\n2. Alineación didáctica\n3. Calidad de redacción",
+      suggested_value: criteriosValue,
       hint: "Cabecera normativa inmutable."
     }
   ];

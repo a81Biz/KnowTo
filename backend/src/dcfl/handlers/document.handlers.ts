@@ -206,6 +206,24 @@ export async function runPipelineAsync(
       }
     }
 
+    const isP7orP8 = body.promptId === 'F4_P7_GENERATE_DOCUMENT' || body.promptId === 'F4_P8_GENERATE_DOCUMENT';
+    if (isP7orP8) {
+      try {
+        const prevProducts = await supabase.getF4Productos(body.projectId);
+        const productos_previos: Record<string, string> = {};
+        for (const p of prevProducts) {
+          if (['P1', 'P2', 'P3', 'P4', 'P5', 'P6'].includes(p.producto) && p.documento_final) {
+            productos_previos[p.producto] = p.documento_final;
+          }
+        }
+        if (Object.keys(productos_previos).length > 0) {
+          enrichedContext.productos_previos = productos_previos;
+        }
+      } catch (err) {
+        console.warn('[F4 P7/P8] No se pudieron inyectar productos previos:', err);
+      }
+    }
+
     // PASO 2: Enriquecer con OSINT (Solo si es F0)
     if (body.promptId === 'F0') {
       enrichedContext = await enrichContextWithOSINT(

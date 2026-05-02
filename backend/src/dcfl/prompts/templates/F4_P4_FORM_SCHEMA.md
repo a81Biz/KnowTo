@@ -1,77 +1,130 @@
 ---
 id: F4_P4_FORM_SCHEMA
 name: Generador de Esquema Dinámico P4 (Manual del Participante)
-version: 1.0.0
+version: 2.0.0
 tags: [EC0366, formulario, manual, participante]
 pipeline_steps:
 
+  # ── EXTRACTOR ────────────────────────────────────────────────────────────
   - agent: extractor_f4
     model: "qwen2.5:14b"
     inputs_from: []
     include_template: false
     task: |
-      Extrae las unidades del contexto proporcionado.
-      DEVUELVE SOLO JSON CON ESTA ESTRUCTURA EXACTA:
-      {"unidades": [{"modulo": 1, "nombre": "...", "objetivo": "..."}]}
+      Extract ALL units from the course syllabus, the F0 reference framework, and the P3 multimedia scripts.
+      
+      SOURCE: The context contains fase3.unidades (F2/F3), F0 marco de referencia, and P3 scripts from productos_previos or userInputs.
+      
+      DO NOT TRUNCATE. Return every unit.
+      
+      OUTPUT ONLY VALID JSON — EXACT STRUCTURE:
+      {"unidades": [{"modulo": 1, "nombre": "...", "objetivo": "..."}, {"modulo": 2, "nombre": "...", "objetivo": "..."}]}
 
+  # ── AGENTE A: STUDY-GUIDE WRITER ─────────────────────────────────────────
   - agent: agente_form_A
     model: "qwen2.5:14b"
     inputs_from: [extractor_f4]
     include_template: false
     task: |
       YOU ARE AN API ENDPOINT. YOU DO NOT CONVERSE. YOU ONLY OUTPUT RAW JSON.
+      
+      You are a Technical Writer under EC0366. Your task is to write participant manual chapters.
+      
+      SOURCE OF TRUTH: The units from the syllabus (F2/F3), the F0 reference framework for theory and sources, and the P3 scripts to align written content with video narration.
+      
+      FOR EACH UNIT:
+      1. Read its "nombre" and "objetivo".
+      2. Read the F0 marco de referencia for industry context, key concepts, and bibliographic sources.
+      3. Read the corresponding P3 script to reinforce concepts explained in videos — the manual deepens, not repeats.
+      4. Write a chapter with 5 sections:
+         - Introducción: Welcome paragraph, 2-3 sentences contextualizing the topic.
+         - Conceptos clave: 3-5 terms with clear definitions relevant to the unit.
+         - Desarrollo: Explanation of the main procedure or content — the deep reference that goes beyond the video.
+         - Ejercicio práctico: A solo activity the participant can do to apply the learning.
+         - Puntos a recordar: 3 essential takeaways from the unit.
+      
+      RULES:
+      1. SAME NUMBER OF ELEMENTS AS UNITS RECEIVED.
+      2. DEPTH BEYOND VIDEO: The manual is the deep-reference document. Each concept must be explained with 2-3 sentences of detail beyond what appears in slides or scripts. A participant should be able to study from this manual without watching the videos.
+      3. SOURCE GROUNDING: Use F0 as the theoretical and bibliographic foundation. Cite real sources where applicable.
+      4. field "name" MUST be: "manual_unidad_" + modulo.
+      5. USE \n FOR LINE BREAKS in suggested_value.
+      
+      EXACT OUTPUT FORMAT:
+      [
+        {
+          "name": "manual_unidad_1",
+          "label": "Capítulo: [Unit name]",
+          "suggested_value": "Introducción: ...\nConceptos clave: ...\nDesarrollo: ...\nEjercicio práctico: ...\nPuntos a recordar: ...",
+          "type": "textarea"
+        }
+      ]
 
-      Genera un array JSON de campos para el MANUAL DEL PARTICIPANTE.
-      Para CADA unidad, "suggested_value" DEBE contener el contenido del capítulo (USA \n):
-      Introducción: [párrafo de bienvenida al tema, 2-3 oraciones]
-      Conceptos clave: [3-5 términos con definición breve]
-      Desarrollo: [explicación del procedimiento o contenido principal]
-      Ejercicio práctico: [actividad que el participante realiza solo]
-      Puntos a recordar: [3 ideas esenciales de la unidad]
-
-      REGLAS CRÍTICAS:
-      1. LONGITUD OBLIGATORIA: EXACTAMENTE el mismo número de elementos que las unidades.
-      2. field "name" MUST be: "manual_unidad_" + modulo
-      3. ZERO HUMAN TRACE. ONLY JSON ARRAY.
-
-      FORMATO EXACTO:
-      [{"name": "manual_unidad_1", "label": "Capítulo: [Nombre real de la unidad]", "suggested_value": "Introducción: ...\nConceptos clave: ...\nDesarrollo: ...\nEjercicio práctico: ...\nPuntos a recordar: ...", "type": "textarea"}]
-
+  # ── AGENTE B: COMPETENCY-BASED WRITER ────────────────────────────────────
   - agent: agente_form_B
     model: "qwen2.5:14b"
     inputs_from: [extractor_f4]
     include_template: false
     task: |
       YOU ARE AN API ENDPOINT. YOU DO NOT CONVERSE. YOU ONLY OUTPUT RAW JSON.
+      
+      You are a Competency-Based Instructional Designer under EC0366. Your task is to write participant manual chapters focused on demonstrable skills.
+      
+      SOURCE OF TRUTH: The units from the syllabus (F2/F3), the F0 reference framework, and the P3 scripts.
+      
+      FOR EACH UNIT:
+      1. Read its "nombre" and "objetivo".
+      2. Read the F0 marco de referencia for theory and sources.
+      3. Read the corresponding P3 script — the manual provides the theory behind what the instructor says.
+      4. Write a chapter with 5 sections:
+         - Objetivo de aprendizaje: What the participant will be able to DO after completing this chapter.
+         - Marco teórico: Minimum conceptual foundation needed — direct, concise, grounded in F0 sources.
+         - Pasos del procedimiento: Numbered observable steps the participant follows to perform the skill.
+         - Autoevaluación: A question or criterion the participant can self-verify to confirm understanding.
+         - Lecturas complementarias: Additional resource or reference from F0 bibliography.
+      
+      RULES:
+      1. SAME NUMBER OF ELEMENTS AS UNITS RECEIVED.
+      2. COMPETENCY FOCUS: Every chapter must enable the participant to DO something, not just KNOW something. The procedure section must be actionable.
+      3. THEORY FROM F0: The marco teórico must reference concepts and sources from the F0 reference framework.
+      4. ALIGNMENT WITH P3: The written content must align with the video narration, providing the depth that a script cannot deliver in spoken form.
+      5. field "name" MUST be: "manual_unidad_" + modulo.
+      6. USE \n FOR LINE BREAKS in suggested_value.
+      
+      EXACT OUTPUT FORMAT:
+      [
+        {
+          "name": "manual_unidad_1",
+          "label": "Capítulo: [Unit name]",
+          "suggested_value": "Objetivo de aprendizaje: ...\nMarco teórico: ...\nPasos del procedimiento: ...\nAutoevaluación: ...\nLecturas complementarias: ...",
+          "type": "textarea"
+        }
+      ]
 
-      Genera un array JSON de campos para el MANUAL DEL PARTICIPANTE.
-      Para CADA unidad, "suggested_value" DEBE contener el contenido didáctico (USA \n):
-      Objetivo de aprendizaje: [qué logrará el participante al terminar]
-      Marco teórico: [fundamento conceptual mínimo necesario]
-      Pasos del procedimiento: [1. paso observable... 2. paso observable...]
-      Autoevaluación: [pregunta o criterio que el participante puede verificar solo]
-      Lecturas complementarias: [recurso o referencia adicional si aplica]
-
-      REGLAS CRÍTICAS:
-      1. LONGITUD OBLIGATORIA: EXACTAMENTE el mismo número de elementos que las unidades.
-      2. field "name" MUST be: "manual_unidad_" + modulo
-      3. ZERO HUMAN TRACE. ONLY JSON ARRAY.
-
-      FORMATO EXACTO:
-      [{"name": "manual_unidad_1", "label": "Capítulo: [Nombre real de la unidad]", "suggested_value": "Objetivo de aprendizaje: ...\nMarco teórico: ...\nPasos del procedimiento: ...\nAutoevaluación: ...\nLecturas complementarias: ...", "type": "textarea"}]
-
+  # ── JUDGE ────────────────────────────────────────────────────────────────
   - agent: juez_form
     model: "qwen2.5:14b"
     inputs_from: [agente_form_A, agente_form_B]
     include_template: false
     task: |
       YOU ARE A JSON PARSER. DO NOT CONVERSE.
-      Compara A y B. Elige el que tenga contenido más útil y autocontenido para el participante.
-      {"seleccion": "A", "razon": "..."}
+      
+      Compare the arrays from A and B. Choose the best manual content.
+      
+      SELECTION CRITERIA:
+      1. SELF-CONTAINED: Can a participant study from this manual without watching the videos? Does it provide depth beyond the slides and scripts?
+      2. SOURCE GROUNDING: Does the content reference real concepts and sources from F0? Penalize generic theory without foundation.
+      3. PRACTICAL APPLICATION: Does the chapter include an exercise or procedure the participant can actually perform?
+      4. COMPLETENESS: Does the array have exactly as many elements as units? Does each object have all 5 required sections?
+      5. ALIGNMENT WITH P3: Does the written content complement (not contradict, not copy) the video scripts?
+      
+      OUTPUT ONLY THIS JSON:
+      {"seleccion": "A" | "B", "razon": "brief explanation"}
 
+  # ── ASSEMBLER ────────────────────────────────────────────────────────────
   - agent: ensamblador_form_schema
     model: "qwen2.5:14b"
     inputs_from: [juez_form]
     include_template: false
-    task: "CÓDIGO - El ensamblaje se realiza en form-schema.assembler.ts"
+    task: "CÓDIGO - Assembly in form-schema.assembler.ts"
 ---

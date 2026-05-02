@@ -111,10 +111,14 @@ export class AIService {
     for (const [k, v] of Object.entries(options.context)) {
       if (typeof v === 'string') compactContextObj[k] = v;
     }
-    if (options.context.previousData) compactContextObj.previousData = options.context.previousData;
+    const isF4DocPipeline = options.promptId?.startsWith('F4_P') && options.promptId?.includes('_GENERATE_DOCUMENT');
+    if (options.context.previousData && !isF4DocPipeline) {
+      compactContextObj.previousData = options.context.previousData;
+    }
     if (options.context.webSearchResults) compactContextObj.webSearchResults = options.context.webSearchResults;
     // Incluir fase3 (objeto, no string) para pipelines F4 que usan inputs_from + task
     if (options.context.fase3) compactContextObj.fase3 = options.context.fase3;
+    if (options.context.productos_previos) compactContextObj.productos_previos = options.context.productos_previos;
     if (options.userInputs && Object.keys(options.userInputs).length > 0) {
       compactContextObj.userInputs = options.userInputs;
     }

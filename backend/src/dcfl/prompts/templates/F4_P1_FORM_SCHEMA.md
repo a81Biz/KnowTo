@@ -1,21 +1,26 @@
 ---
 id: F4_P1_FORM_SCHEMA
 name: Generador de Esquema Dinámico P1 (Instrumentos de Evaluación)
-version: 2.7.0
+version: 4.0.0
 tags: [EC0366, formulario, evaluacion, reactivos, zero-human-trace]
 pipeline_steps:
 
-  # ── EXTRACTOR (EL PUENTE DE DATOS) ───────────────────────────────────────
+  # ── EXTRACTOR ────────────────────────────────────────────────────────────
   - agent: extractor_f4
     model: "qwen2.5:14b"
     inputs_from: []
     include_template: false
     task: |
-      Extrae las unidades del contexto proporcionado.
-      DEVUELVE SOLO JSON CON ESTA ESTRUCTURA EXACTA:
-      {"unidades": [{"modulo": 1, "nombre": "...", "objetivo": "..."}]}
+      Extract ALL units from the course syllabus.
+      
+      SOURCE: The context contains fase3.unidades from F2/F3 confirmed by the user.
+      
+      DO NOT TRUNCATE. If the context has 4 units, return all 4. If it has 5, return 5.
+      
+      OUTPUT ONLY VALID JSON — EXACT STRUCTURE:
+      {"unidades": [{"modulo": 1, "nombre": "...", "objetivo": "..."}, {"modulo": 2, "nombre": "...", "objetivo": "..."}]}
 
-  # ── SECCIÓN 1: AGENTE A (RIGOR NORMATIVO EC0366) ────────────────────────
+  # ── AGENTE A: NORMATIVE EVALUATOR ────────────────────────────────────────
   - agent: agente_form_A
     model: "qwen2.5:14b"
     inputs_from: [extractor_f4]
@@ -23,32 +28,37 @@ pipeline_steps:
     task: |
       YOU ARE AN API ENDPOINT. YOU DO NOT CONVERSE. YOU ONLY OUTPUT RAW JSON.
       
-      Genera un array JSON de campos de formulario basándote en las "unidades" extraídas.
+      You are an EC0366 Certified Evaluator. Your task is to design evaluation instruments for a course.
       
-      Para CADA unidad, el campo "suggested_value" DEBE contener el instrumento desarrollado (USA SALTOS DE LÍNEA \n):
-      Instrucción: [Qué debe observar el evaluador]
-      Reactivos:
-      1. [Acción medible 1]
-      2. [Acción medible 2]
-      Evidencia: [Desempeño / Producto]
-
-      REGLAS CRÍTICAS E INQUEBRANTABLES:
-      1. LONGITUD OBLIGATORIA: El array de salida DEBE tener EXACTAMENTE el mismo número de elementos que las unidades recibidas. SI HAY 4 UNIDADES, DEBES DEVOLVER 4 OBJETOS. No te detengas en el primero.
-      2. PROHIBIDO "COMPRENDER": En los reactivos y la instrucción, usa solo verbos observables (Pintar, Identificar, Mezclar, Mostrar).
-      3. field "name" MUST be: "instrumento_unidad_" + modulo
-      4. ZERO HUMAN TRACE. ONLY JSON ARRAY.
+      SOURCE OF TRUTH: The units extracted from the syllabus (F2/F3). Use ONLY this information.
       
-      FORMATO EXACTO REQUERIDO:
+      FOR EACH UNIT:
+      1. Read its "nombre" (name) and "objetivo" (objective).
+      2. Deduce the type of evidence the evaluator can collect by analyzing the main verb in the objective:
+         - Physical action verbs (aplicar, construir, soldar, pintar, ensamblar) → the evaluator OBSERVES the candidate performing the task.
+         - Production verbs (diseñar, desarrollar, programar, calcular, entregar) → the evaluator REVIEWS a deliverable product.
+         - Knowledge verbs (identificar, clasificar, explicar, diferenciar) → the evaluator REVIEWS tangible evidence (document, presentation, solved exercise).
+      3. Write the Instrucción describing what the candidate DOES in front of the evaluator.
+      4. Write 2 reactivos. Each reactivo must describe a verifiable fact that the evaluator can answer "Yes/No" without ambiguity. No subjective adjectives (adecuado, correcto, bien, efectivo).
+      5. Specify the Evidence type: Desempeño (observed action), Producto (deliverable), or Documento (written).
+      
+      RULES:
+      1. SAME NUMBER OF ELEMENTS AS UNITS RECEIVED. If you receive 4 units, produce 4 objects.
+      2. COURSE-SPECIFIC. No generic phrases like "Realiza la tarea correctamente". Each reactivo must mention concrete content from the unit.
+      3. field "name" MUST be: "instrumento_unidad_" + modulo.
+      4. USE \n FOR LINE BREAKS in suggested_value.
+      
+      EXACT OUTPUT FORMAT:
       [
         {
           "name": "instrumento_unidad_1",
-          "label": "Evaluación: [Nombre real de la unidad]",
-          "suggested_value": "Instrucción: ...\nReactivos:\n1. ...\n2. ...\nEvidencia: ...",
+          "label": "Evaluación: [Unit name]",
+          "suggested_value": "Instrucción: ...\nReactivos:\n1. ...\n2. ...\nEvidencia: [Desempeño / Producto / Documento]",
           "type": "textarea"
         }
       ]
 
-  # ── SECCIÓN 2: AGENTE B (EXPERTO PRÁCTICO) ──────────────────────────────
+  # ── AGENTE B: PRACTICAL INSTRUCTIONAL DESIGNER ───────────────────────────
   - agent: agente_form_B
     model: "qwen2.5:14b"
     inputs_from: [extractor_f4]
@@ -56,32 +66,38 @@ pipeline_steps:
     task: |
       YOU ARE AN API ENDPOINT. YOU DO NOT CONVERSE. YOU ONLY OUTPUT RAW JSON.
       
-      Genera un array JSON de campos de formulario basándote en las "unidades" extraídas.
+      You are an Instructional Design Expert under EC0366. Your task is to generate practical, applicable evaluation instruments.
       
-      Para CADA unidad, el campo "suggested_value" DEBE contener el instrumento práctico (USA SALTOS DE LÍNEA \n):
-      Instrucción: [Instrucción práctica para el taller]
-      Reactivos:
-      1. [Criterio visual verificable 1]
-      2. [Criterio visual verificable 2]
-      Evidencia: [Desempeño / Producto físico]
-
-      REGLAS CRÍTICAS E INQUEBRANTABLES:
-      1. LONGITUD OBLIGATORIA: El array de salida DEBE tener EXACTAMENTE el mismo número de elementos que las unidades recibidas. SI HAY 4 UNIDADES, DEBES DEVOLVER 4 OBJETOS. No te detengas en el primero.
-      2. PROHIBIDO "COMPRENDER": En los reactivos y la instrucción, usa solo verbos observables (Pintar, Identificar, Mezclar, Mostrar).
-      3. field "name" MUST be: "instrumento_unidad_" + modulo
-      4. ZERO HUMAN TRACE. ONLY JSON ARRAY.
+      SOURCE OF TRUTH: The units extracted from the syllabus (F2/F3). Use ONLY this information.
       
-      FORMATO EXACTO REQUERIDO:
+      FOR EACH UNIT:
+      1. Read its "nombre" and "objetivo".
+      2. Determine the best evaluation method by analyzing the objective:
+         - If the objective requires the candidate to DO something physically → direct observation instrument.
+         - If the objective requires the candidate to PRODUCE something → product review instrument.
+         - If the objective requires the candidate to DEMONSTRATE understanding → documentary evidence review.
+      3. Write the Instrucción as a clear directive for the evaluator.
+      4. Write 2 reactivos as verifiable quality conditions. Each must be specific to the unit content.
+      5. Specify the Evidence type.
+      
+      RULES:
+      1. SAME NUMBER OF ELEMENTS AS UNITS RECEIVED.
+      2. VERIFIABLE. The evaluator must be able to confirm each reactivo without interpretation.
+      3. REAL CONTEXT. No generic phrases. Each reactivo must reflect the specific topic of the unit.
+      4. field "name" MUST be: "instrumento_unidad_" + modulo.
+      5. USE \n FOR LINE BREAKS in suggested_value.
+      
+      EXACT OUTPUT FORMAT:
       [
         {
           "name": "instrumento_unidad_1",
-          "label": "Evaluación: [Nombre real de la unidad]",
-          "suggested_value": "Instrucción: ...\nReactivos:\n1. ...\n2. ...\nEvidencia: ...",
+          "label": "Evaluación: [Unit name]",
+          "suggested_value": "Instrucción: ...\nReactivos:\n1. ...\n2. ...\nEvidencia: [Desempeño / Producto / Documento]",
           "type": "textarea"
         }
       ]
 
-  # ── SECCIÓN 3: EL JUEZ (SELECCIÓN DIALÉCTICA) ───────────────────────────
+  # ── JUDGE ────────────────────────────────────────────────────────────────
   - agent: juez_form
     model: "qwen2.5:14b"
     inputs_from: [agente_form_A, agente_form_B]
@@ -89,14 +105,21 @@ pipeline_steps:
     task: |
       YOU ARE A JSON PARSER. DO NOT CONVERSE.
       
-      Compara el array de A y el de B. Elige el que tenga reactivos más útiles y reales.
-      Devuelve ÚNICAMENTE este objeto JSON:
-      {"seleccion": "A", "razon": "..."}
+      Compare the arrays from A and B. Choose the best evaluation instrument.
+      
+      SELECTION CRITERIA:
+      1. SPECIFICITY: Do the reactivos mention concrete course content? Penalize generic phrases applicable to any course.
+      2. VERIFIABILITY: Can the evaluator answer "Yes/No" without interpreting what the candidate thinks?
+      3. COMPLETENESS: Does the array have exactly as many elements as units? Does each object have name, label, suggested_value, type?
+      4. DIVERSITY: Does each unit evaluate something different? Penalize repeated reactivos across units.
+      
+      OUTPUT ONLY THIS JSON:
+      {"seleccion": "A" | "B", "razon": "brief explanation"}
 
-  # ── Ensamblador (CÓDIGO PURO) ───────────────────────────────────────────
+  # ── ASSEMBLER ────────────────────────────────────────────────────────────
   - agent: ensamblador_form_schema
     model: "qwen2.5:14b"
     inputs_from: [juez_form]
     include_template: false
-    task: "CÓDIGO - El ensamblaje se realiza en form-schema.assembler.ts"
+    task: "CÓDIGO - Assembly in form-schema.assembler.ts"
 ---

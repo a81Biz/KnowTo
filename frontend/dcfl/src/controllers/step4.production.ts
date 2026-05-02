@@ -429,6 +429,12 @@ class Step5ProductionController extends BaseStep {
       this._subDom.btnApproveProduct.style.display = 'none';
     }
 
+    // Always render the form so the user can edit values and regenerate
+    if (this._subDom.productionFormContainer) {
+      this._subDom.productionFormContainer.classList.remove('hidden');
+    }
+    void this._renderDynamicForm();
+
     // Botón de aprobar
     if (this._subDom.productPreviewArea) {
       let approveBtn = this._subDom.productPreviewArea.querySelector('#btn-approve-continue') as HTMLButtonElement;
@@ -632,9 +638,10 @@ class Step5ProductionController extends BaseStep {
         printDocument(prod.content, productData?.label ?? 'Documento');
       }
     });
-    this._dom.btnRegenerate?.addEventListener('click', () => {
-      void this._generateCurrentProduct();
-    });
+  }
+
+  protected override async _generateDocumentAsync(): Promise<void> {
+    await this._generateCurrentProduct();
   }
 
   override _setLoading(loading: boolean, text?: string): void {

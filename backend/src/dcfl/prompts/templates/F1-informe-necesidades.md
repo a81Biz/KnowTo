@@ -1,93 +1,111 @@
 ---
 id: F1
 name: Informe de Necesidades Validado (EC0249)
-version: 2.0.0
+version: 3.0.0
 tags: [EC0249, gap_analysis, SMART]
 pipeline_steps:
+
   # ── BATALLA 1: ANÁLISIS DE BRECHAS ────────────────────────────────
   - agent: agente_analisis_A
     model: "qwen2.5:14b"
     inputs_from: []
     include_template: false
     task: |
-      Eres Analista EC0249. Analiza:
-      F0: {previousData.f0_estructurado}
-      Q&A Cliente: {previousData.preguntas_respuestas_estructuradas}
+      You are a Needs Analysis Specialist certified under EC0249.
       
-      REGLA CRÍTICA DE ESQUEMA JSON:
-      Debes devolver EXACTAMENTE estas llaves:
+      SOURCE MAPPING:
+      - F0 structured data: {previousData.f0_estructurado}
+      - Client Q&A: {previousData.preguntas_respuestas_estructuradas}
+      
+      YOUR TASK: Analyze the gap between the client's current state and desired state.
+      
+      HOW TO ANALYZE:
+      1. "declaracion_problema": Identify the learning problem of the FINAL STUDENT, not the course creator. FORBIDDEN: "el cliente quiere crear un curso".
+      2. "impacto": What business or performance metric is affected. If no explicit impact, deduce it logically from the industry context in F0.
+      3. "perfil_participante": Build the full learner profile from the target audience in F0 and the Q&A. ALL fields required. FORBIDDEN: empty strings or "—".
+      4. "brechas": For each gap found in the Q&A, extract:
+         - comportamiento: the current behavior observed
+         - causa: root cause of the gap
+         - capacitable: "sí" if training can fix it, "no" if it's a tool/process issue
+         - prioridad: "alta" if directly linked to the problem statement, "media" or "baja" otherwise
+      5. "es_capacitable": true if at least one gap is capacitable, false otherwise.
+      6. IGNORE secondary logistical details from research. Focus 100% on the core course topic.
+      
+      OUTPUT ONLY VALID JSON — EXACT STRUCTURE:
       {
-        "declaracion_problema": "string",
-        "impacto": "string", 
+        "declaracion_problema": "",
+        "impacto": "",
         "perfil_participante": {
-          "perfil_profesional": "string",
-          "nivel_educativo_minimo": "string",
-          "experiencia_previa": "string",
-          "conocimientos_previos_requeridos": "string",
-          "rango_de_edad_estimado": "string",
-          "motivacion_principal": "string"
+          "perfil_profesional": "",
+          "nivel_educativo_minimo": "",
+          "experiencia_previa": "",
+          "conocimientos_previos_requeridos": "",
+          "rango_de_edad_estimado": "",
+          "motivacion_principal": ""
         },
-        "brechas": [{"comportamiento": "string", "causa": "string", "capacitable": "sí|no", "prioridad": "alta|media|baja"}],
-        "es_capacitable": boolean
+        "brechas": [{"comportamiento": "", "causa": "", "capacitable": "sí|no", "prioridad": "alta|media|baja"}],
+        "es_capacitable": true
       }
-      - Si un campo no aplica, usa null o string vacío, NO inventes texto genérico como "Hallazgo con fuente".
-      
-      ⚠️ REGLAS ANTI-NECEDAD Y ANTI-VACÍOS:
-      1. PERFIL DEL PARTICIPANTE: Basado en el dolor detectado y el público objetivo del Marco de Referencia (F0), DEBES proponer el perfil completo en el objeto "perfil_participante". PROHIBIDO dejar campos vacíos o usar "—".
-      2. PROHIBIDO usar campos vacíos o guiones ("—") en el impacto o problema. Si no hay impacto explícito, DEDÚCELO lógicamente.
-      3. IGNORA detalles logísticos secundarios de la investigación (ej. "ensamblado"). Enfócate 100% en el tema central del proyecto (ej. técnicas de pintura, luz y sombra).
-      4. PROHIBIDO decir "el cliente quiere crear un curso". El problema debe ser el dolor de aprendizaje del ALUMNO FINAL.
-      
-      Devuelve SOLO JSON.
 
   - agent: agente_analisis_B
     model: "qwen2.5:14b"
     inputs_from: []
     include_template: false
     task: |
-      Eres Analista EC0249 escéptico. Analiza:
-      F0: {previousData.f0_estructurado}
-      Q&A Cliente: {previousData.preguntas_respuestas_estructuradas}
+      You are a Needs Analysis Specialist certified under EC0249 — SKEPTICAL perspective.
       
-      REGLAS: Igual que A, pero crítico. Busca si el problema real son herramientas o procesos en lugar de capacitación.
+      SOURCE MAPPING:
+      - F0 structured data: {previousData.f0_estructurado}
+      - Client Q&A: {previousData.preguntas_respuestas_estructuradas}
       
-      REGLA CRÍTICA DE ESQUEMA JSON:
-      Debes devolver EXACTAMENTE estas llaves:
+      YOUR TASK: Same analysis as Agent A, but challenge assumptions. Ask: is this truly a training problem, or is it a tool/process/management issue?
+      
+      HOW TO ANALYZE:
+      1. "declaracion_problema": Identify the learning problem of the FINAL STUDENT. FORBIDDEN: "el cliente quiere crear un curso".
+      2. "impacto": What metric is affected. Deduce if not explicit.
+      3. "perfil_participante": Full learner profile from F0 + Q&A. ALL fields required. FORBIDDEN: empty strings or "—".
+      4. "brechas": For each gap, be critical — mark "no" for capacitable if the root cause is not solvable by training.
+      5. "es_capacitable": true only if at least one gap is genuinely capacitable.
+      6. IGNORE secondary logistical details. Focus 100% on the core course topic.
+      
+      OUTPUT ONLY VALID JSON — EXACT STRUCTURE:
       {
-        "declaracion_problema": "string",
-        "impacto": "string", 
+        "declaracion_problema": "",
+        "impacto": "",
         "perfil_participante": {
-          "perfil_profesional": "string",
-          "nivel_educativo_minimo": "string",
-          "experiencia_previa": "string",
-          "conocimientos_previos_requeridos": "string",
-          "rango_de_edad_estimado": "string",
-          "motivacion_principal": "string"
+          "perfil_profesional": "",
+          "nivel_educativo_minimo": "",
+          "experiencia_previa": "",
+          "conocimientos_previos_requeridos": "",
+          "rango_de_edad_estimado": "",
+          "motivacion_principal": ""
         },
-        "brechas": [{"comportamiento": "string", "causa": "string", "capacitable": "sí|no", "prioridad": "alta|media|baja"}],
-        "es_capacitable": boolean
+        "brechas": [{"comportamiento": "", "causa": "", "capacitable": "sí|no", "prioridad": "alta|media|baja"}],
+        "es_capacitable": true
       }
-      
-      ⚠️ REGLAS ANTI-NECEDAD Y ANTI-VACÍOS:
-      1. PERFIL DEL PARTICIPANTE: Basado en el dolor detectado y el público objetivo del Marco de Referencia (F0), DEBES proponer el perfil completo en el objeto "perfil_participante". PROHIBIDO dejar campos vacíos o usar "—".
-      2. PROHIBIDO usar campos vacíos o guiones ("—"). Si no hay impacto explícito, DEDÚCELO lógicamente.
-      3. IGNORA detalles logísticos secundarios de la investigación (ej. "ensamblado"). Enfócate 100% en el tema central del proyecto (ej. técnicas de pintura, luz y sombra).
-      4. PROHIBIDO decir "el cliente quiere crear un curso". El problema debe ser el dolor de aprendizaje del ALUMNO FINAL.
-      
-      Devuelve SOLO JSON.
 
   - agent: juez_analisis
     model: "qwen2.5:14b"
     inputs_from: [agente_analisis_A, agente_analisis_B]
     include_template: false
     task: |
-      Elige el análisis más objetivo y que CUMPLA el esquema JSON sin verbosidad. 
-      Si un agente devuelve JSON anidado basura o keys inventadas, PENALÍZALO y elige al otro.
-      Devuelve SOLO JSON: 
+      YOU ARE A JSON PARSER. DO NOT CONVERSE.
+      
+      Compare both analysis outputs.
+      
+      SELECTION CRITERIA:
+      1. Completeness: All fields in perfil_participante are filled — no empty strings, no "—".
+      2. Accuracy: The declaracion_problema describes a LEARNING problem, not a course creation desire.
+      3. Honesty: es_capacitable reflects whether gaps are truly solvable by training.
+      4. Schema compliance: Exact JSON structure, no extra keys, no nesting garbage.
+      
+      If an agent returns broken JSON or invented keys, PENALIZE it.
+      
+      OUTPUT ONLY THIS JSON:
       {
         "seleccion": "A" | "B",
-        "razon": "...",
-        "analisis_ganador": { /* El objeto JSON completo del agente elegido */ }
+        "razon": "brief explanation",
+        "analisis_ganador": { /* full JSON object from chosen agent */ }
       }
 
   # ── BATALLA 2: ESTRATEGIA SMART Y VIABILIDAD ────────────────────
@@ -96,83 +114,97 @@ pipeline_steps:
     inputs_from: [juez_analisis]
     include_template: false
     task: |
-      Eres Analista EC0249. Basado en el "analisis_ganador" que te entregó el juez:
-      F0: {previousData.f0_estructurado}
-      Q&A: {previousData.preguntas_respuestas_estructuradas}
+      You are an Instructional Strategy Specialist certified under EC0366.
       
-      Regla de Oro: El objetivo SMART debe centrarse en el APRENDIZAJE DEL ALUMNO, no en el desarrollo del curso.
-      Fórmula Obligatoria: "El participante [verbo futuro] [objeto de conocimiento] [condición/criterio] [tiempo/plazo]".
+      SOURCE MAPPING:
+      - analysis_ganador from juez_analisis (the winning gap analysis)
+      - F0 structured data: {previousData.f0_estructurado}
+      - Client Q&A: {previousData.preguntas_respuestas_estructuradas}
       
-
-      REGLA CRÍTICA DE ESQUEMA JSON:
-      Debes devolver EXACTAMENTE estas llaves:
+      YOUR TASK: Build a SMART strategy based on the validated gap analysis.
+      
+      HOW TO BUILD:
+      1. "objetivo_general_smart": Use the EXACT formula: "El participante [future-tense verb] [knowledge object] [condition/criterion] [time/deadline]". Center it on STUDENT LEARNING, not course development.
+      2. "desglose_smart": EXPLAIN each SMART criterion in 1-2 sentences. DO NOT cut the objective into pieces — explain WHY each letter is met.
+      3. "objetivos_especificos": Generate exactly 3, one per learning domain, using Bloom's Taxonomy verbs:
+         - Cognitivo: knowledge/comprehension level
+         - Psicomotor: application/execution level
+         - Afectivo: attitude/value level
+      4. "restricciones": Real constraints from F0 context (budget, time, technology).
+      5. "supuestos": Assumptions that must hold true for the strategy to work.
+      6. "viabilidad": Is this achievable with the given constraints?
+      
+      FORBIDDEN: empty fields. Deduce if necessary.
+      
+      OUTPUT ONLY VALID JSON — EXACT STRUCTURE:
       {
-        "objetivo_general_smart": "string",
-        "desglose_smart": {"s": "Explicación detallada...", "m": "Explicación detallada...", "a": "Explicación detallada...", "r": "Explicación detallada...", "t": "Explicación detallada..."},
+        "objetivo_general_smart": "",
+        "desglose_smart": {"s": "", "m": "", "a": "", "r": "", "t": ""},
         "objetivos_especificos": [
-          {"dominio": "Cognitivo", "nivel_bloom": "string", "objetivo": "string"},
-          {"dominio": "Psicomotor", "nivel_bloom": "string", "objetivo": "string"},
-          {"dominio": "Afectivo", "nivel_bloom": "string", "objetivo": "string"}
+          {"dominio": "Cognitivo", "nivel_bloom": "", "objetivo": ""},
+          {"dominio": "Psicomotor", "nivel_bloom": "", "objetivo": ""},
+          {"dominio": "Afectivo", "nivel_bloom": "", "objetivo": ""}
         ],
-        "restricciones": ["string"],
-        "supuestos": ["string"],
-        "viabilidad": {"es_viable": boolean, "justificacion": "string", "proximos_pasos": "string"}
+        "restricciones": [""],
+        "supuestos": [""],
+        "viabilidad": {"es_viable": true, "justificacion": "", "proximos_pasos": ""}
       }
-      
-      ⚠️ REGLAS PEDAGÓGICAS (EC0366):
-      1. El "desglose_smart" debe EXPLICAR cada criterio, NO cortar la oración en pedazos.
-      2. Debes generar 3 "objetivos_especificos" usando estrictamente verbos de la Taxonomía de Bloom para cada dominio de aprendizaje (Saber, Saber Hacer, Saber Ser).
-      3. PROHIBIDO DEJAR CAMPOS VACÍOS. Deduce restricciones o supuestos si es necesario.
-      
-      Devuelve SOLO JSON.
 
   - agent: agente_estrategia_B
     model: "qwen2.5:14b"
     inputs_from: [juez_analisis]
     include_template: false
     task: |
-      Eres Analista EC0249. Basado en el "analisis_ganador" que te entregó el juez:
-      F0: {previousData.f0_estructurado}
-      Q&A: {previousData.preguntas_respuestas_estructuradas}
+      You are an Instructional Strategy Specialist certified under EC0366 — MEASURABILITY focus.
       
-      REGLAS: Igual que A, pero garantiza que el criterio "Medible" sea numérico/tangible.
-      Regla de Oro: El objetivo SMART debe centrarse en el APRENDIZAJE DEL ALUMNO, no en el desarrollo del curso.
-      Fórmula Obligatoria: "El participante [verbo futuro] [objeto de conocimiento] [condición/criterio] [tiempo/plazo]".
+      SOURCE MAPPING: Same as Agent A.
       
-      REGLA CRÍTICA DE ESQUEMA JSON:
-      Debes devolver EXACTAMENTE estas llaves:
+      YOUR TASK: Same as Agent A, but guarantee every "M" criterion has NUMERIC or TANGIBLE indicators.
+      
+      HOW TO BUILD:
+      1. "objetivo_general_smart": Same EXACT formula. Center on STUDENT LEARNING.
+      2. "desglose_smart": The "m" field MUST include a numeric metric (e.g., "≥80% score", "within 2mm tolerance", "with zero critical errors").
+      3. "objetivos_especificos": Exactly 3, one per domain. Bloom verbs required.
+      4-6. Same as Agent A.
+      
+      FORBIDDEN: empty fields.
+      
+      OUTPUT ONLY VALID JSON — EXACT STRUCTURE:
       {
-        "objetivo_general_smart": "string",
-        "desglose_smart": {"s": "Explicación detallada...", "m": "Explicación detallada...", "a": "Explicación detallada...", "r": "Explicación detallada...", "t": "Explicación detallada..."},
+        "objetivo_general_smart": "",
+        "desglose_smart": {"s": "", "m": "", "a": "", "r": "", "t": ""},
         "objetivos_especificos": [
-          {"dominio": "Cognitivo", "nivel_bloom": "string", "objetivo": "string"},
-          {"dominio": "Psicomotor", "nivel_bloom": "string", "objetivo": "string"},
-          {"dominio": "Afectivo", "nivel_bloom": "string", "objetivo": "string"}
+          {"dominio": "Cognitivo", "nivel_bloom": "", "objetivo": ""},
+          {"dominio": "Psicomotor", "nivel_bloom": "", "objetivo": ""},
+          {"dominio": "Afectivo", "nivel_bloom": "", "objetivo": ""}
         ],
-        "restricciones": ["string"],
-        "supuestos": ["string"],
-        "viabilidad": {"es_viable": boolean, "justificacion": "string", "proximos_pasos": "string"}
+        "restricciones": [""],
+        "supuestos": [""],
+        "viabilidad": {"es_viable": true, "justificacion": "", "proximos_pasos": ""}
       }
-      
-      ⚠️ REGLAS PEDAGÓGICAS (EC0366):
-      1. El "desglose_smart" debe EXPLICAR cada criterio, NO cortar la oración en pedazos.
-      2. Debes generar 3 "objetivos_especificos" usando estrictamente verbos de la Taxonomía de Bloom para cada dominio de aprendizaje (Saber, Saber Hacer, Saber Ser).
-      3. PROHIBIDO DEJAR CAMPOS VACÍOS. Deduce restricciones o supuestos si es necesario.
-      
-      Devuelve SOLO JSON.
 
   - agent: juez_estrategia
     model: "qwen2.5:14b"
     inputs_from: [agente_estrategia_A, agente_estrategia_B]
     include_template: false
     task: |
-      Compara estrategias. Elige el objetivo SMART más realista y que CUMPLA el esquema JSON.
-      Si un agente alucina o es verboso, PENALÍZALO.
-      Actúa como embudo y devuelve SOLO JSON: 
+      YOU ARE A JSON PARSER. DO NOT CONVERSE.
+      
+      Compare both strategy outputs.
+      
+      SELECTION CRITERIA:
+      1. SMART compliance: The objetivo_general follows the formula exactly. The "m" criterion is measurable.
+      2. Completeness: All fields filled — no empty strings.
+      3. Bloom's Taxonomy: Each objetivo_especifico uses the correct domain and level.
+      4. Schema compliance: Exact JSON structure, no extra keys.
+      
+      If an agent returns broken JSON or verbosity, PENALIZE it.
+      
+      OUTPUT ONLY THIS JSON:
       {
-        "seleccion": "A" | "B", 
-        "razon": "...",
-        "analisis_ganador": { /* El objeto JSON completo del agente elegido */ }
+        "seleccion": "A" | "B",
+        "razon": "brief explanation",
+        "analisis_ganador": { /* full JSON object from chosen agent */ }
       }
 
   # ── ENSAMBLADOR ───────────────────────────────────────────────────
