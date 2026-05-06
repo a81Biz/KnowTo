@@ -11,29 +11,44 @@ pipeline_steps:
     inputs_from: []
     include_template: false
     task: |
-      Read ONLY from userInputs in the provided context. Ignore previousData entirely.
+      Read from userInputs AND webSearchResults in the provided context. Ignore previousData entirely.
       
       SOURCE MAPPING:
-      - The form fields follow the pattern "manual_unidad_N" where N is the unit number.
-      - projectName and clientName come from the context root.
+      - Form fields: "manual_unidad_N" where N is the unit number.
+      - webSearchResults: Tavily search results with 8 categories for research.
+      - projectName and clientName from the context root.
       
-      YOUR TASK: Map each form field to its unit number by extracting N from the key name. Preserve the EXACT text of each field value.
+      YOUR TASK:
+      1. Map each form field to its unit number. Preserve EXACT text.
+      2. For each unit, extract from webSearchResults the relevant research data:
+         - From "practices": best practices and techniques related to the unit topic.
+         - From "references": authoritative sources, articles, or documentation.
+         - From "trends": current trends or innovations in the unit's domain.
+         - From "market_size": industry context and relevance of the topic.
       
       OUTPUT ONLY VALID JSON — EXACT STRUCTURE:
       {
         "producto": "P4",
-        "proyecto": "[projectName from context]",
-        "candidato": "[clientName from context]",
+        "proyecto": "[projectName]",
+        "candidato": "[clientName]",
         "secciones": [
-          { "campo": "manual_unidad_1", "contenido": "[value of manual_unidad_1]" },
-          { "campo": "manual_unidad_2", "contenido": "[value of manual_unidad_2]" }
+          { "campo": "manual_unidad_1", "contenido": "[EXACT value]" }
+        ],
+        "investigacion": [
+          {
+            "unidad": "1",
+            "practicas": ["[practice 1]", "[practice 2]"],
+            "referencias": ["[URL or source 1]", "[URL or source 2]"],
+            "tendencias": ["[trend 1]"],
+            "contexto_industria": "[industry relevance]"
+          }
         ]
       }
       
       RULES:
-      - Include ONLY fields whose key starts with "manual_unidad_"
-      - Preserve the exact text of each field value — do not paraphrase or summarize
-      - The number of secciones must equal the number of manual_unidad_* keys in userInputs
+      - Include ONLY manual_unidad_* fields in secciones.
+      - Preserve exact form text.
+      - For investigacion: extract REAL data from webSearchResults. If a category is empty, use empty array [].
 
   # ── AGENTE A: STUDY-GUIDE COMPILER ───────────────────────────────────────
   - agent: agente_doc_generic_A
@@ -45,30 +60,67 @@ pipeline_steps:
       
       You are an EC0366 Technical Writer compiling the official participant manual.
       
-      SOURCE: The manual chapter sections extracted from the user-confirmed form.
+      SOURCE: The manual sections AND the investigacion data extracted from webSearchResults.
       
-      HOW TO BUILD THE DOCUMENT:
+      HOW TO BUILD THE DOCUMENT — PROCESS EACH UNIT ONE AT A TIME:
       
-      1. Generate the complete document in SPANISH.
-      2. Use # for the document title, ## for each chapter/module, ### for subsections.
-      3. Each chapter MUST include ALL sections from the form field:
-         - Introducción → ### Introducción
-         - Conceptos clave → ### Conceptos Clave (use a definition table)
-         - Desarrollo → ### Desarrollo (main content with examples and common mistakes)
-         - Ejercicio práctico → ### Ejercicio Práctico
-         - Puntos a recordar → ### Puntos a Recordar (bullet list)
-      4. This is a self-study document — a participant must be able to learn from this manual WITHOUT watching any video or attending any class.
+      FOR EACH UNIT in the extracted secciones:
+      
+      STEP 1 — Read the unit's form content (objetivo, marco teórico base, pasos del procedimiento, autoevaluación).
+      STEP 2 — Read the unit's investigacion data (practicas, referencias, tendencias, contexto_industria).
+      STEP 3 — Write the complete chapter using this EXACT narrative structure:
+      
+         ### Introducción
+         Hook sentence + what this chapter covers (2-3 sentences connecting to the unit's objective).
+         
+         ### Marco Teórico
+         Real theory from the investigacion data. 4-6 sentences with sourced facts, industry data, or established techniques. Do NOT write "F0 marco de referencia". Use the research: mention real methods, real tools, real industry standards.
+         
+         ### Conceptos Clave
+         Markdown table: | Término | Definición | Ejemplo |
+         Use 3-5 terms derived from BOTH the form content and the research data.
+         
+         ### Desarrollo
+         The procedure explained step by step. Expand each form step with concrete details from the research. Include measurements, specific tools, techniques, and expected results. Write in instructional prose with numbered steps.
+         
+         ### Ejemplo Práctico
+         One concrete real-world scenario or case from the investigacion practicas or tendencias that illustrates the chapter's concepts.
+         
+         ### Ejercicio Práctico
+         The practice activity from the form. Preserve the user-confirmed procedure.
+         
+         ### Puntos a Recordar
+         3 bullet points — the essential takeaways from this chapter.
+      
+      STEP 4 — MOVE TO THE NEXT UNIT. Repeat STEPS 1-4 for ALL units.
       
       CRITICAL RULES:
-      1. DEPTH REQUIREMENT: Every concept must be explained with 2-3 sentences of detail beyond what appears in slides or scripts. Include concrete examples, counter-examples, and common mistakes. This is the deep-reference document.
-      2. COMPLETE SECTIONS: Include ALL sections from the form. If a section is empty in the form, write a one-sentence placeholder indicating what should go there.
-      3. DEFINITION TABLES: Use Markdown tables for the Conceptos clave section — Término | Definición | Ejemplo.
-      4. CALLOUTS: Use > **Nota:** blockquotes for important warnings, tips, or safety information.
-      5. NO RAW JSON OR FIELD NAMES in the output. Clean, professional manual.
-      6. BIBLIOGRAPHY: If the form references sources, include them in a ## Bibliografía section at the end of the manual.
+      1. FORM CONTENT IS SACRED: The learning objective, procedure steps, and self-assessment come from the user-confirmed form. Do NOT replace or rewrite them.
+      2. RESEARCH ADDS DEPTH: The investigacion data provides real theory, real examples, and real bibliography. Use it to enrich every section.
+      3. COVERAGE RULE: Process ALL units in order. If there are 3 units, the output MUST have 3 complete chapters. Before finalizing, verify: "Have I written all chapters?" If not, continue.
+      4. MINIMUM DEPTH: Each chapter must be at least 800 characters of substantive content beyond the form fields.
+      5. NO FAKE REFERENCES: Bibliography must use real URLs from the investigacion.referencias arrays.
+      6. NO RAW JSON OR FIELD NAMES in the output. Clean, professional manual in Spanish.
+      
+      FINAL OUTPUT STRUCTURE:
+      # Manual del Participante
+      ## Capítulo 1: [Unit Name]
+      ### Introducción
+      ...
+      ### Puntos a Recordar
+      - ...
+      ## Capítulo 2: [Unit Name]
+      ...
+      (ALL chapters included)
+      ## Glosario
+      | Término | Definición |
+      |---|---|
+      ...
+      ## Bibliografía
+      - [Real source]. Available at: [Real URL]
       
       OUTPUT ONLY THIS JSON:
-      {"documento_md": "# Manual del Participante\n\n## Capítulo 1: ...\n### Introducción\n...\n### Conceptos Clave\n| Término | Definición | Ejemplo |\n|---|---|---|\n..."}
+      {"documento_md": "[complete manual with ALL chapters]"}
 
   # ── AGENTE B: SELF-STUDY DESIGNER ────────────────────────────────────────
   - agent: agente_doc_generic_B
@@ -80,31 +132,62 @@ pipeline_steps:
       
       You are an EC0366 Self-Study Instructional Designer compiling a comprehensive participant manual.
       
-      SOURCE: The manual chapter sections extracted from the user-confirmed form.
+      SOURCE: The manual sections AND the investigacion data extracted from webSearchResults.
       
-      HOW TO BUILD THE DOCUMENT:
+      HOW TO BUILD THE DOCUMENT — PROCESS EACH UNIT ONE AT A TIME:
       
-      1. Generate the complete document in SPANISH.
-      2. Use # for the document title, ## for each chapter, ### for subsections.
-      3. Structure each chapter for self-study with:
-         - Learning objective at the top
-         - Theory section with diagrams or tables
-         - Numbered procedure with observable steps
-         - Self-assessment checklist or rubric
-         - Further reading references
-      4. Include a comprehensive ## Glosario section at the end with ALL key terms from ALL chapters.
-      5. Include a ## Bibliografía section with all F0 sources.
-      6. Use callout boxes, comparison tables, and checklists throughout.
+      FOR EACH UNIT in the extracted secciones:
+      
+      STEP 1 — Read the unit's form content.
+      STEP 2 — Read the unit's investigacion data.
+      STEP 3 — Write the complete chapter using this EXACT self-study structure:
+      
+         ### Objetivo de Aprendizaje
+         What the participant will DO after completing this chapter. From the form.
+         
+         ### Marco Teórico
+         Minimum conceptual foundation. Use the investigacion data for real theory. 4-6 sentences. Do NOT write "F0 marco de referencia".
+         
+         ### Conceptos que Debes Conocer
+         Markdown table: | Término | Significado | Ejemplo Cotidiano |
+         Accessible language for a worker with no prior training.
+         
+         ### Pasos del Procedimiento
+         Numbered observable steps from the form. Expand each with details from research — specific techniques, tools, measurements.
+         
+         ### Ejemplo en el Trabajo Real
+         A concrete workplace scenario from the investigacion practicas or tendencias.
+         
+         ### Errores Comunes que Debes Evitar
+         2-3 frequent mistakes. Derive from the investigacion challenges data if available, or from common industry knowledge in the research.
+         
+         ### Autoevaluación
+         The self-assessment from the form. Add one additional self-check question based on the research.
+         
+         ### Lecturas Complementarias
+         Real references from the investigacion.referencias array with URLs.
+      
+      STEP 4 — MOVE TO THE NEXT UNIT. Repeat for ALL units.
       
       CRITICAL RULES:
-      1. CONTENT COMPLETENESS: Your document may use a different chapter structure than the standard template, but it MUST contain ALL factual information from the form fields. Different structure ≠ different content.
-      2. SELF-ASSESSMENT: Every chapter must include a way for the participant to verify their own understanding — checklist, rubric, or self-test question.
-      3. GLOSSARY: The final glossary must merge ALL key terms from ALL chapters. Do not limit to one unit.
-      4. CROSS-REFERENCES: Where a concept in one chapter relates to another chapter, add a brief cross-reference: (→ ver Capítulo X).
-      5. NO RAW JSON OR FIELD NAMES in the output.
+      1. FORM CONTENT IS SACRED: The learning objective, procedure steps, and self-assessment come from the form. Do NOT replace.
+      2. PLAIN LANGUAGE: Write for a worker with no prior training. Explain technical terms.
+      3. COVERAGE RULE: ALL units must have complete chapters. Verify before outputting.
+      4. MINIMUM DEPTH: Each chapter at least 800 characters beyond form fields.
+      5. CROSS-REFERENCES: Where a concept relates to another chapter, add (→ ver Capítulo X).
+      6. NO RAW JSON OR FIELD NAMES in output.
+      
+      FINAL OUTPUT STRUCTURE:
+      # Manual del Participante — Autoestudio
+      ## Capítulo 1: [Unit Name]
+      ...
+      ## Glosario General
+      (ALL terms from ALL chapters merged)
+      ## Bibliografía
+      - [Real source]. Available at: [Real URL]
       
       OUTPUT ONLY THIS JSON:
-      {"documento_md": "# Manual del Participante — Autoestudio\n\n## Capítulo 1: ...\n..."}
+      {"documento_md": "[complete manual with ALL chapters]"}
 
   # ── JUDGE ────────────────────────────────────────────────────────────────
   - agent: juez_doc_generic

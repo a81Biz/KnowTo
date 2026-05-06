@@ -60,7 +60,13 @@ export function cleanJsonResponse(raw: string): string {
   
   // 8. Corregir trailing commas dentro de objetos y arrays
   cleaned = cleaned.replace(/,\s*([}\]])/g, '$1');
-  
+
+  // 8.5. Sanitizar escapes Unicode del output del modelo:
+  // Paso 1 — decodificar escapes válidos (á → á) para evitar falsos positivos en paso 2
+  cleaned = cleaned.replace(/\\u([0-9a-fA-F]{4})/g, (_, hex) => String.fromCharCode(parseInt(hex, 16)));
+  // Paso 2 — escapar cualquier \u residual (ahora todos son inválidos porque los válidos ya se decodificaron)
+  cleaned = cleaned.replace(/\\u/g, '\\\\u');
+
   // 9. Si después de todo esto no es un JSON válido, intentar extraer con regex más agresiva
   try {
     JSON.parse(cleaned);
@@ -128,7 +134,6 @@ export function cleanAgentOutput(output: string): string {
  */
 export function parseJsonSafely<T = any>(raw: string, fallback: T): T {
   if (!raw || typeof raw !== 'string') {
-    // Si ya es un objeto (por ejemplo, devuelto por un tool call ya procesado), devolverlo
     if (raw && typeof raw === 'object') return raw as any;
     console.warn('[parseJsonSafely] raw vacío o no es string, usando fallback');
     return fallback;
@@ -136,13 +141,20 @@ export function parseJsonSafely<T = any>(raw: string, fallback: T): T {
   
   try {
     // Limpieza de bloques Markdown JSON antes del parseo
-    const cleanString = raw.replace(/```json\n?|```\n?/g, '').trim();
+    let cleanString = raw.replace(/```json\n?|```\n?/g, '').trim();
+    
+    // Sanitizar Unicode escapes mal formados que el LLM a veces genera
+    // Reemplazar \uXXXX válidos por sus caracteres reales para evitar errores de parseo
+    cleanString = cleanString.replace(/\\u([0-9a-fA-F]{4})/g, (_, hex) => {
+      return String.fromCharCode(parseInt(hex, 16));
+    });
+    
     const cleaned = cleanJsonResponse(cleanString);
     const parsed = JSON.parse(cleaned) as T;
     return parsed;
   } catch (error) {
     console.error(`[parseJsonSafely] Error: ${error instanceof Error ? error.message : String(error)}`);
-    console.error(`[parseJsonSafely] Raw preview: ${raw.substring(0, 200)}`);
+    console.error(`[parseJsonSafely] Raw length: ${raw.length}, preview: ${raw.substring(0, 200)}`);
     return fallback;
   }
 }

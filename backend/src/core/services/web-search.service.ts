@@ -146,4 +146,20 @@ export class WebSearchService {
     const query = `mejores prácticas cursos en línea diseño instruccional ${industry}`;
     return this.search(query, { maxResults: 5 });
   }
+  
+  /**
+   * Busca información específica para una unidad de un curso
+   */
+  async searchUnitTopic(unitName: string, projectName: string): Promise<any> {
+    const query = `información técnica y mejores prácticas para "${unitName}" en el contexto de ${projectName}`;
+    const res = await this.search(query, { maxResults: 3 });
+    
+    // Devolvemos estructura compatible con lo que espera el assembler
+    return {
+      practicas: res.results?.map((r: any) => r.content) || [],
+      referencias: res.results?.map((r: any) => r.url) || [],
+      tendencias: res.answer ? [res.answer] : [],
+      contexto_industria: res.answer || ''
+    };
+  }
 }

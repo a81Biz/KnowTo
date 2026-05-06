@@ -63,7 +63,7 @@ export class OllamaProvider implements ILLMProvider {
           prompt,
           system: systemPrompt ?? '',
           stream: false,
-          options: { num_ctx: 16384 },
+          options: { num_ctx: 16384, num_predict: 8192 },
         }),
         signal: controller.signal,
       });
@@ -136,7 +136,7 @@ export class OllamaProvider implements ILLMProvider {
       model,
       messages,
       stream: false,
-      options: { num_ctx: 16384 }
+      options: { num_ctx: 16384, num_predict: 8192 }
     };
     
     if (tools && tools.length > 0) {

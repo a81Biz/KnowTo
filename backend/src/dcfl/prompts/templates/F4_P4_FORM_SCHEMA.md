@@ -11,9 +11,12 @@ pipeline_steps:
     inputs_from: []
     include_template: false
     task: |
-      Extract ALL units from the course syllabus, the F0 reference framework, and the P3 multimedia scripts.
+      YOU ARE AN EXTRACTOR, NOT AN EDITOR. Your ONLY job is to copy fields verbatim from the source.
+      NEVER rewrite, rephrase, improve, or apply any verb rules to any text — copy it EXACTLY as written.
+      Even if the objective says "comprenderá", "sabrá", or "conocerá" — copy it as-is. Do NOT change it.
       
-      SOURCE: The context contains fase3.unidades (F2/F3), F0 marco de referencia, and P3 scripts from productos_previos or userInputs.
+      Extract ALL units from the course syllabus, the F0 reference framework, and the P1 instruments.
+      SOURCE: The context contains fase3.unidades (F2/F3), F0 reference framework, and P1 instruments from productos_previos.
       
       DO NOT TRUNCATE. Return every unit.
       
@@ -34,8 +37,8 @@ pipeline_steps:
       
       FOR EACH UNIT:
       1. Read its "nombre" and "objetivo".
-      2. Read the F0 marco de referencia for industry context, key concepts, and bibliographic sources.
-      3. Read the corresponding P3 script to reinforce concepts explained in videos — the manual deepens, not repeats.
+      2. Read the corresponding P1 instrument to align manual content with what will be evaluated.
+      3. Read the F0 marco de referencia for industry context, key concepts, and bibliographic sources.
       4. Write a chapter with 5 sections:
          - Introducción: Welcome paragraph, 2-3 sentences contextualizing the topic.
          - Conceptos clave: 3-5 terms with clear definitions relevant to the unit.
@@ -45,7 +48,7 @@ pipeline_steps:
       
       RULES:
       1. SAME NUMBER OF ELEMENTS AS UNITS RECEIVED.
-      2. DEPTH BEYOND VIDEO: The manual is the deep-reference document. Each concept must be explained with 2-3 sentences of detail beyond what appears in slides or scripts. A participant should be able to study from this manual without watching the videos.
+      2. DEPTH BEYOND SCRIPT: The manual is the deep-reference document. Each concept must be explained with 2-3 sentences of detail. A participant should be able to study from this manual as the primary knowledge source.
       3. SOURCE GROUNDING: Use F0 as the theoretical and bibliographic foundation. Cite real sources where applicable.
       4. field "name" MUST be: "manual_unidad_" + modulo.
       5. USE \n FOR LINE BREAKS in suggested_value.
@@ -74,8 +77,8 @@ pipeline_steps:
       
       FOR EACH UNIT:
       1. Read its "nombre" and "objetivo".
-      2. Read the F0 marco de referencia for theory and sources.
-      3. Read the corresponding P3 script — the manual provides the theory behind what the instructor says.
+      2. Read the corresponding P1 instrument to ensure the manual covers what will be evaluated.
+      3. Read the F0 marco de referencia for theory and sources.
       4. Write a chapter with 5 sections:
          - Objetivo de aprendizaje: What the participant will be able to DO after completing this chapter.
          - Marco teórico: Minimum conceptual foundation needed — direct, concise, grounded in F0 sources.

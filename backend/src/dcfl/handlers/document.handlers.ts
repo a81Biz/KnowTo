@@ -92,7 +92,7 @@ export async function handleGetJob(c: Context) {
 
 export async function handleGenerateAsync(c: Context) {
   const body: any = (c.req as any).valid('json');
-  const userId = c.get('userId') || '00000000-0000-0000-0000-000000000000';
+  const userId = c.get('userId') || '00000000-0000-0000-0000-000000000001';
   const jobsSvc = new PipelineJobsService(c.env);
 
   const jobId = await jobsSvc.createJob({
@@ -139,7 +139,7 @@ export async function runPipelineAsync(
   const projectService = new ProjectService(projectRepository);
   const pipelineService = new PipelineService(pipelineRepository, supabase);
 
-  const services = { pipelineService, supabase, projectService, ai, webSearch };
+  const services = { pipelineService, supabase, projectService, ai, webSearch, osint: webSearch };
 
   console.log(`[pipeline] START job=${jobId} phase=${body.phaseId} prompt=${body.promptId}`);
   console.log(`[FLOW-BE] Iniciando Pipeline para ${body.userInputs?.producto || 'Desconocido'}. Contexto Fase 3 cargado: ${body.context?.fase3?.unidades?.length || 0} unidades.`);
@@ -206,26 +206,34 @@ export async function runPipelineAsync(
       }
     }
 
-    const isP7orP8 = body.promptId === 'F4_P7_GENERATE_DOCUMENT' || body.promptId === 'F4_P8_GENERATE_DOCUMENT';
-    if (isP7orP8) {
+    const needsPrevProducts = [
+      'F4_P2_FORM_SCHEMA',
+      'F4_P3_FORM_SCHEMA',
+      'F4_P7_FORM_SCHEMA',
+      'F4_P8_FORM_SCHEMA',
+      'F4_P7_GENERATE_DOCUMENT',
+      'F4_P8_GENERATE_DOCUMENT'
+    ].includes(body.promptId);
+
+    if (needsPrevProducts) {
       try {
         const prevProducts = await supabase.getF4Productos(body.projectId);
-        const productos_previos: Record<string, string> = {};
+        const productos_previos: Record<string, any> = {};
         for (const p of prevProducts) {
-          if (['P1', 'P2', 'P3', 'P4', 'P5', 'P6'].includes(p.producto) && p.documento_final) {
-            productos_previos[p.producto] = p.documento_final;
+          if (['P1', 'P2', 'P3', 'P4', 'P5', 'P6'].includes(p.producto) && p.datos_producto) {
+            productos_previos[p.producto] = p.datos_producto;
           }
         }
         if (Object.keys(productos_previos).length > 0) {
           enrichedContext.productos_previos = productos_previos;
         }
       } catch (err) {
-        console.warn('[F4 P7/P8] No se pudieron inyectar productos previos:', err);
+        console.warn(`[F4 ${body.promptId}] No se pudieron inyectar productos previos:`, err);
       }
     }
 
-    // PASO 2: Enriquecer con OSINT (Solo si es F0)
-    if (body.promptId === 'F0') {
+    // PASO 2: Enriquecer con OSINT (Solo si es F0 o P4)
+    if (body.promptId === 'F0' || body.promptId === 'F4_P4_GENERATE_DOCUMENT') {
       enrichedContext = await enrichContextWithOSINT(
         enrichedContext,
         jobId,
@@ -251,7 +259,7 @@ export async function runPipelineAsync(
           agentName: agentName as AgentName,
           output,
           body,
-          services: { pipelineService, supabase, projectService }
+          services
         });
       }
     });

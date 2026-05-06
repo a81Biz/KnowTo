@@ -1,224 +1,381 @@
-# Problema de Contexto P7/P8 — Análisis y Cambios Requeridos
-
-## Descripción del Problema
-
-P7 (Documento de Información General) y P8 (Cronograma de Desarrollo) cierran el ciclo de producción: P7 es un manual de referencia y P8 es el cronograma real del proyecto. Para hacer su trabajo correctamente, ambos necesitan saber qué materiales ya fueron producidos (P1–P6).
-
-Actualmente ambos reciben un `compactContext` que solo contiene `userInputs` con los campos `informacion_unidad_N` / `cronograma_unidad_N`. No reciben ningún documento previamente generado.
-
-**Resultado**: los modelos generan contenido genérico en lugar de referenciar los materiales reales producidos para el curso.
+# Mapa Completo del Ecosistema DCFL — Fases F y Productos P
 
 ---
 
-## Raíz del Problema: Flujo de Datos
+## 1. La Lista Maestra de Fases
 
-```
-frontend/dcfl/src/controllers/step4.production.ts
-  └── _generateCurrentProduct() [línea ~481]
-        └── wizardStore.buildContext(STEP_NUMBER) [línea ~515]
-              └── frontend/dcfl/src/stores/wizard.store.ts
-                    └── buildContext() [línea 183]
-                          └── itera solo wizard_steps (F0–F3)
-                          └── returns { ...base, previousData: { ...completed_steps } }
-                          └── NUNCA lee fase4_productos
-```
+### Fases F — Formularios / Inputs base (el usuario las completa antes de F4)
 
-El store `wizard.store.ts` construye el contexto a partir de `wizard_steps` (F0–F3). Los productos F4 (P1–P8) se almacenan en la tabla `fase4_productos`, que el frontend **nunca consulta** al construir el contexto para la generación.
-
-La tabla y el método ya existen en el backend:
-
-```typescript
-// backend/src/core/services/supabase.service.ts — línea 790
-async getF4Productos(projectId: string): Promise<Array<{
-  id: string;
-  producto: string;
-  documento_final: string | null;
-  validacion_estado: string | null;
-  validacion_errores: string[] | null;
-  datos_producto: any;
-  job_id: string | null;
-  created_at: string;
-  approved_at: string | null;
-}>>
-```
-
-> Tabla real: `fase4_productos` (NO `f4_productos_finales`)
+| Fase | Nombre | Tabla BD | Columnas JSONB clave |
+|---|---|---|---|
+| **F0** | Marco de Referencia del Cliente | `fase0_estructurado` | `analisis_sector`, `desafios`, `competencia`, `estandares_ec`, `brechas`, `recomendaciones` |
+| **F1** | Informe de Necesidades de Capacitación | `fase1_informe_necesidades` | `brechas_competencia`, `objetivos_aprendizaje`, `perfil_participante`, `resultados_esperados` |
+| **F2** | Especificaciones de Análisis y Diseño | `fase2_analisis_alcance` | `modalidad`, `interactividad`, `estructura_tematica`, `perfil_ingreso`, `estrategias` |
+| **F2.5** | Recomendaciones (paso intermedio) | `fase2_5_recomendaciones` | `estructura_videos`, `actividades`, `metricas`, `total_videos`, `duracion_promedio_minutos` |
+| **F3** | Especificaciones Técnicas del Curso | `fase3_especificaciones` | `plataforma_navegador`, `formatos_multimedia`, `calculo_duracion`, `reporteo` |
 
 ---
 
-## Tabla de Archivos a Modificar
+### Productos P — Fase 4 (los 8 entregables EC0366)
 
-| # | Archivo | Cambio |
+Todos van a la misma tabla: `fase4_productos`, diferenciados por la columna `producto`.
+
+| Código | Nombre completo | Datos estructurados en `datos_producto` JSONB |
 |---|---|---|
-| 1 | `backend/src/dcfl/handlers/document.handlers.ts` | Inyectar `productos_previos` en `enrichedContext` para P7/P8 |
-| 2 | `backend/src/core/services/ai.service.ts` | Exponer `productos_previos` en `compactContext` |
-| 3 | `backend/src/dcfl/prompts/templates/F4_P7_GENERATE_DOCUMENT.md` | Actualizar extractor + agente_A para usar `materiales_producidos` |
-| 4 | `backend/src/dcfl/prompts/templates/F4_P8_GENERATE_DOCUMENT.md` | Actualizar extractor + agente_A para usar `entregables_existentes` |
+| **P1** | Instrumentos de Evaluación | `{objetivo_general, objetivos_particulares, perfil_ingreso}` |
+| **P2** | Presentación Electrónica del Facilitador | `{partes: {modulo_1: {slides, actividades, cierre}, ...}, total_modulos}` |
+| **P3** | Guiones Multimedia (Paquete de Producción) | `{partes: {modulo_1: {ficha_tecnica, escaleta, guion_literario, guion_tecnico, storyboard}, ...}, total_modulos}` |
+| **P4** | Manual del Participante | `{capitulos: [{unidad, nombre, contenido_md, palabras}]}` |
+| **P5** | Guías de Actividades | — |
+| **P6** | Calendario General | — |
+| **P7** | Documento de Información | — |
+| **P8** | Cronograma de Desarrollo | — |
 
 ---
 
-## Cambio 1 — `document.handlers.ts`
+## 2. Orden Cronológico de Ejecución
 
-**Punto de inserción**: después del bloque `if (body.phaseId === 'F3')` (~línea 207), antes de `// PASO 2: Enriquecer con OSINT`.
+### Fases F (secuencial, cada una alimenta a la siguiente)
+
+```
+F0 → F1 → F2 → F2.5 → F3 → F4
+```
+
+### Dentro de F4 — orden de ejecución del PRODUCTS array (frontend)
+
+```
+P1 → P4 → P3 → P2 → P5 → P6 → P7 → P8
+```
+
+> **Nota:** El número del producto (P1, P2…) es el código de negocio EC0366.
+> El orden de ejecución (índice 0-7 del array) es distinto: P4 se ejecuta antes que P3 y P2.
+> Esto es intencional: P4 (Manual) genera el `datos_producto.capitulos` que P3 y P2 necesitan como contexto.
+
+---
+
+## 3. El Payload de `userInputs` — ¿Quién lo arma y cómo?
+
+### El frontend lo arma antes del POST (step4.production.ts)
+
+El backend **no** va a la BD a traer datos F dentro de `userInputs`. El frontend lo hace directamente antes de lanzar el pipeline.
+
+---
+
+### Para P3 — un POST por módulo
 
 ```typescript
-const isP7orP8 = body.promptId === 'F4_P7_GENERATE_DOCUMENT' || body.promptId === 'F4_P8_GENERATE_DOCUMENT';
-if (isP7orP8) {
-  try {
-    const prevProducts = await supabase.getF4Productos(body.projectId);
-    const productos_previos: Record<string, string> = {};
-    for (const p of prevProducts) {
-      if (['P1', 'P2', 'P3', 'P4', 'P5', 'P6'].includes(p.producto) && p.documento_final) {
-        productos_previos[p.producto] = p.documento_final;
-      }
-    }
-    if (Object.keys(productos_previos).length > 0) {
-      enrichedContext.productos_previos = productos_previos;
-    }
-  } catch (err) {
-    console.warn('[F4 P7/P8] No se pudieron inyectar productos previos:', err);
-  }
+// Frontend carga P4.datos_producto.capitulos desde /api/fase4-productos
+const p4Capitulo = p4Capitulos.find(c => c.unidad === moduloNum)?.contenido_md || '';
+
+userInputs = {
+  guion_unidad_N: valores["guion_unidad_N"],   // texto del form dinámico
+  _modulo_actual: moduloNum,                    // número entero
+  _nombre_video: "Nombre del módulo",           // extraído del label del campo en schema
+  _producto: 'P3',
+  p4_capitulo: p4Capitulo,                      // capítulo completo de P4 en Markdown
 }
 ```
 
+**Fuente de `p4_capitulo`:** `fase4_productos.datos_producto.capitulos` (JSONB) — NO el `documento_final` TEXT.
+
 ---
 
-## Cambio 2 — `ai.service.ts`
-
-**Punto de inserción**: después de la línea `if (options.context.fase3) compactContextObj.fase3 = options.context.fase3;` (~línea 120).
+### Para P2 — un POST por módulo
 
 ```typescript
-if (options.context.productos_previos) compactContextObj.productos_previos = options.context.productos_previos;
+// Frontend carga P3.datos_producto.partes y P4.datos_producto.capitulos en un solo fetch
+const p3ModuloKey = `modulo_${moduloNum}`;
+const p3Data = p3Partes[p3ModuloKey] || {};
+const p3Guion = [p3Data.guion_literario, p3Data.escaleta]
+  .filter(Boolean).join('\n\n');
+
+const p4Capitulo = p4Capitulos.find(c => c.unidad === moduloNum)?.contenido_md || '';
+
+userInputs = {
+  presentacion_unidad_N: valores["presentacion_unidad_N"],  // texto del form dinámico
+  _modulo_actual: moduloNum,
+  _nombre_modulo: "Nombre del módulo",
+  _producto: 'P2',
+  p3_guion: p3Guion,       // guion_literario + escaleta del módulo correspondiente
+  p4_capitulo: p4Capitulo,  // capítulo completo de P4
+}
 ```
 
-**`compactContext` resultante para P7/P8 tras el fix:**
+**Fuente de `p3_guion`:** `fase4_productos.datos_producto.partes.modulo_N.guion_literario` + `.escaleta` (JSONB) — NO el `documento_final` TEXT.
+
+---
+
+### Para P7 / P8 y algunos FORM_SCHEMA — el backend inyecta en `context`
+
+El backend (document.handlers.ts:209-233) enriquece el **`context`** (no el `userInputs`) con productos anteriores:
+
+```typescript
+// Solo para: F4_P7_GENERATE_DOCUMENT, F4_P8_GENERATE_DOCUMENT,
+//            F4_P2_FORM_SCHEMA, F4_P3_FORM_SCHEMA, F4_P7_FORM_SCHEMA, F4_P8_FORM_SCHEMA
+const prevProducts = await supabase.getF4Productos(body.projectId);
+for (const p of prevProducts) {
+  if (['P1', 'P2', 'P3', 'P4', 'P5', 'P6'].includes(p.producto) && p.documento_final) {
+    productos_previos[p.producto] = p.documento_final;  // ← Aquí SÍ se usa documento_final TEXT
+  }
+}
+context.productos_previos = productos_previos;
+```
+
+**Para F7/F8:** se usa `documento_final` (Markdown), no el JSONB.
+
+---
+
+### Para F1 / F2 / F3 — el backend inyecta en `context.previousData`
+
+```typescript
+// F1: lee fase0_estructurado (tabla propia)
+context.previousData.f0_estructurado = await supabase.getFase0Estructurado(projectId);
+context.previousData.preguntas_respuestas_estructuradas = await supabase.getFaseAnswersDetailed(projectId, 1);
+
+// F2: lee fase0_estructurado + fase1_informe_necesidades
+context.previousData.f0_estructurado = await supabase.getF0AgentOutputs(projectId);
+context.previousData.f1_estructurado = await supabase.getF1Informe(projectId);
+
+// F3: lee fase2_analisis_alcance + fase2_5_recomendaciones
+context.previousData.f2_estructurado = await supabase.getF2Analisis(projectId);
+context.previousData.f2_5_estructurado = { total_videos, duracion_promedio_video, estructura_videos, ... };
+```
+
+---
+
+## 4. Esquema de Base de Datos
+
+### Tabla principal de productos: `fase4_productos`
+
+```sql
+CREATE TABLE fase4_productos (
+  id                  UUID        PRIMARY KEY,
+  project_id          UUID        NOT NULL,
+  producto            VARCHAR(10) NOT NULL,          -- 'P1'..'P8'
+  documento_final     TEXT,                          -- Markdown ensamblado (legible humano)
+  borrador_a          TEXT,                          -- Auditoría
+  borrador_b          TEXT,                          -- Auditoría
+  juez_decision       JSONB,                         -- {borrador_elegido, razon, campos_faltantes}
+  validacion_estado   VARCHAR(20) DEFAULT 'pendiente', -- 'aprobado'|'revision_humana'|'pendiente'
+  validacion_errores  JSONB,
+  datos_producto      JSONB,                         -- Datos estructurados por producto (ver abajo)
+  job_id              UUID,
+  version             INT DEFAULT 1,
+  created_at          TIMESTAMPTZ,
+  updated_at          TIMESTAMPTZ
+);
+
+-- Índice único parcial: solo un registro 'aprobado' por proyecto+producto
+CREATE UNIQUE INDEX idx_fase4_unique_aprobado
+  ON fase4_productos(project_id, producto)
+  WHERE validacion_estado = 'aprobado';
+```
+
+**Respuesta directa:** el assembler **siempre lee de `datos_producto` JSONB** para acumular entre módulos, nunca del `documento_final`. El `documento_final` es solo el Markdown final para mostrar en pantalla.
+
+---
+
+### Tablas de inputs base (Fases F)
+
+| Tabla | Fase | Qué guarda |
+|---|---|---|
+| `fase0_estructurado` | F0 | JSONB: analisis_sector, competencia, estandares_ec, recomendaciones |
+| `fase1_informe_necesidades` | F1 | JSONB: brechas_competencia, objetivos_aprendizaje, perfil_participante |
+| `fase2_analisis_alcance` | F2 | JSONB: modalidad, estructura_tematica (módulos), perfil_ingreso, estrategias |
+| `fase2_5_recomendaciones` | F2.5 | JSONB: estructura_videos, total_videos, duracion_promedio_minutos |
+| `fase3_especificaciones` | F3 | JSONB: plataforma_navegador, formatos_multimedia, calculo_duracion |
+| `fase4_productos` | F4 | `datos_producto` JSONB acumulativo por módulo + `documento_final` TEXT |
+| `producto_form_schemas` | F4 forms | Schema JSONB del formulario dinámico + valores_usuario por producto |
+| `pipeline_agent_outputs` | Todos | Output crudo de cada agente por job_id+agent_name (UNIQUE) |
+| `pipeline_jobs` | Todos | Estado y progreso del job async |
+| `wizard_steps` | Todos | input_data JSONB + output_text por step_number |
+
+---
+
+## 5. Generación de Form Schemas — El paso intermedio entre Fases F y Documentos P
+
+### ¿Qué es un form schema?
+
+Antes de que el pipeline de un producto P genere el documento, el usuario debe rellenar un formulario. Ese formulario **no está hardcodeado** — lo genera la IA en tiempo real a partir de los datos de F2 y F3. El resultado se guarda en `producto_form_schemas` y lo que el usuario escribe en `valores_usuario`.
+
+---
+
+### Flujo completo: de Fase F a Documento P
+
+```
+F2 (estructura_tematica)  ─┐
+F3 (calculo_duracion)     ─┼──► GET /api/form-schema/:projectId/:producto
+P4 documento (solo P3)    ─┘          │
+                                       ▼
+                            Pipeline F4_P{N}_FORM_SCHEMA
+                            (extractor_f4 → agente_form_A ‖ agente_form_B → juez_form → ensamblador)
+                                       │
+                                       ▼
+                            producto_form_schemas  (schema_json + valores_sugeridos)
+                                       │
+                              Usuario edita el formulario en el browser
+                                       │
+                            POST /api/form-schema/:projectId/:producto
+                            (guarda valores_usuario)
+                                       │
+                                       ▼
+                            Frontend arma userInputs desde valores_usuario
+                                       │
+                            POST /api/dcfl/wizard/generate-async
+                            (body: { context, userInputs })
+                                       │
+                                       ▼
+                            Pipeline F4_P{N}_GENERATE_DOCUMENT
+                            (extractor → agentes A/B → juez → ensamblador)
+                                       │
+                                       ▼
+                            fase4_productos (documento_final + datos_producto)
+```
+
+---
+
+### Estructura del pipeline de form schema (igual para todos los P)
+
+| Agente | Rol | Entrada |
+|---|---|---|
+| `extractor_f4` | Copia verbatim `fase3.unidades` a JSON estructurado | `context.fase3.unidades` |
+| `agente_form_A` | Genera array de campos de formulario (perspectiva A) | output de `extractor_f4` |
+| `agente_form_B` | Genera array de campos de formulario (perspectiva B) | output de `extractor_f4` |
+| `juez_form` | Elige A o B — `{"seleccion": "A"|"B", "razon": "..."}` | outputs de A y B |
+| `ensamblador_form_schema` | Agrega cabecera normativa + campos del ganador → UPSERT en BD | `juez_form` output (lee el ganador de pipeline_agent_outputs) |
+
+---
+
+### Contexto que inyecta la ruta `form-schema.routes.ts` en el `context`
+
+La ruta lee directamente de las tablas F **antes de lanzar el pipeline**:
+
+```typescript
+// Desde fase2_analisis_alcance (F2)
+context.fase3.unidades = f2.estructura_tematica   // array [{modulo, nombre, objetivo}]
+
+// Desde fase3_especificaciones (F3)
+context.fase3.calculo_duracion = f3.calculo_duracion
+
+// Solo para P3: desde fase4_productos (P4 ya generado)
+context.productos_previos.P4 = fase4_productos.documento_final  // Markdown completo de P4
+```
+
+**Para P7 y P8:** el backend (`document.handlers.ts`) inyecta `context.productos_previos` con los Markdown de P1–P6 al momento de ejecutar el pipeline de FORM_SCHEMA (no en la ruta, sino en el handler).
+
+---
+
+### Lo que genera cada agente de form schema
+
+Todos devuelven un **array de objetos de campo** con esta estructura:
 
 ```json
-{
-  "projectName": "Herrería Ornamental",
-  "clientName": "Juana García",
-  "userInputs": {
-    "informacion_unidad_1": "Tema: Materiales metálicos...",
-    "informacion_unidad_2": "Tema: Técnicas de corte..."
-  },
-  "productos_previos": {
-    "P1": "# Instrumentos de Evaluación (EC0366)\n...",
-    "P2": "# Presentación Electrónica\n...",
-    "P3": "# Guiones Multimedia\n...",
-    "P4": "# Manual del Participante\n...",
-    "P5": "# Guías de Actividades\n...",
-    "P6": "# Calendario General del Curso\n..."
+[
+  {
+    "name": "instrumento_unidad_1",
+    "label": "Evaluación: Nombre de la Unidad",
+    "type": "textarea",
+    "suggested_value": "Instrucción: ...\nReactivos:\n1. ...\n2. ...\nEvidencia: Desempeño"
   }
-}
+]
 ```
+
+El nombre del campo (`name`) usa un prefijo fijo por producto:
+
+| Producto | Prefijo de campo |
+|---|---|
+| P1 | `instrumento_unidad_N` |
+| P2 | `presentacion_unidad_N` |
+| P3 | `guion_unidad_N` |
+| P4 | `manual_unidad_N` |
+| P5 | `actividad_unidad_N` |
+| P6 | `sesion_unidad_N` |
+| P7 | `informacion_unidad_N` |
+| P8 | `cronograma_unidad_N` |
+
+El ensamblador antepone siempre un campo fijo de cabecera normativa (`criterios_evaluacion_global`) generado deterministamente a partir de `unidades`, sin pasar por los agentes.
 
 ---
 
-## Cambio 3 — `F4_P7_GENERATE_DOCUMENT.md`
+### Tabla `producto_form_schemas`
 
-### Extractor actualizado
-
-Reemplazar el task del `extractor_doc_generic`:
-
-```yaml
-    task: |
-      Read from userInputs AND productos_previos in the provided context. Ignore previousData entirely.
-      The product is "Documento de Información General" (P7). The form fields follow the pattern "informacion_unidad_N" where N is the unit number.
-
-      OUTPUT ONLY THIS JSON — no other text, no markdown:
-      {
-        "producto": "P7",
-        "proyecto": "[projectName from context]",
-        "candidato": "[clientName from context]",
-        "secciones": [
-          { "campo": "informacion_unidad_1", "contenido": "[value of userInputs.informacion_unidad_1]" }
-        ],
-        "materiales_producidos": {
-          "P1": "[first 300 chars of productos_previos.P1 if present, else null]",
-          "P2": "[first 300 chars of productos_previos.P2 if present, else null]",
-          "P5": "[first 300 chars of productos_previos.P5 if present, else null]",
-          "P6": "[first 300 chars of productos_previos.P6 if present, else null]"
-        }
-      }
-
-      Rules:
-      - Include ONLY fields whose key starts with "informacion_unidad_" in secciones
-      - Preserve the exact text of each field value — do not paraphrase or summarize
-      - The number of secciones must equal the number of informacion_unidad_* keys in userInputs
-      - For materiales_producidos: include a short excerpt (first 300 chars) if present; null if absent
+```sql
+CREATE TABLE producto_form_schemas (
+  id              UUID  PRIMARY KEY,
+  project_id      UUID  NOT NULL,
+  producto        TEXT  NOT NULL,                  -- 'P1'..'P8'
+  schema_json     JSONB NOT NULL DEFAULT '{"fields":[]}',  -- campos renderizables
+  valores_sugeridos JSONB,                          -- contexto del extractor LLM
+  valores_usuario JSONB,                            -- lo que el usuario escribió/confirmó
+  UNIQUE(project_id, producto)
+);
 ```
 
-### Regla adicional para `agente_doc_generic_A`
-
-Agregar como Regla 7:
-
-```
-7. USE MATERIALES PRODUCIDOS: If materiales_producidos is present in the extracted data,
-   the Recursos section of each unit MUST reference the actual materials already produced
-   for this course. List them as: "P1 — Instrumento de Evaluación (producido)",
-   "P5 — Guía de Actividades (producida)", etc. Do not list generic resource names.
-   If materiales_producidos is null or absent, use generic resource descriptions.
-```
+El frontend lee `schema_json.fields` para renderizar el formulario, y `valores_usuario` para pre-rellenar con la última sesión del usuario.
 
 ---
 
-## Cambio 4 — `F4_P8_GENERATE_DOCUMENT.md`
+## 6. Mapa de Dependencias: qué alimenta a cada P
 
-### Extractor actualizado
+### Form Schema (quién le da contexto al pipeline de formulario)
 
-Reemplazar el task del `extractor_doc_generic`:
-
-```yaml
-    task: |
-      Read from userInputs AND productos_previos in the provided context. Ignore previousData entirely.
-      The product is "Cronograma de Desarrollo" (P8). The form fields follow the pattern "cronograma_unidad_N" where N is the unit number.
-
-      OUTPUT ONLY THIS JSON — no other text, no markdown:
-      {
-        "producto": "P8",
-        "proyecto": "[projectName from context]",
-        "candidato": "[clientName from context]",
-        "secciones": [
-          { "campo": "cronograma_unidad_1", "contenido": "[value of userInputs.cronograma_unidad_1]" }
-        ],
-        "entregables_existentes": {
-          "P1": "[extract instrument types per unit from productos_previos.P1 if present, else null]",
-          "P2": "[extract slide counts per unit from productos_previos.P2 if present, else null]",
-          "P3": "[extract script status per unit from productos_previos.P3 if present, else null]",
-          "P4": "[extract page counts per unit from productos_previos.P4 if present, else null]",
-          "P5": "[extract activity count per unit from productos_previos.P5 if present, else null]",
-          "P6": "[extract session durations per unit from productos_previos.P6 if present, else null]"
-        }
-      }
-
-      Rules:
-      - Include ONLY fields whose key starts with "cronograma_unidad_" in secciones
-      - Preserve the exact text of each field value — do not paraphrase or summarize
-      - The number of secciones must equal the number of cronograma_unidad_* keys in userInputs
-      - For entregables_existentes: extract factual quantities (counts, durations) if present; null if absent
-```
-
-### Regla adicional para `agente_doc_generic_A`
-
-Agregar como Regla 7:
-
-```
-7. REAL DELIVERABLES: If entregables_existentes is present in the extracted data,
-   the schedule tables MUST use the actual slide counts, page counts, and durations
-   already established in P2, P4, and P6. The Estado column MUST reflect "Producido"
-   for any deliverable present in entregables_existentes. Do not invent quantities
-   that contradict the already-produced materials.
-```
-
----
-
-## Estado Actual vs. Estado Esperado (tras aplicar los cambios propuestos)
-
-| Aspecto | Estado actual | Estado esperado |
+| Schema | Consume de F | Consume de P previo |
 |---|---|---|
-| P7 — Normativa | Inventada o genérica | Basada en los instrumentos reales de P1 |
-| P7 — Recursos | Genéricos | Lista los materiales producidos P1–P6 por nombre |
-| P8 — Conteo de diapositivas | Inventado | Usa los valores reales de P2 |
-| P8 — Duración de sesiones | Inventada | Usa los valores reales de P6 |
-| P8 — Estado de entregables | Todos "Pendiente" | Marca como "Producido" los ya generados |
-| Contexto disponible | Solo `userInputs` | `userInputs` + `productos_previos` |
+| P1 schema | F2 (`estructura_tematica`) | — |
+| P2 schema | F2 (`estructura_tematica`), F3 (`calculo_duracion`) | — |
+| P3 schema | F2 (`estructura_tematica`), F3 (`calculo_duracion`) | **P4** (`documento_final` Markdown) |
+| P4 schema | F2 (`estructura_tematica`), F3 (`calculo_duracion`) | — |
+| P5 schema | F2 (`estructura_tematica`) | — |
+| P6 schema | F2 (`estructura_tematica`) | — |
+| P7 schema | F2 (`estructura_tematica`) | **P1–P6** (`documento_final` Markdown) |
+| P8 schema | F2 (`estructura_tematica`), F3 (`calculo_duracion`) | **P1–P6** (`documento_final` Markdown) |
+
+---
+
+### Document (quién le da contexto al pipeline de generación de documento)
+
+| Documento | Consume de F (vía `context`) | Consume de P previo (vía `userInputs`) |
+|---|---|---|
+| P1 doc | F2 unidades, F3 duración (vía `context.fase3`) | — |
+| P4 doc | F2 unidades + OSINT enriquecido (vía `context.fase3`) | — |
+| P3 doc | F2 unidades (vía `context.fase3`) | **P4** `datos_producto.capitulos[N].contenido_md` → `userInputs.p4_capitulo` |
+| P2 doc | F2 unidades (vía `context.fase3`) | **P4** `datos_producto.capitulos[N].contenido_md` → `userInputs.p4_capitulo`; **P3** `datos_producto.partes.modulo_N.{guion_literario,escaleta}` → `userInputs.p3_guion` |
+| P5 doc | F2 unidades (vía `context.fase3`) | — |
+| P6 doc | F2 unidades (vía `context.fase3`) | — |
+| P7 doc | F2 unidades (vía `context.fase3`) | **P1–P6** `documento_final` Markdown → `context.productos_previos` |
+| P8 doc | F2 unidades (vía `context.fase3`) | **P1–P6** `documento_final` Markdown → `context.productos_previos` |
+
+> **Regla clave:** P3 y P2 leen de `datos_producto` JSONB (datos estructurados). P7 y P8 leen de `documento_final` TEXT (Markdown completo). Los schema de P7/P8 también usan `documento_final`.
+
+---
+
+### Orden cronológico completo con dependencias
+
+```
+F0 → F1 → F2 → F2.5 → F3
+                 │
+                 └──► F4 sub-wizard:
+                        P1 schema (F2)
+                        P1 doc    (F2 + userInputs)
+                            │
+                        P4 schema (F2, F3)
+                        P4 doc    (F2, F3, OSINT + userInputs)
+                            │
+                        P3 schema (F2, F3, P4.documento_final)
+                        P3 doc    (userInputs + P4.datos_producto.capitulos)
+                            │
+                        P2 schema (F2, F3)
+                        P2 doc    (userInputs + P4.datos_producto.capitulos + P3.datos_producto.partes)
+                            │
+                        P5 schema (F2)
+                        P5 doc    (userInputs)
+                            │
+                        P6 schema (F2)
+                        P6 doc    (userInputs)
+                            │
+                        P7 schema (F2, P1–P6.documento_final)
+                        P7 doc    (userInputs + P1–P6.documento_final)
+                            │
+                        P8 schema (F2, F3, P1–P6.documento_final)
+                        P8 doc    (userInputs + P1–P6.documento_final)
+```

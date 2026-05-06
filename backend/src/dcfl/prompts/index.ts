@@ -13,7 +13,6 @@ import F1     from './templates/F1-informe-necesidades.md';
 import F2     from './templates/F2-estructuracion-temario.md';
 import F2_5   from './templates/F2_5-recomendaciones.md';
 import F3     from './templates/F3-especificaciones-tecnicas.md';
-import F4_GENERATE_FORM_SCHEMA from './templates/F4_GENERATE_FORM_SCHEMA.md';
 import F4_P1_FORM_SCHEMA from './templates/F4_P1_FORM_SCHEMA.md';
 import F4_P1_GENERATE_DOCUMENT from './templates/F4_P1_GENERATE_DOCUMENT.md';
 import F4_P2_FORM_SCHEMA from './templates/F4_P2_FORM_SCHEMA.md';
@@ -25,6 +24,7 @@ import F4_P7_FORM_SCHEMA from './templates/F4_P7_FORM_SCHEMA.md';
 import F4_P8_FORM_SCHEMA from './templates/F4_P8_FORM_SCHEMA.md';
 import F4_P2_GENERATE_DOCUMENT from './templates/F4_P2_GENERATE_DOCUMENT.md';
 import F4_P3_GENERATE_DOCUMENT from './templates/F4_P3_GENERATE_DOCUMENT.md';
+import F4_P3_ORCHESTRATOR from './templates/F4_P3_ORCHESTRATOR.md';
 import F4_P4_GENERATE_DOCUMENT from './templates/F4_P4_GENERATE_DOCUMENT.md';
 import F4_P5_GENERATE_DOCUMENT from './templates/F4_P5_GENERATE_DOCUMENT.md';
 import F4_P6_GENERATE_DOCUMENT from './templates/F4_P6_GENERATE_DOCUMENT.md';
@@ -45,7 +45,6 @@ export const DCFL_PROMPT_MAP: Record<PromptId, string> = {
   F2,
   F2_5,
   F3,
-  F4_GENERATE_FORM_SCHEMA,
   F4_P1_FORM_SCHEMA,
   F4_P1_GENERATE_DOCUMENT,
   F4_P2_FORM_SCHEMA,
@@ -57,6 +56,7 @@ export const DCFL_PROMPT_MAP: Record<PromptId, string> = {
   F4_P8_FORM_SCHEMA,
   F4_P2_GENERATE_DOCUMENT,
   F4_P3_GENERATE_DOCUMENT,
+  F4_P3_ORCHESTRATOR,
   F4_P4_GENERATE_DOCUMENT,
   F4_P5_GENERATE_DOCUMENT,
   F4_P6_GENERATE_DOCUMENT,

@@ -11,8 +11,11 @@ pipeline_steps:
     inputs_from: []
     include_template: false
     task: |
-      Extract ALL units and the volume of content generated across P1-P5.
+      YOU ARE AN EXTRACTOR, NOT AN EDITOR. Your ONLY job is to copy fields verbatim from the source.
+      NEVER rewrite, rephrase, improve, or apply any verb rules to any text — copy it EXACTLY as written.
+      Even if the objective says "comprenderá", "sabrá", or "conocerá" — copy it as-is. Do NOT change it.
       
+      Extract ALL units and the volume of content generated across P1-P5.
       SOURCE: The context contains fase3.unidades (F2/F3) and P1-P5 data from productos_previos or userInputs.
       
       DO NOT TRUNCATE. Return every unit.

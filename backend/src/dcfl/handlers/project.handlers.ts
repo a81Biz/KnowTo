@@ -5,8 +5,7 @@ export async function handleCreateProject(c: Context) {
   try {
     const { name, clientName, industry, email } = (c.req as any).valid('json');
     const supabase = new SupabaseService(c.env);
-    // Usar UUID nulo para entornos sin autenticación
-    const data = await supabase.createProject({ userId: '00000000-0000-0000-0000-000000000000', name, clientName, industry, email });
+    const data = await supabase.createProject({ userId: '00000000-0000-0000-0000-000000000001', name, clientName, industry, email });
     return c.json({ success: true, data, timestamp: new Date().toISOString() }, 201 as 201);
   } catch (error: any) {
     console.error('[PROJECT-CREATE-ERROR]', error);

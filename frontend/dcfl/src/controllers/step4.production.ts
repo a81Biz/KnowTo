@@ -18,6 +18,7 @@ interface F4ProductoBD {
   documento_final: string | null;
   validacion_estado: string;
   validacion_errores: Record<string, unknown> | null;
+  datos_producto: Record<string, unknown> | null;
   job_id: string | null;
 }
 
@@ -25,9 +26,9 @@ const STEP_NUMBER = 5;
 
 const PRODUCTS: Array<{ promptId: PromptId; productCode: string; label: string; elementoEC: string }> = [
   { promptId: 'F4_P1_GENERATE_DOCUMENT' as PromptId, productCode: 'P1', label: '1 Instrumentos de Evaluación', elementoEC: 'Producto #1' },
-  { promptId: 'F4_P2_GENERATE_DOCUMENT' as PromptId, productCode: 'P2', label: '2 Presentación Electrónica', elementoEC: 'Producto #2' },
+  { promptId: 'F4_P4_GENERATE_DOCUMENT' as PromptId, productCode: 'P4', label: '2 Manual del Participante', elementoEC: 'Producto #2' },
   { promptId: 'F4_P3_GENERATE_DOCUMENT' as PromptId, productCode: 'P3', label: '3 Guiones Multimedia', elementoEC: 'Producto #3' },
-  { promptId: 'F4_P4_GENERATE_DOCUMENT' as PromptId, productCode: 'P4', label: '4 Manual del Participante', elementoEC: 'Producto #4' },
+  { promptId: 'F4_P2_GENERATE_DOCUMENT' as PromptId, productCode: 'P2', label: '4 Presentación Electrónica', elementoEC: 'Producto #4' },
   { promptId: 'F4_P5_GENERATE_DOCUMENT' as PromptId, productCode: 'P5', label: '5 Guías de Actividades', elementoEC: 'Producto #5' },
   { promptId: 'F4_P6_GENERATE_DOCUMENT' as PromptId, productCode: 'P6', label: '6 Calendario General', elementoEC: 'Producto #6' },
   { promptId: 'F4_P7_GENERATE_DOCUMENT' as PromptId, productCode: 'P7', label: '7 Documento de Información', elementoEC: 'Producto #7' },
@@ -388,9 +389,8 @@ class Step5ProductionController extends BaseStep {
 
       let maxApprovedIndex = -1;
       for (const p of productos) {
-        const productNumber = parseInt(p.producto.replace('P', ''), 10);
-        if (isNaN(productNumber) || productNumber === 0) continue;
-        const idx = productNumber - 1;
+        const idx = PRODUCTS.findIndex(prod => prod.productCode === p.producto);
+        if (idx < 0) continue;
         if (!p.documento_final) continue;
         this._approvedProducts.set(idx, {
           content: p.documento_final,
@@ -478,6 +478,17 @@ class Step5ProductionController extends BaseStep {
     this._renderDynamicForm();
   }
 
+  private _waitForJobComplete(jobId: string, onProgress?: (step: string) => void): Promise<void> {
+    return new Promise((resolve, reject) => {
+      subscribeToJob(
+        jobId,
+        () => { resolve(); },
+        (err) => { reject(new Error(err)); },
+        (job) => { if (job.progress?.currentStep) onProgress?.(job.progress.currentStep); }
+      );
+    });
+  }
+
   private async _generateCurrentProduct(): Promise<void> {
     const product = PRODUCTS[this._currentProductIndex];
     if (!product) return;
@@ -485,10 +496,8 @@ class Step5ProductionController extends BaseStep {
     const state = wizardStore.getState();
     if (!state.projectId) { showError('No hay proyecto activo.'); return; }
 
-    // Recolectar valores actuales del formulario
     await this._saveFormValues();
 
-    // Cargar esquema para obtener los valores_usuario guardados
     const productoNum = product.productCode;
     const schemaData = await this._loadFormSchema(productoNum);
     const userInputs = { ...(schemaData?.valores_usuario || this._sharedFormData), _producto: productoNum };
@@ -514,6 +523,471 @@ class Step5ProductionController extends BaseStep {
     try {
       const context = wizardStore.buildContext(STEP_NUMBER) as any;
 
+      // ── P3: iteración módulo a módulo ──────────────────────────────────
+      if (productoNum === 'P3') {
+        const valores = schemaData?.valores_usuario || {};
+        const moduloKeys = Object.keys(valores)
+          .filter(k => k.startsWith('guion_unidad_'))
+          .sort();
+
+        if (moduloKeys.length === 0) {
+          showError('No hay módulos en el formulario de P3.');
+          this._setLoading(false);
+          hideLoading();
+          return;
+        }
+
+        // Construir mapa de fieldName → nombre real desde schema_json
+        const labelMap: Record<string, string> = {};
+        const schemaFields: any[] = schemaData?.schema?.fields || [];
+        for (const field of schemaFields) {
+          if (field.name && field.label) {
+            const rawLabel: string = field.label;
+            const nombre = rawLabel
+              .replace(/^(Configuración de Producción|Ficha Técnica de Producción):\s*/i, '')
+              .trim();
+            labelMap[field.name] = nombre || rawLabel;
+          }
+        }
+
+        // Cargar capítulos de P4 para inyectarlos como contexto por módulo
+        let p4Capitulos: Array<{ unidad: number; contenido_md: string; secciones_json?: Record<string, any> }> = [];
+        try {
+          const p4Res = await getData<{ productos: F4ProductoBD[] }>(
+            buildEndpoint(ENDPOINTS.wizard.fase4Productos(state.projectId!))
+          );
+          const p4Producto = p4Res.data?.productos?.find(p => p.producto === 'P4');
+          const caps = (p4Producto?.datos_producto as any)?.capitulos;
+          if (Array.isArray(caps)) p4Capitulos = caps;
+        } catch (err) {
+          console.warn('[F4] No se pudo cargar P4 para contexto de P3:', err);
+        }
+
+        for (let i = 0; i < moduloKeys.length; i++) {
+          const key = moduloKeys[i];
+          const moduloNum = parseInt(key.replace('guion_unidad_', ''), 10);
+          const nombreVideo = labelMap[key] || `Módulo ${moduloNum}`;
+          showLoading(`⏳ Generando Guiones P3... Módulo ${i + 1}/${moduloKeys.length}: ${nombreVideo}`);
+
+          const p4CapituloData = p4Capitulos.find(c => c.unidad === moduloNum)?.secciones_json || {};
+
+          const res = await postData<{ jobId: string }>(
+            buildEndpoint(ENDPOINTS.wizard.generateAsync),
+            {
+              projectId: state.projectId,
+              stepId,
+              phaseId: 'F4',
+              promptId: 'F4_P3_GENERATE_DOCUMENT' as PromptId,
+              context,
+              userInputs: {
+                [key]: valores[key],
+                _modulo_actual: moduloNum,
+                _nombre_video: nombreVideo,
+                _producto: 'P3',
+                p4_secciones: p4CapituloData,
+              },
+            }
+          );
+
+          if (!res.data?.jobId) throw new Error(`Sin jobId para módulo ${moduloNum}`);
+
+          await this._waitForJobComplete(res.data.jobId, (step) => {
+            showLoading(`⏳ Módulo ${i + 1}/${moduloKeys.length}: ${step}`);
+          });
+        }
+
+        // Todos los módulos completados — cargar documento ensamblado desde BD
+        const idx = this._currentProductIndex;
+        await this._loadProductsFromBD(state.projectId!);
+        this._currentProductIndex = idx;
+        const prod = this._approvedProducts.get(idx);
+        if (prod) {
+          this._showProductPreview(prod.content);
+          this._renderProductIndicators();
+        }
+        this._setLoading(false);
+        hideLoading();
+        return;
+      }
+      // ── P2: iteración módulo a módulo ──────────────────────────────────
+      if (productoNum === 'P2') {
+        const valores = schemaData?.valores_usuario || {};
+        const moduloKeys = Object.keys(valores)
+          .filter(k => k.startsWith('presentacion_unidad_'))
+          .sort();
+
+        if (moduloKeys.length === 0) {
+          showError('No hay módulos en el formulario de P2.');
+          this._setLoading(false);
+          hideLoading();
+          return;
+        }
+
+        // Construir mapa de fieldName → nombre real desde schema_json
+        const labelMap: Record<string, string> = {};
+        const schemaFields: any[] = schemaData?.schema?.fields || [];
+        for (const field of schemaFields) {
+          if (field.name && field.label) {
+            const rawLabel: string = field.label;
+            const nombre = rawLabel
+              .replace(/^Presentación:\s*/i, '')
+              .trim();
+            labelMap[field.name] = nombre || rawLabel;
+          }
+        }
+
+        // Cargar P3 y P4 para inyectar datos estructurados como contexto
+        let p3Partes: Record<string, any> = {};
+        let p4Capitulos: Array<{ unidad: number; contenido_md: string; secciones_json?: Record<string, any> }> = [];
+        try {
+          const res = await getData<{ productos: F4ProductoBD[] }>(
+            buildEndpoint(ENDPOINTS.wizard.fase4Productos(state.projectId!))
+          );
+          const productos = res.data?.productos ?? [];
+          const p3Producto = productos.find(p => p.producto === 'P3');
+          if (p3Producto?.datos_producto) {
+            p3Partes = (p3Producto.datos_producto as any)?.partes || {};
+          }
+          const p4Producto = productos.find(p => p.producto === 'P4');
+          const caps = (p4Producto?.datos_producto as any)?.capitulos;
+          if (Array.isArray(caps)) p4Capitulos = caps;
+        } catch (err) {
+          console.warn('[F4] No se pudo cargar P3/P4 para contexto de P2:', err);
+        }
+
+        for (let i = 0; i < moduloKeys.length; i++) {
+          const key = moduloKeys[i];
+          const moduloNum = parseInt(key.replace('presentacion_unidad_', ''), 10);
+          const nombreModulo = labelMap[key] || `Módulo ${moduloNum}`;
+          showLoading(`⏳ Generando Presentación P2... Módulo ${i + 1}/${moduloKeys.length}: ${nombreModulo}`);
+
+          // Datos estructurados de P3 y P4 para este módulo (JSON puro, sin concatenar)
+          const p3ModuloKey = `modulo_${moduloNum}`;
+          const p3Data = p3Partes[p3ModuloKey] || {};
+          const p4CapituloData = p4Capitulos.find(c => c.unidad === moduloNum)?.secciones_json || {};
+
+          const res = await postData<{ jobId: string }>(
+            buildEndpoint(ENDPOINTS.wizard.generateAsync),
+            {
+              projectId: state.projectId,
+              stepId,
+              phaseId: 'F4',
+              promptId: 'F4_P2_GENERATE_DOCUMENT' as PromptId,
+              context,
+              userInputs: {
+                [key]: valores[key],
+                _modulo_actual: moduloNum,
+                _nombre_modulo: nombreModulo,
+                _producto: 'P2',
+                p3_escaleta: p3Data.escaleta || [],
+                p3_guion_literario: p3Data.guion_literario || [],
+                p4_secciones: p4CapituloData,
+              },
+            }
+          );
+
+          if (!res.data?.jobId) throw new Error(`Sin jobId para módulo ${moduloNum}`);
+
+          await this._waitForJobComplete(res.data.jobId, (step) => {
+            showLoading(`⏳ Módulo ${i + 1}/${moduloKeys.length}: ${step}`);
+          });
+        }
+
+        // Todos los módulos completados — cargar documento ensamblado desde BD
+        const idx = this._currentProductIndex;
+        await this._loadProductsFromBD(state.projectId!);
+        this._currentProductIndex = idx;
+        const prod = this._approvedProducts.get(idx);
+        if (prod) {
+          this._showProductPreview(prod.content);
+          this._renderProductIndicators();
+        }
+        this._setLoading(false);
+        hideLoading();
+        return;
+      }
+      // ── P5: iteración módulo a módulo ──────────────────────────────────
+      if (productoNum === 'P5') {
+        const valores = schemaData?.valores_usuario || {};
+        const moduloKeys = Object.keys(valores)
+          .filter(k => k.startsWith('actividad_unidad_'))
+          .sort();
+
+        if (moduloKeys.length === 0) {
+          showError('No hay actividades en el formulario de P5.');
+          this._setLoading(false);
+          hideLoading();
+          return;
+        }
+
+        // Construir mapa de fieldName → nombre real
+        const labelMap: Record<string, string> = {};
+        const schemaFields: any[] = schemaData?.schema?.fields || [];
+        for (const field of schemaFields) {
+          if (field.name && field.label) {
+            const rawLabel: string = field.label;
+            const nombre = rawLabel
+              .replace(/^(Configuración de Actividad|Actividad):\s*/i, '')
+              .trim();
+            labelMap[field.name] = nombre || rawLabel;
+          }
+        }
+
+        for (let i = 0; i < moduloKeys.length; i++) {
+          const key = moduloKeys[i];
+          const moduloNum = parseInt(key.replace('actividad_unidad_', ''), 10);
+          const nombreActividad = labelMap[key] || `Actividad ${moduloNum}`;
+          showLoading(`⏳ Generando Guías P5... Unidad ${i + 1}/${moduloKeys.length}: ${nombreActividad}`);
+
+          const res = await postData<{ jobId: string }>(
+            buildEndpoint(ENDPOINTS.wizard.generateAsync),
+            {
+              projectId: state.projectId,
+              stepId,
+              phaseId: 'F4',
+              promptId: 'F4_P5_GENERATE_DOCUMENT' as PromptId,
+              context,
+              userInputs: {
+                [key]: valores[key],
+                _modulo_actual: moduloNum,
+                _nombre_actividad: nombreActividad,
+                _producto: 'P5',
+              },
+            }
+          );
+
+          if (!res.data?.jobId) throw new Error(`Sin jobId para actividad ${moduloNum}`);
+
+          await this._waitForJobComplete(res.data.jobId, (step) => {
+            showLoading(`⏳ Unidad ${i + 1}/${moduloKeys.length}: ${step}`);
+          });
+        }
+
+        // Finalizar P5
+        const idx = this._currentProductIndex;
+        await this._loadProductsFromBD(state.projectId!);
+        this._currentProductIndex = idx;
+        const prod = this._approvedProducts.get(idx);
+        if (prod) {
+          this._showProductPreview(prod.content);
+          this._renderProductIndicators();
+        }
+        this._setLoading(false);
+        hideLoading();
+        return;
+      }
+      // ── P6: iteración módulo a módulo ──────────────────────────────────
+      if (productoNum === 'P6') {
+        const valores = schemaData?.valores_usuario || {};
+        const moduloKeys = Object.keys(valores)
+          .filter(k => k.startsWith('sesion_unidad_'))
+          .sort();
+
+        if (moduloKeys.length === 0) {
+          showError('No hay sesiones en el formulario de P6.');
+          this._setLoading(false);
+          hideLoading();
+          return;
+        }
+
+        // Construir mapa de fieldName → nombre real
+        const labelMap: Record<string, string> = {};
+        const schemaFields: any[] = schemaData?.schema?.fields || [];
+        for (const field of schemaFields) {
+          if (field.name && field.label) {
+            const rawLabel: string = field.label;
+            const nombre = rawLabel
+              .replace(/^(Programación de Sesión|Sesión):\s*/i, '')
+              .trim();
+            labelMap[field.name] = nombre || rawLabel;
+          }
+        }
+
+        for (let i = 0; i < moduloKeys.length; i++) {
+          const key = moduloKeys[i];
+          const moduloNum = parseInt(key.replace('sesion_unidad_', ''), 10);
+          const nombreSesion = labelMap[key] || `Sesión ${moduloNum}`;
+          showLoading(`⏳ Generando Calendario P6... Sesión ${i + 1}/${moduloKeys.length}: ${nombreSesion}`);
+
+          const res = await postData<{ jobId: string }>(
+            buildEndpoint(ENDPOINTS.wizard.generateAsync),
+            {
+              projectId: state.projectId,
+              stepId,
+              phaseId: 'F4',
+              promptId: 'F4_P6_GENERATE_DOCUMENT' as PromptId,
+              context,
+              userInputs: {
+                [key]: valores[key],
+                _modulo_actual: moduloNum,
+                _nombre_sesion: nombreSesion,
+                _producto: 'P6',
+              },
+            }
+          );
+
+          if (!res.data?.jobId) throw new Error(`Sin jobId para sesión ${moduloNum}`);
+
+          await this._waitForJobComplete(res.data.jobId, (step) => {
+            showLoading(`⏳ Sesión ${i + 1}/${moduloKeys.length}: ${step}`);
+          });
+        }
+
+        // Finalizar P6
+        const idx = this._currentProductIndex;
+        await this._loadProductsFromBD(state.projectId!);
+        this._currentProductIndex = idx;
+        const prod = this._approvedProducts.get(idx);
+        if (prod) {
+          this._showProductPreview(prod.content);
+          this._renderProductIndicators();
+        }
+        this._setLoading(false);
+        hideLoading();
+        return;
+      }
+      // ── P7: iteración módulo a módulo ──────────────────────────────────
+      if (productoNum === 'P7') {
+        const valores = schemaData?.valores_usuario || {};
+        const moduloKeys = Object.keys(valores)
+          .filter(k => k.startsWith('informacion_unidad_'))
+          .sort();
+
+        if (moduloKeys.length === 0) {
+          showError('No hay información en el formulario de P7.');
+          this._setLoading(false);
+          hideLoading();
+          return;
+        }
+
+        // Construir mapa de fieldName → nombre real
+        const labelMap: Record<string, string> = {};
+        const schemaFields: any[] = schemaData?.schema?.fields || [];
+        for (const field of schemaFields) {
+          if (field.name && field.label) {
+            const rawLabel: string = field.label;
+            const nombre = rawLabel
+              .replace(/^(Información General|Tema):\s*/i, '')
+              .trim();
+            labelMap[field.name] = nombre || rawLabel;
+          }
+        }
+
+        for (let i = 0; i < moduloKeys.length; i++) {
+          const key = moduloKeys[i];
+          const moduloNum = parseInt(key.replace('informacion_unidad_', ''), 10);
+          const nombreTema = labelMap[key] || `Tema ${moduloNum}`;
+          showLoading(`⏳ Generando Información P7... Tema ${i + 1}/${moduloKeys.length}: ${nombreTema}`);
+
+          const res = await postData<{ jobId: string }>(
+            buildEndpoint(ENDPOINTS.wizard.generateAsync),
+            {
+              projectId: state.projectId,
+              stepId,
+              phaseId: 'F4',
+              promptId: 'F4_P7_GENERATE_DOCUMENT' as PromptId,
+              context,
+              userInputs: {
+                [key]: valores[key],
+                _modulo_actual: moduloNum,
+                _nombre_tema: nombreTema,
+                _producto: 'P7',
+              },
+            }
+          );
+
+          if (!res.data?.jobId) throw new Error(`Sin jobId para tema ${moduloNum}`);
+
+          await this._waitForJobComplete(res.data.jobId, (step) => {
+            showLoading(`⏳ Tema ${i + 1}/${moduloKeys.length}: ${step}`);
+          });
+        }
+
+        // Finalizar P7
+        const idx = this._currentProductIndex;
+        await this._loadProductsFromBD(state.projectId!);
+        this._currentProductIndex = idx;
+        const prod = this._approvedProducts.get(idx);
+        if (prod) {
+          this._showProductPreview(prod.content);
+          this._renderProductIndicators();
+        }
+        this._setLoading(false);
+        hideLoading();
+        return;
+      }
+      // ── P8: iteración módulo a módulo ──────────────────────────────────
+      if (productoNum === 'P8') {
+        const valores = schemaData?.valores_usuario || {};
+        const moduloKeys = Object.keys(valores)
+          .filter(k => k.startsWith('cronograma_unidad_'))
+          .sort();
+
+        if (moduloKeys.length === 0) {
+          showError('No hay cronograma en el formulario de P8.');
+          this._setLoading(false);
+          hideLoading();
+          return;
+        }
+
+        // Construir mapa de fieldName → nombre real
+        const labelMap: Record<string, string> = {};
+        const schemaFields: any[] = schemaData?.schema?.fields || [];
+        for (const field of schemaFields) {
+          if (field.name && field.label) {
+            const rawLabel: string = field.label;
+            const nombre = rawLabel
+              .replace(/^(Cronograma de Módulo|Desarrollo):\s*/i, '')
+              .trim();
+            labelMap[field.name] = nombre || rawLabel;
+          }
+        }
+
+        for (let i = 0; i < moduloKeys.length; i++) {
+          const key = moduloKeys[i];
+          const moduloNum = parseInt(key.replace('cronograma_unidad_', ''), 10);
+          const nombreModulo = labelMap[key] || `Módulo ${moduloNum}`;
+          showLoading(`⏳ Generando Cronograma P8... Módulo ${i + 1}/${moduloKeys.length}: ${nombreModulo}`);
+
+          const res = await postData<{ jobId: string }>(
+            buildEndpoint(ENDPOINTS.wizard.generateAsync),
+            {
+              projectId: state.projectId,
+              stepId,
+              phaseId: 'F4',
+              promptId: 'F4_P8_GENERATE_DOCUMENT' as PromptId,
+              context,
+              userInputs: {
+                [key]: valores[key],
+                _modulo_actual: moduloNum,
+                _nombre_modulo: nombreModulo,
+                _producto: 'P8',
+              },
+            }
+          );
+
+          if (!res.data?.jobId) throw new Error(`Sin jobId para cronograma ${moduloNum}`);
+
+          await this._waitForJobComplete(res.data.jobId, (step) => {
+            showLoading(`⏳ Módulo ${i + 1}/${moduloKeys.length}: ${step}`);
+          });
+        }
+
+        // Finalizar P8
+        const idx = this._currentProductIndex;
+        await this._loadProductsFromBD(state.projectId!);
+        this._currentProductIndex = idx;
+        const prod = this._approvedProducts.get(idx);
+        if (prod) {
+          this._showProductPreview(prod.content);
+          this._renderProductIndicators();
+        }
+        this._setLoading(false);
+        hideLoading();
+        return;
+      }
+
+      // ── Resto de productos: pipeline único ─────────────────────────────
       const res = await postData<{ jobId: string; status: string }>(
         buildEndpoint(ENDPOINTS.wizard.generateAsync),
         {
@@ -591,7 +1065,7 @@ class Step5ProductionController extends BaseStep {
         // Persist completion to DB so resumeProject() advances past step 5 on next load
         const stepId = wizardStore.getState().steps[STEP_NUMBER]?.stepId;
         if (stepId) {
-          postData(buildEndpoint(ENDPOINTS.wizard.completeStep), { stepId }).catch(() => {});
+          postData(buildEndpoint(ENDPOINTS.wizard.completeStep), { stepId }).catch(() => { });
         }
       }
       this._renderProductIndicators();

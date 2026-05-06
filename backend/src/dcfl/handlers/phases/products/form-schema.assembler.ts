@@ -12,6 +12,17 @@ const PRODUCTOS_NOMBRES: Record<string, string> = {
   'P8': 'Cronograma de Desarrollo'
 };
 
+const FIELD_PREFIX: Record<string, string> = {
+  'P1': 'instrumento_unidad_',
+  'P2': 'presentacion_unidad_',
+  'P3': 'guion_unidad_',
+  'P4': 'manual_unidad_',
+  'P5': 'actividad_unidad_',
+  'P6': 'sesion_unidad_',
+  'P7': 'informacion_unidad_',
+  'P8': 'cronograma_unidad_',
+};
+
 export async function handleFormSchemaAssembler(context: ProductContext): Promise<any> {
   const { jobId, projectId, services, promptId, event } = context;
 
@@ -25,8 +36,9 @@ export async function handleFormSchemaAssembler(context: ProductContext): Promis
     (await services.pipelineService.getAgentOutput(jobId, 'extractor_f4')) ||
     (await services.pipelineService.getAgentOutput(jobId, 'refinador_contexto_form')) ||
     '{}';
-  const contextMatch = rawContext.match(/\{[\s\S]*\}/);
-  const contexto = parseJsonSafely(contextMatch ? contextMatch[0] : rawContext, {});
+  console.log(`[form-schema-assembler] Extractor raw (${rawContext.length} chars): ${rawContext.slice(0, 300)}`);
+  const contexto = parseJsonSafely(rawContext, {});
+  console.log(`[form-schema-assembler] Extractor parseado — unidades LLM: ${(contexto as any).unidades?.length ?? 0}`);
 
   // 2. Unidades: fuente primaria = contexto directo de la ruta; secundaria = extractor LLM
   const unidadesDirectas: any[] = event?.body?.context?.fase3?.unidades || [];
@@ -79,8 +91,9 @@ export async function handleFormSchemaAssembler(context: ProductContext): Promis
   if (propuestasDinamicas.length > 0) {
     propuestasDinamicas.forEach((bloque: any, idx: number) => {
       const unitId = bloque.unit_id || idx + 1;
+      const prefix = FIELD_PREFIX[producto] || 'instrumento_unidad_';
       fields.push({
-        name: `instrumento_unidad_${unitId}`,
+        name: `${prefix}${unitId}`,
         label: bloque.label || `Evaluación: Unidad ${unitId}`,
         type: "textarea",
         required: true,
@@ -91,8 +104,9 @@ export async function handleFormSchemaAssembler(context: ProductContext): Promis
   } else {
     // Fallback de Emergencia: Descubrimiento básico si la dialéctica falla pero el contexto es válido
     unidades.forEach((u: any, idx: number) => {
+      const prefix = FIELD_PREFIX[producto] || 'instrumento_unidad_';
       fields.push({
-        name: `instrumento_unidad_${idx + 1}`,
+        name: `${prefix}${idx + 1}`,
         label: `Evaluación: ${u.titulo || u.nombre || `Unidad ${idx+1}`}`,
         type: "textarea",
         required: true,

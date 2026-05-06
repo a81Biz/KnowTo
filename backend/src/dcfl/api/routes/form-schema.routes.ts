@@ -35,13 +35,29 @@ router.get('/:projectId/:producto', async (c) => {
 
     if (error || !existing || !existing.schema_json?.fields?.length) {
       const jobsSvc = new PipelineJobsService(c.env);
-      
+
+      // 3. Elegir el pipeline especializado por producto
+      const FORM_SCHEMA_PROMPT_BY_PRODUCT: Record<string, string> = {
+        'P1': 'F4_P1_FORM_SCHEMA',
+        'P2': 'F4_P2_FORM_SCHEMA',
+        'P3': 'F4_P3_FORM_SCHEMA',
+        'P4': 'F4_P4_FORM_SCHEMA',
+        'P5': 'F4_P5_FORM_SCHEMA',
+        'P6': 'F4_P6_FORM_SCHEMA',
+        'P7': 'F4_P7_FORM_SCHEMA',
+        'P8': 'F4_P8_FORM_SCHEMA',
+      };
+      const formSchemaPromptId = FORM_SCHEMA_PROMPT_BY_PRODUCT[producto] as PromptId | undefined;
+      if (!formSchemaPromptId) {
+        return c.json({ success: false, error: `Producto desconocido: ${producto}` }, 400);
+      }
+
       // 1. Evitar múltiples jobs: Verificar si ya hay un job activo para este producto en este proyecto
       const { data: activeJob } = await supabase.client!
         .from('pipeline_jobs')
         .select('id, status, created_at')
         .eq('project_id', projectId)
-        .eq('prompt_id', 'F4_GENERATE_FORM_SCHEMA')
+        .eq('prompt_id', formSchemaPromptId)
         .contains('user_inputs', { producto })
         .in('status', ['pending', 'running'])
         .order('created_at', { ascending: false })
@@ -79,32 +95,43 @@ router.get('/:projectId/:producto', async (c) => {
         .eq('id', projectId)
         .single();
 
-      // Auditoría de datos: Buscar en Fase 2 (Temario) y Fase 3 (Especificaciones)
+      // Fase 2: lista canónica de módulos (fuente de verdad para nombres y número de unidades)
       const { data: f2 } = await supabase.client!
         .from('fase2_analisis_alcance')
-        .select('estructura_tematica, perfil_ingreso')
+        .select('estructura_tematica')
         .eq('project_id', projectId)
         .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle();
 
+      // Fase 3: tiempos calculados por módulo (detalle_por_modulo + duracion_total_horas)
       const { data: f3 } = await supabase.client!
         .from('fase3_especificaciones')
-        .select('calculo_duracion, plataformas_navegador')
+        .select('calculo_duracion')
         .eq('project_id', projectId)
         .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle();
 
-      // Solo enviamos unidades al pipeline — perfil_ingreso y duracion aumentan el prompt ~3×
-      // sin aportar información útil para generar el formulario de campo
+      // Fase 2.5: duración promedio por video (fallback si F3 no tiene detalle_por_modulo)
+      const { data: f2_5 } = await supabase.client!
+        .from('fase2_5_recomendaciones')
+        .select('duracion_promedio_minutos, total_videos')
+        .eq('project_id', projectId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
       const fase3Data = {
         unidades: f2?.estructura_tematica || (project?.data?.fase3?.unidades ?? []),
+        calculo_duracion: f3?.calculo_duracion || {},
+        duracion_promedio_minutos: f2_5?.duracion_promedio_minutos ?? null,
+        total_videos: f2_5?.total_videos ?? null,
       };
 
       console.log(`[DEBUG-F4-DATA] Contexto podado → ${fase3Data.unidades.length} unidades`);
 
-      const userId = c.get('userId') || project?.user_id || '00000000-0000-0000-0000-000000000000';
+      const userId = c.get('userId') || project?.user_id || '00000000-0000-0000-0000-000000000001';
 
       if (!fase3Data.unidades?.length) {
         console.warn(`[DEBUG-F4-DATA] Intento de generar esquema para ${producto} sin datos de origen.`);
@@ -114,18 +141,6 @@ router.get('/:projectId/:producto', async (c) => {
         }, 400);
       }
 
-      // 3. Elegir el pipeline especializado por producto, con fallback al genérico
-      const FORM_SCHEMA_PROMPT_BY_PRODUCT: Record<string, string> = {
-        'P1': 'F4_P1_FORM_SCHEMA',
-        'P2': 'F4_P2_FORM_SCHEMA',
-        'P3': 'F4_P3_FORM_SCHEMA',
-        'P4': 'F4_P4_FORM_SCHEMA',
-        'P5': 'F4_P5_FORM_SCHEMA',
-        'P6': 'F4_P6_FORM_SCHEMA',
-        'P7': 'F4_P7_FORM_SCHEMA',
-        'P8': 'F4_P8_FORM_SCHEMA',
-      };
-      const formSchemaPromptId = (FORM_SCHEMA_PROMPT_BY_PRODUCT[producto] ?? 'F4_GENERATE_FORM_SCHEMA') as PromptId;
       console.log(`[GATEWAY-INFO] Usando pipeline: ${formSchemaPromptId} para ${producto}`);
 
       // 4. Crear el nuevo Job
@@ -153,6 +168,22 @@ router.get('/:projectId/:producto', async (c) => {
             producto,
             // Inyectar datos estructurados de Fase 3
             fase3: fase3Data,
+            // Para P3: inyectar P4 (Manual) como input requerido
+            ...(producto === 'P3' ? await (async () => {
+              try {
+                const { data: p4Data } = await supabase.client!
+                  .from('fase4_productos')
+                  .select('datos_producto')
+                  .eq('project_id', projectId)
+                  .eq('producto', 'P4')
+                  .order('created_at', { ascending: false })
+                  .limit(1)
+                  .maybeSingle();
+                return p4Data?.datos_producto
+                  ? { productos_previos: { P4: p4Data.datos_producto } }
+                  : {};
+              } catch { return {}; }
+            })() : {}),
           },
           userInputs: { producto },
         },

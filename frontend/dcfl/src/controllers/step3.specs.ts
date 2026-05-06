@@ -110,7 +110,7 @@ class Step4SpecsController extends BaseStep {
     if (!this._dom.form) return;
 
     // No sobreescribir si el usuario ya guardó datos en este paso
-    const savedInputs = wizardStore.getState().steps[5]?.inputData ?? {};
+    const savedInputs = wizardStore.getState().steps[4]?.inputData ?? {};
     if (Object.keys(savedInputs).length > 0) return;
 
     const form = this._dom.form;
@@ -119,7 +119,7 @@ class Step4SpecsController extends BaseStep {
       if (value == null || value === '') return false;
       const el = form.elements.namedItem(name) as
         | HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement | null;
-      if (!el || el.value) return false;
+      if (!el) return false;
       el.value = String(value);
       return true;
     };
@@ -140,11 +140,6 @@ class Step4SpecsController extends BaseStep {
       if (data.metricas?.length) {
         const names = data.metricas.map((m) => m.metrica).filter(Boolean).join(', ');
         anySet = setField('reportingActivities', names) || anySet;
-      }
-
-      if (data.documento_final) {
-        const lms = this._extractLmsFromDoc(data.documento_final);
-        if (lms) anySet = setField('lmsName', lms) || anySet;
       }
 
       // Mostrar badge si se precargó algo
@@ -168,22 +163,6 @@ class Step4SpecsController extends BaseStep {
     if (/mensual|monthly/.test(lower))    return 'Mensual';
     if (/m[oó]dulo|module/.test(lower))   return 'Por módulo';
     return 'Semanal'; // default
-  }
-
-  /** Intenta extraer el nombre del LMS del documento final de F2.5. */
-  private _extractLmsFromDoc(content: string): string | null {
-    const patterns = [
-      /plataforma\s+(?:LMS\s*)?recomendada[:\s]+\*?\*?([^\n*,]+)/i,
-      /\*\*Plataforma[:\s]+\*?\*?([^\n*,]+)/i,
-      /LMS[:\s]+\*?\*?([^\n*,]+)/i,
-      /(Moodle|TalentLMS|Canvas|Blackboard|Teachable|Google Classroom|Hotmart|Chamilo|Dokeos)\b/i,
-    ];
-    for (const p of patterns) {
-      const m = content.match(p);
-      const val = m?.[1]?.trim().replace(/\*\*/g, '');
-      if (val && val.length > 1 && val.length < 60) return val;
-    }
-    return null;
   }
 
   // ── Generación ────────────────────────────────────────────────────────────

@@ -1,126 +1,349 @@
 ---
 id: F4_P3_GENERATE_DOCUMENT
-name: Compilador de Documento P3 — Guiones Multimedia EC0366
-version: 2.0.0
-tags: [EC0366, guiones, multimedia, markdown]
+name: Generador de Paquete de Producción — Video Individual
+version: 11.1.0
+tags: [EC0366, guiones, multimedia, produccion, json-structured, zero-loss]
 pipeline_steps:
 
   # ── EXTRACTOR ────────────────────────────────────────────────────────────
-  - agent: extractor_doc_generic
+  - agent: extractor_p3
     model: "qwen2.5:14b"
     inputs_from: []
     include_template: false
     task: |
-      Read ONLY from userInputs in the provided context. Ignore previousData entirely.
+      YOU ARE AN API ENDPOINT. YOU DO NOT CONVERSE. YOU ONLY OUTPUT RAW JSON.
       
-      SOURCE MAPPING:
-      - The form fields follow the pattern "guion_unidad_N" where N is the unit number.
-      - projectName and clientName come from the context root.
+      You receive pre-structured JSON data in userInputs. DO NOT parse or summarize — map it verbatim.
       
-      YOUR TASK: Map each form field to its unit number by extracting N from the key name. Preserve the EXACT text of each field value.
+      FIELDS IN userInputs:
+      - "guion_unidad_N": technical sheet text from form (string)
+      - "_modulo_actual": module number (integer)
+      - "_nombre_video": human-readable video name (string)
+      - "p4_secciones": JSON object with P4 chapter sections (already structured — pass through as-is)
       
-      OUTPUT ONLY VALID JSON — EXACT STRUCTURE:
+      Extract "duracion" from guion_unidad_N (look for a pattern like "5 min", "10 min"). Default: "5 min".
+      
+      OUTPUT ONLY VALID JSON:
       {
-        "producto": "P3",
-        "proyecto": "[projectName from context]",
-        "candidato": "[clientName from context]",
-        "secciones": [
-          { "campo": "guion_unidad_1", "contenido": "[value of guion_unidad_1]" },
-          { "campo": "guion_unidad_2", "contenido": "[value of guion_unidad_2]" }
-        ]
+        "modulo": {_modulo_actual},
+        "nombre": "{_nombre_video}",
+        "ficha_tecnica_form": "{guion_unidad_N verbatim}",
+        "duracion": "extracted or default '5 min'",
+        "p4_secciones": {p4_secciones as-is}
       }
+
+  # ═══════════════════════════════════════════════════════════════════════
+  # SECCIÓN 1: FICHA TÉCNICA
+  # ═══════════════════════════════════════════════════════════════════════
+  - agent: agente_ficha_A
+    model: "qwen2.5:14b"
+    inputs_from: [extractor_p3]
+    include_template: false
+    task: |
+      YOU ARE AN API ENDPOINT. YOU DO NOT CONVERSE. YOU ONLY OUTPUT RAW JSON.
+      ROLE: Production Director. TASK: Generate FICHA TÉCNICA as structured JSON.
+      
+      INPUT: {nombre}, {ficha_tecnica_form}, {duracion}, p4_secciones
+      
+      Derive objetivo_aprendizaje from p4_secciones.introduccion + p4_secciones.puntos_recordar.
+      
+      OUTPUT ONLY THIS JSON:
+      {
+        "ficha_tecnica": {
+          "modulo": "MUST be exactly the value of {nombre}.",
+          "objetivo_aprendizaje": "Acción observable. STRICT RULE: PROHIBIDO USAR la raíz de las palabras: aprender, comprender, entender, saber, conocer.",
+          "duracion": "{duracion}",
+          "recursos": ["Format: Array de STRINGS SIMPLES. Ej: 'Animación 2D', 'Close-up'. PROHIBIDO devolver objetos JSON."],
+          "equipamiento": "Menciona solo objetos físicos reales (ej. Pinturas, Pinceles, Agua).",
+          "perfil_talento": "Narrador/actor sugerido..."
+        }
+      }
+
+  - agent: agente_ficha_B
+    model: "qwen2.5:14b"
+    inputs_from: [extractor_p3]
+    include_template: false
+    task: |
+      SAME AS AGENT A. DIFFERENT: vary the "perfil_talento" and "equipamiento" suggestions.
+      OUTPUT ONLY THIS JSON:
+      {
+        "ficha_tecnica": {
+          "modulo": "MUST be exactly the value of {nombre}.",
+          "objetivo_aprendizaje": "Acción observable. STRICT RULE: PROHIBIDO USAR la raíz de las palabras: aprender, comprender, entender, saber, conocer.",
+          "duracion": "{duracion}",
+          "recursos": ["Format: Array de STRINGS SIMPLES. Ej: 'Animación 2D', 'Close-up'. PROHIBIDO devolver objetos JSON."],
+          "equipamiento": "Menciona solo objetos físicos reales (ej. Pinturas, Pinceles, Agua).",
+          "perfil_talento": "Narrador/actor sugerido..."
+        }
+      }
+
+  - agent: juez_ficha
+    model: "qwen2.5:14b"
+    inputs_from: [agente_ficha_A, agente_ficha_B]
+    include_template: false
+    task: |
+      YOU ARE A JSON PARSER AND STRICT AUDITOR. DO NOT CONVERSE. DO NOT SYNTHESIZE.
+      
+      Compare the Ficha Técnica from A and B. 
+      Select the BEST ONE based on:
+      1. No forbidden verbs in objetivo_aprendizaje.
+      2. Specific and logical physical 'equipamiento'.
+      3. Strict JSON structure compliance.
+      
+      OUTPUT ONLY THIS EXACT JSON (Choose ONLY 'A' or 'B'):
+      {"seleccion": "A", "razon": "1-line explanation"}
+
+  # ═══════════════════════════════════════════════════════════════════════
+  # SECCIÓN 2: ESCALETA
+  # ═══════════════════════════════════════════════════════════════════════
+  - agent: agente_escaleta_A
+    model: "qwen2.5:14b"
+    inputs_from: [extractor_p3]
+    include_template: false
+    task: |
+      YOU ARE AN API ENDPOINT. YOU DO NOT CONVERSE. YOU ONLY OUTPUT RAW JSON.
+      ROLE: Production Director. TASK: Generate ESCALETA as array of exactly 9 objects.
+      
+      BUILD 9 SCENES exactly matching: Apertura-Gancho, Agenda, Concepto_1, Ejemplo_1, Concepto_2, Ejemplo_2, Practica_guiada, Error_comun, Cierre.
+      
+      TIME SCALE STRICT RULE:
+      - The total elapsed time of all 9 scenes MUST equal {duracion} (e.g., if duracion is "8 min", last row ends at "8:00").
+      - Distribute proportionally: Apertura-Gancho ~8%, Agenda ~5%, each Concepto+Ejemplo pair ~18%, Practica_guiada ~15%, Error_comun ~10%, Cierre ~8%.
+      - FORBIDDEN: time ranges that don't sum to {duracion}. FORBIDDEN: rows with overlapping or non-consecutive times.
+      
+      REGLA DE DENSIDAD DE CONTENIDO (ZERO LOSS):
+      1. PROHIBIDO usar tiempos de ejemplo genéricos (como "5 min") — usa siempre {duracion}.
+      2. El detalle de cada "accion" debe ser PROPORCIONAL a {p4_secciones}: si el P4 describe 10 pasos técnicos, DEBES distribuirlos entre las 9 escenas, nombrando cada paso específicamente.
+      3. Eres un transcriptor técnico, no un resumidor. PROHIBIDO escribir "se explica el proceso" — escribe EL proceso.
       
       RULES:
-      - Include ONLY fields whose key starts with "guion_unidad_"
-      - Preserve the exact text of each field value — do not paraphrase or summarize
-      - The number of secciones must equal the number of guion_unidad_* keys in userInputs
+      - "accion" MUST describe a concrete, physical visual. 
+      - ZERO LOSS: If P4 mentions specific tools or techniques, THEY MUST be in the "accion".
+      - End of row N MUST equal start of row N+1.
+      
+      OUTPUT ONLY THIS JSON:
+      {
+        "escaleta": [
+          {"tiempo": "0:00 - 0:30", "escena": "Apertura-Gancho", "accion": "CONCRETE VISUAL ACTION derived from P4"},
+          ...9 rows total
+        ]
+      }
 
-  # ── AGENTE A: STANDARD SCRIPT COMPILER ───────────────────────────────────
-  - agent: agente_doc_generic_A
+  - agent: agente_escaleta_B
     model: "qwen2.5:14b"
-    inputs_from: [extractor_doc_generic]
+    inputs_from: [extractor_p3]
+    include_template: false
+    task: |
+      SAME AS AGENT A. APPLY SAME TIME SCALE STRICT RULE (total elapsed time MUST equal {duracion}) AND SAME REGLA DE DENSIDAD DE CONTENIDO (transcribe all specific P4 steps, no summaries). DIFFERENT: vary shot_type field: "close_up", "medium_shot", "wide_shot", "insert_shot", "split_screen". Max 2 consecutive same type.
+      OUTPUT ONLY THIS JSON:
+      {"escaleta": [{"tiempo": "...", "escena": "...", "accion": "...", "shot_type": "..."}, ...9 rows]}
+
+  - agent: juez_escaleta
+    model: "qwen2.5:14b"
+    inputs_from: [agente_escaleta_A, agente_escaleta_B]
+    include_template: false
+    task: |
+      YOU ARE A JSON PARSER AND STRICT AUDITOR. DO NOT CONVERSE. DO NOT SYNTHESIZE.
+      
+      Compare the Escaleta from A and B. 
+      Select the BEST ONE based on:
+      1. Exactly 9 rows with the mandatory scene names.
+      2. Consecutive and ascending time ranges.
+      3. The "accion" field contains highly specific visual descriptions retaining P4 details, not generic summaries.
+      
+      OUTPUT ONLY THIS EXACT JSON (Choose ONLY 'A' or 'B'):
+      {"seleccion": "B", "razon": "1-line explanation"}
+
+  # ═══════════════════════════════════════════════════════════════════════
+  # SECCIÓN 3: GUION LITERARIO (ANTI-LOSS COMPRESSION)
+  # ═══════════════════════════════════════════════════════════════════════
+  - agent: agente_literario_A
+    model: "qwen2.5:14b"
+    inputs_from: [extractor_p3]
     include_template: false
     task: |
       YOU ARE AN API ENDPOINT. YOU DO NOT CONVERSE. YOU ONLY OUTPUT RAW JSON.
+      ROLE: Production Director. TASK: Generate GUION LITERARIO as array of 9 scene narrations.
       
-      You are an EC0366 Multimedia Producer compiling the official script document for video production.
+      TIME DENSITY STRICT RULE:
+      - Target word count: approximately 130 words per minute of narration (natural speech pace).
+      - Total word count across all 9 scenes MUST be approximately {duracion} × 130 (e.g., "8 min" → ~1040 words).
+      - Distribute proportionally by scene: longer scenes (Concepto, Ejemplo) get more words; shorter scenes (Agenda, Cierre) get fewer.
+      - FORBIDDEN: scenes with fewer than 20 words. FORBIDDEN: total word count below 80% of target.
       
-      SOURCE: The script sections extracted from the user-confirmed form.
+      REGLA DE DENSIDAD DE CONTENIDO (ZERO LOSS):
+      1. PROHIBIDO usar duración genérica (como "5 min") — la duración oficial es {duracion}.
+      2. El tamaño de cada "texto" debe ser PROPORCIONAL a {p4_secciones}: si el P4 menciona 10 pasos técnicos, DEBES narrar los 10. Eres un transcriptor, no un resumidor.
+      3. PROHIBIDO escribir "se explica el proceso" — escribe EL proceso con sus términos exactos.
       
-      HOW TO BUILD THE DOCUMENT:
+      REGLA DE FIDELIDAD EXTREMA (ZERO LOSS): 
+      IT IS STRICTLY FORBIDDEN to summarize or generalize the P4 content. If the P4 manual mentions specific tools, physical steps, materials, or technical names (e.g., 'veladuras', 'pincel seco'), YOU MUST USE THOSE EXACT WORDS in the spoken narration.
       
-      1. Generate the complete document in SPANISH.
-      2. Use ## for each module/unit title.
-      3. Use ### for each scene (Escena 1, Escena 2, etc.).
-      4. Place all spoken narration in blockquotes: > **Narrador:** "exact text here"
-      5. Include estimated duration per scene in brackets: [XX seg] or [X min YY seg].
-      6. This is a formal EC0366 production document — ready to hand to a video team.
-      
-      CRITICAL RULES:
-      1. EXACT NARRATOR TEXT: Every blockquote MUST reproduce the EXACT text from the form field. DO NOT rewrite, paraphrase, or summarize. The audio script in the form is the approved version — treat it as final.
-      2. SCENE DURATION: Include estimated duration per scene. Sum within a module should be coherent with the module's allocated time.
-      3. NO RAW JSON OR FIELD NAMES in the output. Clean production document only.
-      
+      STRICT SCHEMA — YOU MUST NOT INVENT OR RENAME MARCADORES. Output exactly these 9 rows:
       OUTPUT ONLY THIS JSON:
-      {"documento_md": "# Guiones Multimedia\n\n## Módulo 1: ...\n### Escena 1 — Introducción [XX seg]\n> **Narrador:** \"...\"\n..."}
+      {
+        "guion_literario": [
+          {"marcador": "Apertura-Gancho", "texto": "2-3 conversational sentences from p4_secciones.introduccion"},
+          {"marcador": "Agenda", "texto": "1-2 sentences previewing what will be learned"},
+          {"marcador": "Concepto_1", "texto": "4-6 conversational sentences retaining exact technical terms from p4_secciones.marco_teorico"},
+          {"marcador": "Ejemplo_1", "texto": "5-8 sentences retaining specific steps from p4_secciones.ejemplo_practico"},
+          {"marcador": "Concepto_2", "texto": "4-6 sentences from p4_secciones.conceptos_clave[0]"},
+          {"marcador": "Ejemplo_2", "texto": "5-8 sentences retaining specific steps from p4_secciones.desarrollo[0]"},
+          {"marcador": "Practica_guiada", "texto": "3-4 sentences inviting action from p4_secciones.ejercicio_practico"},
+          {"marcador": "Error_comun", "texto": "4-5 sentences warning about a mistake"},
+          {"marcador": "Cierre", "texto": "4-5 sentences: 3 takeaways + call to action"}
+        ]
+      }
 
-  # ── AGENTE B: TECHNICAL PRODUCER COMPILER ────────────────────────────────
-  - agent: agente_doc_generic_B
+  - agent: agente_literario_B
     model: "qwen2.5:14b"
-    inputs_from: [extractor_doc_generic]
+    inputs_from: [extractor_p3]
+    include_template: false
+    task: |
+      SAME AS AGENT A. APPLY SAME TIME DENSITY STRICT RULE (word count ~{duracion} × 130), SAME REGLA DE DENSIDAD DE CONTENIDO (transcribe all specific P4 steps), SAME ZERO LOSS RULE (retain exact technical terms).
+      DIFFERENT: use "I do, we do, you do" pedagogy INSIDE the "texto" fields.
+      STRICT RULE: DO NOT CHANGE THE "marcador" NAMES. You MUST use exactly these 9 marcadores in this order: Apertura-Gancho, Agenda, Concepto_1, Ejemplo_1, Concepto_2, Ejemplo_2, Practica_guiada, Error_comun, Cierre.
+      OUTPUT ONLY THIS JSON:
+      {"guion_literario": [{"marcador": "Apertura-Gancho", "texto": "..."}, {"marcador": "Agenda", "texto": "..."}, {"marcador": "Concepto_1", "texto": "..."}, {"marcador": "Ejemplo_1", "texto": "..."}, {"marcador": "Concepto_2", "texto": "..."}, {"marcador": "Ejemplo_2", "texto": "..."}, {"marcador": "Practica_guiada", "texto": "..."}, {"marcador": "Error_comun", "texto": "..."}, {"marcador": "Cierre", "texto": "..."}]}
+
+  - agent: juez_literario
+    model: "qwen2.5:14b"
+    inputs_from: [agente_literario_A, agente_literario_B]
+    include_template: false
+    task: |
+      YOU ARE A JSON PARSER AND STRICT AUDITOR. DO NOT CONVERSE. DO NOT SYNTHESIZE OR MERGE.
+      
+      Compare the Guion Literario from A and B. 
+      CRITICAL FIDELITY CHECK: Read the "texto" fields. Which agent actually used specific technical terms, tools, and examples from the P4? If an agent wrote generic fluff like "el contraste es clave" without explaining the specific technique, it loses.
+      
+      Select the BEST ONE based on:
+      1. Highest retention of specific technical details from the source.
+      2. Conversational tone.
+      3. Exactly 9 required rows.
+      
+      OUTPUT ONLY THIS EXACT JSON (Choose ONLY 'A' or 'B'):
+      {"seleccion": "A", "razon": "1-line explanation"}
+
+  # ═══════════════════════════════════════════════════════════════════════
+  # SECCIÓN 4: GUION TÉCNICO
+  # ═══════════════════════════════════════════════════════════════════════
+  - agent: agente_tecnico_A
+    model: "qwen2.5:14b"
+    inputs_from: [extractor_p3]
     include_template: false
     task: |
       YOU ARE AN API ENDPOINT. YOU DO NOT CONVERSE. YOU ONLY OUTPUT RAW JSON.
+      ROLE: Production Director. TASK: Generate GUION TÉCNICO as array of exactly 9 objects.
       
-      You are an EC0366 Multimedia Producer compiling a technical production script with full audio/video direction.
+      STRICT RULE: The "escena" field MUST MATCH EXACTLY these 9 names in this order: Apertura-Gancho, Agenda, Concepto_1, Ejemplo_1, Concepto_2, Ejemplo_2, Practica_guiada, Error_comun, Cierre. DO NOT invent new scene names.
       
-      SOURCE: The script sections extracted from the user-confirmed form.
-      
-      HOW TO BUILD THE DOCUMENT:
-      
-      1. Generate the complete document in SPANISH.
-      2. Use ## for each module/unit title.
-      3. Use ### for each scene.
-      4. Use two-column Markdown tables for scenes that benefit from Audio | Video separation:
-         | Audio | Video |
-         |---|---|
-         | Narrador: "..." | Visual: slide reference, animation, or demonstration |
-      5. Include estimated duration per scene in brackets.
-      6. Add **Notas de producción:** subsection per module with rhythm, tone, sound effects, and B-roll suggestions.
-      
-      CRITICAL RULES:
-      1. CONTENT COMPLETENESS: Your document may use tables instead of blockquotes, but it MUST contain ALL narration text and production notes from the form fields. Different structure ≠ different content.
-      2. VISUAL DIRECTION: Every narrated segment must have a corresponding visual direction — what appears on screen while the narrator speaks.
-      3. NO RAW JSON OR FIELD NAMES in the output.
+      MANDATORY: EVERY field must be filled with specific data. "notas_duracion" MUST be a number followed by "s". "notas_color" MUST exist.
       
       OUTPUT ONLY THIS JSON:
-      {"documento_md": "# Guiones Multimedia — Documento de Producción\n\n## Módulo 1: ...\n..."}
+      {
+        "guion_tecnico": [
+          {
+            "escena": "Apertura-Gancho",
+            "imagen_tipo_plano": "close_up|medium_shot|wide_shot|insert_shot|split_screen",
+            "imagen_descripcion": "What camera sees: elements, lighting setup, text overlays, animation type",
+            "audio_locucion": "First and last 10 words of narration for this scene",
+            "audio_musica": "Music style and volume %",
+            "audio_sfx": "SFX description with timing",
+            "notas_camara": "tripod|handheld",
+            "notas_transicion": "cut|dissolve|wipe",
+            "notas_duracion": "duration in seconds",
+            "notas_color": "color grading notes"
+          },
+          ...9 rows total matching the 9 required names
+        ]
+      }
 
-  # ── JUDGE ────────────────────────────────────────────────────────────────
-  - agent: juez_doc_generic
+  - agent: agente_tecnico_B
     model: "qwen2.5:14b"
-    inputs_from: [agente_doc_generic_A, agente_doc_generic_B]
+    inputs_from: [extractor_p3]
     include_template: false
     task: |
-      YOU ARE A JSON PARSER. DO NOT CONVERSE.
+      SAME AS AGENT A. DIFFERENT: Add b_roll_sugerencias field with 1-2 B-roll ideas per scene derived from p4_secciones.conceptos_clave.
+      STRICT RULE: Use exactly the 9 required scene names in order.
+      OUTPUT ONLY THIS JSON:
+      {"guion_tecnico": [{"escena": "Apertura-Gancho", "imagen_tipo_plano": "...", ...9 rows with b_roll_sugerencias}]}
+
+  - agent: juez_tecnico
+    model: "qwen2.5:14b"
+    inputs_from: [agente_tecnico_A, agente_tecnico_B]
+    include_template: false
+    task: |
+      YOU ARE A JSON PARSER AND STRICT AUDITOR. DO NOT CONVERSE. DO NOT SYNTHESIZE OR MERGE.
       
-      Compare "documento_md" from A and B. Select the better Guiones Multimedia document.
+      Compare the Guion Técnico from A and B. 
+      Select the BEST ONE based on:
+      1. NO empty fields, nulls, or "undefined".
+      2. Exactly 9 rows matching the required scenes.
+      3. Specificity in "imagen_descripcion" holding true to the P4 content.
       
-      SELECTION CRITERIA:
-      1. No raw JSON or field names visible — clean production document.
-      2. Clear scene structure with narrator text easily identifiable (blockquotes or table format).
-      3. Production readiness: Can a video team use this document to record and edit? Penalize missing durations or vague visual directions.
-      4. Fidelity to form: ALL narration text comes from userInputs — no invented dialogue or paraphrased content.
-      5. Correct unit count: ALL modules from the form input are present; none missing, none added.
-      6. Audio/Visual sync: Does each spoken segment have a corresponding visual reference?
+      OUTPUT ONLY THIS EXACT JSON (Choose ONLY 'A' or 'B'):
+      {"seleccion": "B", "razon": "1-line explanation"}
+
+  # ═══════════════════════════════════════════════════════════════════════
+  # SECCIÓN 5: STORYBOARD
+  # ═══════════════════════════════════════════════════════════════════════
+  - agent: agente_storyboard_A
+    model: "qwen2.5:14b"
+    inputs_from: [extractor_p3]
+    include_template: false
+    task: |
+      YOU ARE AN API ENDPOINT. YOU DO NOT CONVERSE. YOU ONLY OUTPUT RAW JSON.
+      ROLE: Production Director. TASK: Generate STORYBOARD as array of 4 scene objects.
+      
+      LANGUAGE: ALL 6 field VALUES MUST be written in SPANISH. JSON keys stay in English.
       
       OUTPUT ONLY THIS JSON:
-      {"seleccion": "A" | "B", "razon": "1-line explanation"}
+      {
+        "storyboard": [
+          {
+            "escena": "Apertura",
+            "framing": "shot type, angle, distance",
+            "subject": "what/who, position, action",
+            "lighting": "direction, quality (hard/soft), color temp",
+            "environment": "background, setting, props",
+            "color_palette": "dominant colors, contrast level",
+            "composition": "rule of thirds, leading lines, depth"
+          },
+          ...4 scenes total (Apertura, Concepto Principal, Ejemplo Práctico, Cierre)
+        ]
+      }
 
-  # ── ASSEMBLER ────────────────────────────────────────────────────────────
-  - agent: ensamblador_doc_generic
+  - agent: agente_storyboard_B
     model: "qwen2.5:14b"
-    inputs_from: [juez_doc_generic]
+    inputs_from: [extractor_p3]
     include_template: false
-    task: "CÓDIGO - Assembly in document-generic.assembler.ts"
+    task: |
+      SAME AS AGENT A. DIFFERENT: add "mood" and "camera_movement" fields. Choose most visually striking moment.
+      OUTPUT ONLY THIS JSON:
+      {"storyboard": [{"escena": "...", "framing": "...", ..., "mood": "...", "camera_movement": "..."}, ...4 scenes]}
+
+  - agent: juez_storyboard
+    model: "qwen2.5:14b"
+    inputs_from: [agente_storyboard_A, agente_storyboard_B]
+    include_template: false
+    task: |
+      YOU ARE A JSON PARSER AND STRICT AUDITOR. DO NOT CONVERSE. DO NOT SYNTHESIZE OR MERGE.
+      
+      Compare the Storyboard from A and B. 
+      Select the BEST ONE based on:
+      1. AI-prompt readiness: Highly descriptive fields.
+      2. No missing fields, no english values.
+      3. Exactly 4 scenes.
+      
+      OUTPUT ONLY THIS EXACT JSON (Choose ONLY 'A' or 'B'):
+      {"seleccion": "B", "razon": "1-line explanation"}
+
+  # ═══════════════════════════════════════════════════════════════════════
+  # ASSEMBLER
+  # ═══════════════════════════════════════════════════════════════════════
+  - agent: ensamblador_doc_p3
+    model: "qwen2.5:14b"
+    inputs_from: [juez_ficha, juez_escaleta, juez_literario, juez_tecnico, juez_storyboard]
+    include_template: false
+    task: "CÓDIGO - Assembly in p3-document.assembler.ts (The assembler MUST read the 'seleccion' boolean output of each judge and extract the raw JSON array from the winning agent's output)"
 ---

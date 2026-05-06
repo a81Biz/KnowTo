@@ -11,8 +11,11 @@ pipeline_steps:
     inputs_from: []
     include_template: false
     task: |
-      Extract ALL units from the course syllabus, the P1 evaluation instruments, and the P4 participant manual.
+      YOU ARE AN EXTRACTOR, NOT AN EDITOR. Your ONLY job is to copy fields verbatim from the source.
+      NEVER rewrite, rephrase, improve, or apply any verb rules to any text — copy it EXACTLY as written.
+      Even if the objective says "comprenderá", "sabrá", or "conocerá" — copy it as-is. Do NOT change it.
       
+      Extract ALL units from the course syllabus, the P1 evaluation instruments, and the P4 participant manual.
       SOURCE: The context contains fase3.unidades (F2/F3), P1 instruments, and P4 manual from productos_previos or userInputs.
       
       DO NOT TRUNCATE. Return every unit.

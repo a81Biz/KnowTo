@@ -641,6 +641,76 @@ class Step5ProductionController extends BaseStep {
     }
     if (!stepId) { showError('No se pudo registrar el paso.'); return; }
 
+    // --- LÓGICA MODULAR PARA P2 Y P3 ---
+    if (product.promptId === 'F4_P2' || product.promptId === 'F4_P3') {
+      this._setLoading(true);
+      const isP2 = product.promptId === 'F4_P2';
+      const promptToUse = isP2 ? 'F4_P2_GENERATE_DOCUMENT' : 'F4_P3_GENERATE_DOCUMENT';
+      const prefix = isP2 ? 'presentacion_unidad_' : 'guion_unidad_';
+      
+      const unitKeys = Object.keys(userInputs).filter(k => k.startsWith(prefix));
+      
+      if (unitKeys.length === 0) {
+        showError(`No se encontraron módulos para generar ${product.label}.`);
+        this._setLoading(false);
+        return;
+      }
+
+      // Obtener P3 si es P2 (para referencia en las slides)
+      let p3Partes: any = {};
+      if (isP2) {
+        try {
+          const resP3 = await getData<any>(buildEndpoint(ENDPOINTS.wizard.fase4Productos(state.projectId)));
+          const p3Prod = resP3.data?.productos?.find((p: any) => p.producto === 'P3');
+          p3Partes = p3Prod?.datos_producto?.partes || {};
+        } catch (e) { console.warn('[F4] No se pudo cargar P3 para referencia'); }
+      }
+
+      for (const key of unitKeys.sort()) {
+        const n = key.replace(prefix, '');
+        const nombreModulo = userInputs[`_nombre_modulo_${n}`] || userInputs[`_nombre_video_${n}`] || `Módulo ${n}`;
+        
+        showLoading(`⏳ Generando ${product.label} - ${nombreModulo}...`);
+        
+        const modularInputs: Record<string, any> = {
+          _modulo_actual: n,
+          _nombre_modulo: nombreModulo,
+          [key]: userInputs[key]
+        };
+
+        if (isP2 && p3Partes[`modulo_${n}`]) {
+          const m = p3Partes[`modulo_${n}`];
+          modularInputs['p3_guion'] = `GUION LITERARIO:\n${m.guion_literario}\n\nGUION TECNICO:\n${m.guion_tecnico}`;
+        }
+
+        const res = await postData<{ jobId: string }>(
+          buildEndpoint(ENDPOINTS.wizard.generateAsync),
+          {
+            projectId: state.projectId,
+            stepId,
+            phaseId: 'F4',
+            promptId: promptToUse,
+            context: wizardStore.buildContext(STEP_NUMBER),
+            userInputs: modularInputs,
+          }
+        );
+
+        if (res.data?.jobId) {
+          await new Promise((resolve, reject) => {
+            subscribeToJob(res.data!.jobId, (r) => resolve(r), (e) => reject(e));
+          });
+        }
+      }
+
+      await this._loadProductsFromBD(state.projectId);
+      const prod = this._approvedProducts.get(this._currentProductIndex);
+      if (prod) this._showProductPreview(prod.content);
+      this._renderProductIndicators();
+      this._setLoading(false);
+      hideLoading();
+      return;
+    }
+
     this._setLoading(true);
     showLoading(`⏳ Generando ${product.label}...`);
 
