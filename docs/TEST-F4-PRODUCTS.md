@@ -52,15 +52,25 @@ docker exec knowto-supabase-db psql -U postgres -d postgres -c "
 
 ## 2. Generar todos los productos (test run)
 
-El endpoint corre los 8 productos en orden secuencial en el background y retorna inmediatamente.
+El endpoint corre el ciclo completo por cada producto en background y retorna inmediatamente.
 
-### Prerequisito: llenar formularios
+### Ciclo por producto
 
-Los formularios deben existir con `valores_usuario`. Hay dos formas:
+```
+Para cada producto (P1, P4, P3, P2, P5, P6, P7, P8):
+  1. Genera el form schema vía pipeline F4_P{N}_FORM_SCHEMA
+     (si ya existe en BD lo reutiliza, no lo regenera)
+  2. Lee los suggested_value de cada campo del schema como entradas
+     (si el usuario ya llenó el formulario manualmente, usa esos valores)
+  3. Genera el documento vía pipeline F4_P{N}_GENERATE_DOCUMENT
+     - P1, P4: un solo job con todos los campos
+     - P2, P3, P5, P6, P7, P8: un job por cada módulo (guion_unidad_N, etc.)
+  4. Espera a que el job complete antes de pasar al siguiente producto
+```
 
-**Opción A** — Abrir el wizard en el navegador (`http://dcfl.localhost`) y navegar hasta Step 4. El sistema genera los form schemas automáticamente al llegar a cada producto. Llenar los formularios y guardarlos (se auto-guardan al hacer cualquier cambio).
+### No requiere preparación previa
 
-**Opción B** — Esperar a que el test intente correr: saltará los productos sin form values y lo indicará en los logs.
+El test genera los form schemas automáticamente. Solo necesita que las fases 0-3 estén completas.
 
 ### Lanzar el test
 
