@@ -753,6 +753,84 @@ async function check(label, fn) {
 
 ---
 
+## Test de productos F4 (EC0366)
+
+Genera los 8 productos automáticamente a partir de un proyecto con fases 0-3 completas. No requiere interacción manual con el wizard.
+
+### Ciclo por producto
+
+```
+Para cada producto en orden (P1 → P4 → P3 → P2 → P5 → P6 → P7 → P8):
+  1. Genera el form schema  (F4_PN_FORM_SCHEMA)  — si ya existe lo reutiliza
+  2. Usa suggested_value de cada campo como entradas del formulario
+     (si el usuario ya llenó el formulario manualmente, usa esos valores)
+  3. Genera el documento    (F4_PN_GENERATE_DOCUMENT)
+     — P1, P4: un solo job con todos los campos
+     — P2, P3, P5, P6, P7, P8: un job por módulo
+  4. Espera que el job complete antes de pasar al siguiente producto
+```
+
+### Obtener el projectId
+
+```bash
+docker exec knowto-supabase-db psql -U postgres -d postgres \
+  -c "SELECT id, name FROM projects ORDER BY created_at DESC LIMIT 5;"
+```
+
+### 1. Limpiar datos generados
+
+```bash
+# Por endpoint:
+curl -X DELETE http://api.localhost/dcfl/test/reset/<PROJECT_ID>
+
+# O con SQL directo:
+docker exec knowto-supabase-db psql -U postgres -d postgres -c "
+  DELETE FROM fase4_productos       WHERE project_id = '<PROJECT_ID>';
+  DELETE FROM producto_form_schemas WHERE project_id = '<PROJECT_ID>';
+  DELETE FROM pipeline_jobs         WHERE project_id = '<PROJECT_ID>' AND phase_id = 'F4';"
+```
+
+### 2. Reiniciar backend (necesario tras cambios de código)
+
+```bash
+docker compose restart backend
+```
+
+### 3. Lanzar el test run
+
+```bash
+curl -X POST http://api.localhost/dcfl/test/run-all \
+  -H "Content-Type: application/json" \
+  -d '{ "projectId": "<PROJECT_ID>" }'
+```
+
+Retorna `202` inmediatamente. La generación corre en background (2-6 horas con Ollama local).
+
+### 4. Monitorear
+
+```bash
+# Logs del test runner
+docker logs knowto-backend -f 2>&1 | grep TEST-RUN
+
+# Estado de productos en BD
+docker exec knowto-supabase-db psql -U postgres -d postgres -c "
+  SELECT producto, validacion_estado, created_at
+  FROM fase4_productos
+  WHERE project_id = '<PROJECT_ID>'
+  ORDER BY producto, created_at DESC;"
+
+# Jobs y errores
+docker exec knowto-supabase-db psql -U postgres -d postgres -c "
+  SELECT prompt_id, status, LEFT(error, 100)
+  FROM pipeline_jobs
+  WHERE project_id = '<PROJECT_ID>' AND phase_id = 'F4'
+  ORDER BY created_at DESC LIMIT 30;"
+```
+
+Ver [docs/TEST-F4-PRODUCTS.md](docs/TEST-F4-PRODUCTS.md) para diagnóstico detallado.
+
+---
+
 ## Verificar conectividad Ollama
 
 ```bash
