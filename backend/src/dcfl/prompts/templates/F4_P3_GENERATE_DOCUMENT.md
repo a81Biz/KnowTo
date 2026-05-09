@@ -19,7 +19,13 @@ pipeline_steps:
       - "guion_unidad_N": technical sheet text from form (string)
       - "_modulo_actual": module number (integer)
       - "_nombre_video": human-readable video name (string)
-      - "p4_secciones": JSON object with P4 chapter sections (already structured — pass through as-is)
+      - "productos_previos": object containing all approved products data
+      
+      EXTRACT p4_secciones as follows:
+        1. Access productos_previos.P4.capitulos (array of chapters)
+        2. Find the chapter where chapter.unidad === _modulo_actual
+        3. Use that chapter's "secciones_json" as p4_secciones
+        4. If productos_previos.P4 is absent or no matching chapter found: output empty object {}
       
       VIDEO DURATION CAP (CRITICAL RULE):
       The "duracion" field represents the VIDEO length — NOT the class/module duration.
@@ -34,8 +40,8 @@ pipeline_steps:
         "modulo": {_modulo_actual},
         "nombre": "{_nombre_video}",
         "ficha_tecnica_form": "{guion_unidad_N verbatim}",
-        "duracion": "extracted or default '5 min'",
-        "p4_secciones": {p4_secciones as-is}
+        "duracion": "extracted or default '8 min'",
+        "p4_secciones": {extracted secciones_json or {}}
       }
 
   # ═══════════════════════════════════════════════════════════════════════

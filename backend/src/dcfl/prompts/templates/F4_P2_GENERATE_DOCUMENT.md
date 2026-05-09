@@ -13,15 +13,25 @@ pipeline_steps:
     task: |
       YOU ARE AN API ENDPOINT. YOU DO NOT CONVERSE. YOU ONLY OUTPUT RAW JSON.
       
-      You receive pre-structured JSON data in userInputs. DO NOT parse or summarize — map it verbatim.
+      You receive pre-structured JSON data in userInputs. DO NOT parse or summarize — extract and map the fields described below.
       
       FIELDS IN userInputs:
       - "presentacion_unidad_N": slide design text from form (string)
       - "_modulo_actual": module number (integer)
       - "_nombre_modulo": human-readable module name (string)
-      - "p3_escaleta": JSON array with P3 escaleta rows (already structured — pass through as-is)
-      - "p3_guion_literario": JSON array with P3 literary script blocks (already structured — pass through as-is)
-      - "p4_secciones": JSON object with P4 chapter sections (already structured — pass through as-is)
+      - "productos_previos": object containing all approved products data
+      
+      EXTRACT from productos_previos:
+      
+      P3 data:
+        - key = "modulo_" + _modulo_actual  (e.g., "modulo_1" when _modulo_actual is 1)
+        - p3_escaleta      = productos_previos.P3.partes[key].escaleta_json        (array — pass as-is; use [] if absent)
+        - p3_guion_literario = productos_previos.P3.partes[key].guion_literario_json (array — pass as-is; use [] if absent)
+      
+      P4 data:
+        - Search productos_previos.P4.capitulos (array) for the entry where entry.unidad === _modulo_actual
+        - p4_secciones = that entry's "secciones_json" field           (object — pass as-is; use {} if absent)
+        - If productos_previos.P4 is absent or no matching chapter found: use {}
       
       OUTPUT ONLY VALID JSON:
       {
