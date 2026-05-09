@@ -116,9 +116,9 @@ userInputs: { productos_previos: productosPreviosP3 }
 
 `_cargarProductosPrevios()` retorna `{ P1: datos_producto, P3: datos_producto, P4: datos_producto, ... }` — todos los productos aprobados con sus datos. Los templates acceden a `productos_previos.P4.capitulos` para P4, o a `productos_previos.P3.partes` para P3, sin código adicional en el controller.
 
-### Nota: templates P2 y P3 requieren actualización
+### Nota: templates P2 y P3 actualizados (commit 064d9c1)
 
-Los templates `F4_P2_GENERATE_DOCUMENT.md` y `F4_P3_GENERATE_DOCUMENT.md` actualmente usan variables `{p4_secciones}`, `{p3_escaleta}`, `{p3_guion_literario}`. Con la estandarización, deben leer de `productos_previos.P4.capitulos[N].secciones_json` etc. **Esta es la siguiente tarea después de validar P5.**
+Los templates `F4_P2_GENERATE_DOCUMENT.md` y `F4_P3_GENERATE_DOCUMENT.md` ahora leen de `productos_previos.P3.partes[modulo_N]` y `productos_previos.P4.capitulos[where unidad===N].secciones_json`. Las variables directas `{p4_secciones}`, `{p3_escaleta}`, `{p3_guion_literario}` han sido eliminadas.
 
 ---
 
@@ -131,7 +131,7 @@ Los templates `F4_P2_GENERATE_DOCUMENT.md` y `F4_P3_GENERATE_DOCUMENT.md` actual
 | Mínimo de pasos + anti-circulares | `F4_P5_GENERATE_DOCUMENT.md` — agente_procedimiento | ✅ Implementado |
 | Rúbricas por tipo (no por duración) | `F4_P5_GENERATE_DOCUMENT.md` — agente_evaluacion | ✅ Implementado |
 | Predecesores universales en controller | `step4.production.ts` — P3, P2 | ✅ Implementado |
-| Templates P2 y P3 usando productos_previos | `F4_P2_GENERATE_DOCUMENT.md`, `F4_P3_GENERATE_DOCUMENT.md` | ⏳ Pendiente |
+| Templates P2 y P3 usando productos_previos | `F4_P2_GENERATE_DOCUMENT.md`, `F4_P3_GENERATE_DOCUMENT.md` | ✅ Implementado |
 
 ---
 
