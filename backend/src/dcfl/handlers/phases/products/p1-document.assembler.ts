@@ -28,9 +28,46 @@ function validateDocumentoP1(md: string): { valid: boolean; errors: string[] } {
 }
 
 function extractDocumentoMd(raw: string, fallback: string): string {
-  const objMatch = raw.match(/\{[\s\S]*\}/);
-  const data = objMatch ? parseJsonSafely(objMatch[0], {}) : {};
-  return (data as any).documento_md || raw || fallback;
+  // Legacy: agent output wrapped in {"documento_md": "..."}
+  if (raw.includes('"documento_md"')) {
+    // Try standard JSON parsing first
+    const objMatch = raw.match(/\{[\s\S]*\}/);
+    if (objMatch) {
+      const data = parseJsonSafely(objMatch[0], {});
+      const md = (data as any).documento_md;
+      if (typeof md === 'string' && md.length > 100) return md;
+    }
+    // Fallback: scan char-by-char to handle raw newlines in the JSON string value
+    const keyIdx = raw.indexOf('"documento_md"');
+    if (keyIdx !== -1) {
+      const colonIdx = raw.indexOf(':', keyIdx + 14);
+      const quoteStart = raw.indexOf('"', colonIdx + 1);
+      if (quoteStart !== -1) {
+        let content = '';
+        let i = quoteStart + 1;
+        while (i < raw.length) {
+          const ch = raw[i];
+          if (ch === '\\' && i + 1 < raw.length) {
+            const next = raw[i + 1];
+            if (next === 'n') { content += '\n'; i += 2; }
+            else if (next === 't') { content += '\t'; i += 2; }
+            else if (next === '"') { content += '"'; i += 2; }
+            else if (next === '\\') { content += '\\'; i += 2; }
+            else { content += next; i += 2; }
+          } else if (ch === '"') {
+            break;
+          } else {
+            content += ch;
+            i++;
+          }
+        }
+        if (content.length > 100) return content;
+      }
+    }
+  }
+  // Pure markdown output (new format): return as-is
+  const trimmed = raw.trim();
+  return trimmed.length > 50 ? trimmed : fallback;
 }
 
 export async function handleDocumentP1Assembler(context: ProductContext): Promise<string> {

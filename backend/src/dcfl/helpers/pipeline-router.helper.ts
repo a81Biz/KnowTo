@@ -47,12 +47,14 @@ export async function dispatchAgentEvent(event: PipelineEvent): Promise<string |
   }
 
   // C. Manejo especial para prefijos (Fase 4)
-  if (promptId === 'F4_P4') {
-    return await handleF4Events(event);
-  }
-
-  if (promptId.startsWith('F4_')) {
-    return await handleF4Events(event);
+  // Las F4 usan sus propios assemblers (ensamblador_doc_pN) que guardan en fase4_productos.
+  // Re-persistir el resultado en pipeline_agent_outputs para trazabilidad y auditoría.
+  if (promptId.startsWith('F4_') || promptId === 'F4_P4') {
+    const result = await handleF4Events(event);
+    if (typeof result === 'string') {
+      await services.pipelineService.saveAgentOutput(jobId, agentName, result);
+    }
+    return result;
   }
 
   // D. Ruteo por Fase

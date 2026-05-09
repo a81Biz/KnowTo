@@ -121,8 +121,53 @@ function formatearEscaleta(rows: FilaEscaleta[], duracionTotal: string): string 
   return md;
 }
 
+const MARCADOR_KEYS = ['marcador', 'Marcador', 'marker', 'Marker', 'label', 'scene', 'name', 'titulo'] as const;
+const TEXTO_KEYS    = ['texto', 'Texto', 'text', 'content', 'narration', 'narracion', 'descripcion'] as const;
+
+const MARCADORES_VALIDOS = [
+  'Apertura-Gancho', 'Agenda', 'Concepto_1', 'Ejemplo_1',
+  'Concepto_2', 'Ejemplo_2', 'Practica_guiada', 'Error_comun', 'Cierre',
+] as const;
+
+function normalizarBloques(raw: any[]): BloqueLiterario[] {
+  return MARCADORES_VALIDOS.map((nombreEsperado, idx) => {
+    // First: find by matching marcador value (handles reorder)
+    let candidato = raw.find((b: any) => {
+      for (const k of MARCADOR_KEYS) {
+        if (b[k] && typeof b[k] === 'string' && b[k].trim() === nombreEsperado) return true;
+      }
+      return false;
+    });
+
+    // Fallback: use positional element (handles key rename / capitalization error)
+    if (!candidato) {
+      candidato = raw[idx] || {};
+      console.warn(`[p3-assembler] normalizarBloques: "${nombreEsperado}" no encontrado por nombre → usando posición ${idx}`);
+    }
+
+    // Extract texto from any known variant
+    let texto = '';
+    for (const k of TEXTO_KEYS) {
+      if (candidato[k] && typeof candidato[k] === 'string' && candidato[k].trim()) {
+        texto = candidato[k].trim();
+        break;
+      }
+    }
+
+    if (!texto) {
+      console.warn(`[p3-assembler] normalizarBloques: "${nombreEsperado}" sin texto → placeholder`);
+      texto = 'Contenido no disponible';
+    }
+
+    return { marcador: nombreEsperado, texto };
+  });
+}
+
 function formatearGuionLiterario(bloques: BloqueLiterario[]): string {
-  return bloques.map(b => `[${b.marcador}]\n${b.texto}`).join('\n\n');
+  return bloques
+    .filter(b => b.marcador && b.texto)
+    .map(b => `[${b.marcador}]\n${b.texto}`)
+    .join('\n\n');
 }
 
 function formatearGuionTecnico(rows: FilaTecnica[]): string {
@@ -144,7 +189,7 @@ function formatearStoryboard(scenes: EscenaStoryboard[]): string {
   return scenes.map(s => {
     let md = `- **${s.escena}:**\n`;
     md += `  - **Framing:** ${s.framing}\n`;
-    md += `  - **Subject:** ${s.subject}\n`;
+    md += `  - **Subject:** ${s.subject || s.escena || '(sin definir)'}\n`;
     md += `  - **Lighting:** ${s.lighting}\n`;
     md += `  - **Environment:** ${s.environment}\n`;
     md += `  - **Color palette:** ${s.color_palette}\n`;
@@ -371,6 +416,13 @@ export async function handleDocumentP3Assembler(context: ProductContext): Promis
       }
     }
 
+    // Normalizar bloques del guion literario: garantiza 9 entradas ordenadas con marcadores canónicos
+    if (seccion === 'literario' && Array.isArray((partes as any)[parteClave])) {
+      const rawBloques = (partes as any)[parteClave];
+      (partes as any)[parteClave] = normalizarBloques(rawBloques);
+      console.log(`[p3-assembler] normalizarBloques: ${rawBloques.length} crudos → ${(partes as any)[parteClave].length} bloques normalizados`);
+    }
+
     const contenido = (partes as any)[parteClave];
     const tipo = Array.isArray(contenido) ? `array[${contenido.length}]` : typeof contenido;
     console.log(`[p3-assembler] Sección ${seccion}: procesada, tipo=${tipo}`);
@@ -422,11 +474,15 @@ export async function handleDocumentP3Assembler(context: ProductContext): Promis
 
   partesAcumuladas[`modulo_${moduloActual}`] = {
     nombre: nombreVideo,
+    // Markdown para el documento final legible
     ficha_tecnica: fichaMd,
     escaleta: escaletaMd,
     guion_literario: literarioMd,
     guion_tecnico: tecnicoMd,
     storyboard: storyboardMd,
+    // JSON estructurado para que P2 y otros productos downstream lo usen como contexto
+    escaleta_json: partes.escaleta,
+    guion_literario_json: partes.guion_literario,
   };
 
   const modulosOrdenados = Object.keys(partesAcumuladas).sort();

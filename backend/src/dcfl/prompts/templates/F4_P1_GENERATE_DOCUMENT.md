@@ -19,20 +19,27 @@ pipeline_steps:
       
       YOUR TASK: Map each form field to its unit number by extracting N from the key name. Preserve the EXACT text of each field value.
       
+      COUNT RULE (CRITICAL): Before outputting, count EVERY key in userInputs that starts with "instrumento_unidad_".
+      Your "evaluaciones" array MUST have EXACTLY that many items — one per field, no more, no less.
+      FORBIDDEN: outputting fewer evaluaciones than there are "instrumento_unidad_*" keys.
+      EXAMPLE: if userInputs has instrumento_unidad_1, instrumento_unidad_2, instrumento_unidad_3 → "evaluaciones" MUST have 3 items.
+      
       OUTPUT ONLY VALID JSON — EXACT STRUCTURE:
       {
         "proyecto": "[projectName from context]",
         "candidato": "[clientName from context]",
+        "total_unidades": [integer: count of instrumento_unidad_* keys],
         "evaluaciones": [
           { "unidad": "1", "contenido": "[value of instrumento_unidad_1]" },
-          { "unidad": "2", "contenido": "[value of instrumento_unidad_2]" }
+          { "unidad": "2", "contenido": "[value of instrumento_unidad_2]" },
+          { "unidad": "N", "contenido": "[value of instrumento_unidad_N]" }
         ]
       }
       
       RULES:
       - Include ONLY fields whose key starts with "instrumento_unidad_"
       - Preserve the exact text of each field value — do not paraphrase or summarize
-      - The number of evaluaciones must equal the number of instrumento_unidad_* keys in userInputs
+      - The number of evaluaciones MUST equal total_unidades
 
   # ── AGENTE A: NORMATIVE AUDITOR ──────────────────────────────────────────
   - agent: agente_doc_A
@@ -40,13 +47,24 @@ pipeline_steps:
     inputs_from: [extractor_doc_p1]
     include_template: false
     task: |
-      YOU ARE AN API ENDPOINT. YOU DO NOT CONVERSE. YOU ONLY OUTPUT RAW JSON.
+      YOU ARE A DOCUMENT GENERATOR. OUTPUT ONLY MARKDOWN. DO NOT CONVERSE. DO NOT ADD JSON WRAPPERS OR CODE BLOCKS.
       
       You are an EC0366 Normative Auditor. Generate the final evaluation document.
       
       SOURCE: The evaluation data extracted from the user-confirmed form.
       
-      FORBIDDEN: Non-measurable mental verbs — "Comprender", "Saber", "Conocer", "Entender", "Aprender".
+      FILTRO_OBSERVABILIDAD: Queda estrictamente prohibido el uso de verbos no observables (Saber, Conocer, Entender, Comprender) Y de sustantivos de estado mental (entendimiento, comprensión, conocimiento, conciencia, dominio). Si el reactivo menciona estados internos no verificables, el agente DEBE transformarlos en acciones físicas o productos verificables (ej. "Realiza", "Identifica", "Describe", "Muestra", "Demuestra").
+      EJEMPLOS PROHIBIDOS: "muestra entendimiento del proceso", "evidencia conocimiento de la técnica", "comprensión del concepto".
+      EJEMPLOS CORRECTOS: "ejecuta los pasos en el orden especificado", "identifica visualmente la diferencia entre A y B", "produce una pieza con las características X, Y, Z".
+      
+      REACTIVOS_MINIMOS: Genera MÍNIMO 3 reactivos por unidad. Con solo 2 reactivos la evaluación no cubre los criterios de desempeño EC0366 de forma suficiente. Si la unidad es compleja, genera hasta 5 reactivos.
+      
+      REGLA_CUESTIONARIO: Si el Tipo de Instrumento de una unidad es "Cuestionario", después de la tabla de reactivos DEBES añadir una sección obligatoria:
+      ### CLAVE DE RESPUESTAS
+      | No. Reactivo | Respuesta Correcta | Sustento Técnico |
+      |---|---|---|
+      | 1 | [respuesta] | [fundamento técnico observable] |
+      COUNT_CHECK OBLIGATORIO: Antes de escribir la CLAVE, cuenta las filas `| N | ... |` de la tabla de reactivos anterior. La CLAVE DEBE tener EXACTAMENTE ese mismo número de filas, una por cada reactivo. Si hay 3 reactivos → 3 filas en la CLAVE. Si hay 4 → 4 filas. NUNCA menos.
       
       HOW TO BUILD THE DOCUMENT:
       
@@ -68,7 +86,7 @@ pipeline_steps:
       
       **Instrucción al Evaluador**: Describe the exact physical moment to start observing and the specific sequential observable actions to verify. FORBIDDEN: generic phrases like "Observe al candidato mientras [generic verb]". MUST specify concrete actions: "Verifique que el participante [specific physical action]".
       
-      **Reactivos table**: Each reactivo must describe a verifiable physical action or measurable deliverable.
+      **Reactivos table**: Each reactivo must describe a verifiable physical action or measurable deliverable. MINIMUM 3 reactivos per unit.
       
       **Valor Interno rules**:
       - Each value between 20% and 60% (whole numbers, no decimals)
@@ -79,15 +97,18 @@ pipeline_steps:
       ### Section 3: Criterios de Suficiencia
       Minimum passing score: 85%.
       
+      ALL_UNITS RULE (CRITICAL): Read "total_unidades" from the extractor output. You MUST generate exactly that many "## Unidad N" sections.
+      FORBIDDEN: generating fewer units than total_unidades. If total_unidades is 3, you MUST produce 3 complete unit sections.
+      
       CRITICAL RULES (DO NOT PRINT THESE IN THE OUTPUT):
       1. OBSERVABLE ACTIONS ONLY: FORBIDDEN subjective adjectives — adecuado, correcto, correctamente, bien, efectivo, notable, mejorado.
-         WRONG: "Aplica la pintura correctamente"
-         RIGHT: "Aplica la pintura cubriendo toda la superficie sin dejar grumos visibles"
+         WRONG: "Realiza el procedimiento correctamente"
+         RIGHT: "Realiza el procedimiento completando cada paso en el orden establecido sin omitir verificaciones"
       2. NO REPETITION BETWEEN UNITS: Each unit's reactivos MUST be unique. A reactivo about one skill must not appear in another unit. Before writing, read ALL unit names and ensure distinct, non-overlapping reactivos.
       3. SINGLE INSTRUMENT per unit. Never combine.
       4. PERFECT MATH: Global weights sum exactly 100%.
       
-      MARKDOWN TEMPLATE (fill brackets, generate final text in Spanish):
+      OUTPUT ONLY MARKDOWN — start directly with the # heading. No JSON. No code block. No preamble:
       
       # Instrumentos de Evaluación (EC0366)
       ## 1. Datos Generales
@@ -97,7 +118,7 @@ pipeline_steps:
       ## 2. Instrucciones Generales
       [Detailed instructions based on course topic]
       
-      [REPEAT FOR ALL UNITS]:
+      [REPEAT FOR ALL total_unidades UNITS — DO NOT STOP UNTIL ALL UNITS ARE WRITTEN]:
       ## Unidad [N]: [Unit Name]
       - **Tipo de Instrumento:** [Guía de Observación / Lista de Cotejo / Cuestionario]
       - **Ponderación Global:** [%]
@@ -110,11 +131,6 @@ pipeline_steps:
       
       ## 3. Criterios de Suficiencia
       Para declarar la competencia, el candidato debe sumar el 100% de la evaluación global, requiriendo un puntaje mínimo aprobatorio del 85%.
-      
-      OUTPUT ONLY THIS JSON:
-      {
-        "documento_md": "[generated markdown using \n for line breaks]"
-      }
 
   # ── AGENTE B: PRACTICAL INSTRUCTIONAL DESIGNER ───────────────────────────
   - agent: agente_doc_B
@@ -122,7 +138,7 @@ pipeline_steps:
     inputs_from: [extractor_doc_p1]
     include_template: false
     task: |
-      YOU ARE AN API ENDPOINT. YOU DO NOT CONVERSE. YOU ONLY OUTPUT RAW JSON.
+      YOU ARE A DOCUMENT GENERATOR. OUTPUT ONLY MARKDOWN. DO NOT CONVERSE. DO NOT ADD JSON WRAPPERS OR CODE BLOCKS.
       
       You are an Instructional Designer under EC0366 — PRACTICAL AND REAL-WORLD focus. Generate the final evaluation document.
       
@@ -146,21 +162,26 @@ pipeline_steps:
       ### Section 2: Reglas de Decisión y Firmas
       Include approval rules and signature spaces for evaluator and candidate.
       
+      ALL_UNITS RULE (CRITICAL): Read "total_unidades" from the extractor output. You MUST generate exactly that many "## Unidad N" sections.
+      FORBIDDEN: generating fewer units than total_unidades. If total_unidades is 3, you MUST produce 3 complete unit sections.
+      
       CRITICAL RULES (DO NOT PRINT THESE IN THE OUTPUT):
       1. SINGLE INSTRUMENT per unit. Never combine.
-      2. OBSERVABLE ACTIONS ONLY: FORBIDDEN — adecuado, correcto, correctamente, bien, efectivo, notable, mejorado.
-         WRONG: "Ensambla de forma correcta"
+      2. OBSERVABLE ACTIONS ONLY: FORBIDDEN — adecuado, correcto, correctamente, bien, efectivo, notable, mejorado, entendimiento, comprensión, conocimiento, conciencia.
+         WRONG: "Ensambla de forma correcta" / "Demuestra entendimiento del proceso"
          RIGHT: "Ensambla las piezas haciendo coincidir los bordes sin dejar huecos"
       3. NO REPETITION BETWEEN UNITS: Each unit's reactivos MUST be unique.
       4. PERFECT MATH: All weights sum exactly 100%.
+      5. MINIMUM 3 REACTIVOS per unit.
+      6. CUESTIONARIO CLAVE: If instrument is Cuestionario, add ### CLAVE DE RESPUESTAS with EXACTLY one row per reactivo — no more, no less.
       
-      MARKDOWN TEMPLATE (fill brackets, generate final text in Spanish):
+      OUTPUT ONLY MARKDOWN — start directly with the # heading. No JSON. No code block. No preamble:
       
       # Instrumentos de Evaluación Práctica
       ## 1. Requerimientos Físicos del Entorno
       [Specific inputs, equipment, software, or spatial conditions for this course]
       
-      [REPEAT FOR ALL UNITS]:
+      [REPEAT FOR ALL total_unidades UNITS — DO NOT STOP UNTIL ALL UNITS ARE WRITTEN]:
       ## Unidad [N]: [Unit Name]
       - **Instrumento:** [Guía de Observación / Lista de Cotejo / Cuestionario]
       - **Peso en la Calificación Final:** [%]
@@ -173,11 +194,6 @@ pipeline_steps:
       
       ## 2. Reglas de Decisión y Firmas
       [Approval rules and signature spaces for evaluator and candidate]
-      
-      OUTPUT ONLY THIS JSON:
-      {
-        "documento_md": "[generated markdown using \n for line breaks]"
-      }
 
   # ── JUDGE ────────────────────────────────────────────────────────────────
   - agent: juez_doc
@@ -187,19 +203,26 @@ pipeline_steps:
     task: |
       YOU ARE A JSON PARSER. DO NOT CONVERSE.
       
-      Compare the "documento_md" generated by A and B.
+      Compare the Instrumento de Evaluación document generated by A and B. Both documents are in TRABAJO PREVIO.
       
       SELECTION CRITERIA:
       1. No Prompt Leaking: The critical rules MUST NOT appear in the output text. It must look like a clean, official evaluation document.
-      2. No Subjectivity: The chosen document must NOT contain subjective adjectives — adecuado, correcto, correctamente, bien, efectivo, notable, mejorado. Reactivos must describe physical, observable actions.
+      2. No Subjectivity: The chosen document must NOT contain subjective adjectives — adecuado, correcto, correctamente, bien, efectivo, notable, mejorado — nor mental state nouns — entendimiento, comprensión, conocimiento, conciencia. Reactivos must describe physical, observable actions.
       3. Perfect Math: Global unit weights (Ponderación Global / Peso en la Calificación Final) must sum exactly 100%.
       4. Single Instrument: Only one instrument type per unit. No "Cuestionario y Guía" or similar combined instruments.
-      5. Unique Reactivos: No reactivo text is substantially similar across different units. Each unit evaluates a different skill. If two or more units share nearly identical reactivo text, the document FAILS this criterion.
+      5. Unique Reactivos: No reactivo text is substantially similar across different units.
+      6. Minimum Reactivos: Each unit must have at least 3 reactivos. Documents with only 2 reactivos per unit are penalized.
+      7. CLAVE Completeness: For any Cuestionario unit, the ### CLAVE DE RESPUESTAS section must have EXACTLY as many rows as the reactivos table. A CLAVE with fewer rows than reactivos is a critical deficiency.
       
-      Choose the one that meets ALL criteria. If both fail criterion 5, choose the one with less repetition.
+      Choose the one that meets ALL criteria. If both fail on the same criteria, choose the one with fewer deficiencies.
+      
+      VETO CRITERIA — Output "RECHAZADO" ONLY IF ALL of the following apply to BOTH documents simultaneously:
+      1. Both have forbidden subjective adjectives or mental state nouns in 3 or more reactivos.
+      2. Both have reactivos that describe intentions or knowledge states instead of physical observable actions.
+      If RECHAZADO, "razon" MUST describe the specific shared deficiency so the agents can correct it.
       
       OUTPUT ONLY THIS JSON:
-      {"seleccion": "A" | "B", "razon": "1-line explanation"}
+      {"seleccion": "A" | "B" | "RECHAZADO", "razon": "1-line explanation"}
 
   # ── ASSEMBLER ────────────────────────────────────────────────────────────
   - agent: ensamblador_doc_p1

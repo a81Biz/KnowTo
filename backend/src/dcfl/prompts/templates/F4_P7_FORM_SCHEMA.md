@@ -18,10 +18,23 @@ pipeline_steps:
       Extract ALL units and the synthesized content from all previously generated products.
       SOURCE: The context contains fase3.unidades (F2/F3) and P1-P6 data from productos_previos.
       
+      MANDATORY — Extract P4 concept data from "productos_previos.P4.capitulos":
+      For each chapter in the array, read chapter.unidad and chapter.secciones_json.
+      From secciones_json, copy arrays or strings named "conceptos_clave", "glosario", or "normativa" if present.
+      Build "p4_conceptos" as a dict keyed by "unidad_N" (e.g. "unidad_1", "unidad_2").
+      If "productos_previos.P4" is absent or a chapter has no secciones_json, output empty objects.
+      DO NOT invent terms, definitions, or standard codes — copy only what literally appears in P4.
+      
       DO NOT TRUNCATE. Return every unit.
       
       OUTPUT ONLY VALID JSON — EXACT STRUCTURE:
-      {"unidades": [{"modulo": 1, "nombre": "...", "objetivo": "..."}, {"modulo": 2, "nombre": "...", "objetivo": "..."}]}
+      {
+        "unidades": [{"modulo": 1, "nombre": "...", "objetivo": "..."}, {"modulo": 2, "nombre": "...", "objetivo": "..."}],
+        "p4_conceptos": {
+          "unidad_1": {"conceptos_clave": ["term: definition"], "normativa": ["NOM-XXX"]},
+          "unidad_2": {"conceptos_clave": [], "normativa": []}
+        }
+      }
 
   # ── AGENTE A: REFERENCE DOCUMENT WRITER ──────────────────────────────────
   - agent: agente_form_A

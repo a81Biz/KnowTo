@@ -18,10 +18,25 @@ pipeline_steps:
       Extract ALL units and the total weight of all deliverables from P1-P7.
       SOURCE: The context contains fase3.unidades (F2/F3) and P1-P7 data from productos_previos.
       
+      MANDATORY — Extract effort indicators from "productos_previos":
+      1. From "productos_previos.P4.capitulos": For each chapter, read chapter.unidad and count the number of keys in chapter.secciones_json (each key = one content section).
+      2. From "productos_previos.P5": For each module key (e.g. "modulo_1"), read the activity's "ficha.duracion" string.
+      Build "esfuerzo_por_unidad" as a dict keyed by "unidad_N" (e.g. "unidad_1", "unidad_2"):
+        - "p4_secciones": integer — count of secciones_json keys for that unit in P4
+        - "p5_duracion": string — activity duration from P5 ficha (e.g. "45 minutos") or "" if absent
+      If data is absent for a unit, output {"p4_secciones": 0, "p5_duracion": ""}.
+      DO NOT invent numbers — derive only from actual P4/P5 data.
+      
       DO NOT TRUNCATE. Return every unit.
       
       OUTPUT ONLY VALID JSON — EXACT STRUCTURE:
-      {"unidades": [{"modulo": 1, "nombre": "...", "objetivo": "..."}, {"modulo": 2, "nombre": "...", "objetivo": "..."}]}
+      {
+        "unidades": [{"modulo": 1, "nombre": "...", "objetivo": "..."}, {"modulo": 2, "nombre": "...", "objetivo": "..."}],
+        "esfuerzo_por_unidad": {
+          "unidad_1": {"p4_secciones": 5, "p5_duracion": "45 minutos"},
+          "unidad_2": {"p4_secciones": 3, "p5_duracion": "60 minutos"}
+        }
+      }
 
   # ── AGENTE A: DEVELOPMENT PLANNER ────────────────────────────────────────
   - agent: agente_form_A

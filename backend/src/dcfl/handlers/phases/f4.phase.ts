@@ -24,13 +24,11 @@ const productHandlers: Record<string, Record<string, Function>> = {
   'ensamblador_doc_p1': { 'F4_P1_GENERATE_DOCUMENT': handleDocumentP1Assembler },
   'ensamblador_doc_p3': { 'F4_P3_GENERATE_DOCUMENT': handleDocumentP3Assembler },
   'ensamblador_doc_p2': { 'F4_P2_GENERATE_DOCUMENT': handleDocumentP2Assembler },
-  'ensamblador_doc_generic': {
-    'F4_P4_GENERATE_DOCUMENT': handleDocumentP4Assembler,
-    'F4_P5_GENERATE_DOCUMENT': handleDocumentP5Assembler,
-    'F4_P6_GENERATE_DOCUMENT': handleDocumentP6Assembler,
-    'F4_P7_GENERATE_DOCUMENT': handleDocumentP7Assembler,
-    'F4_P8_GENERATE_DOCUMENT': handleDocumentP8Assembler,
-  },
+  'ensamblador_doc_generic': { 'F4_P4_GENERATE_DOCUMENT': handleDocumentP4Assembler },
+  'ensamblador_doc_p5': { 'F4_P5_GENERATE_DOCUMENT': handleDocumentP5Assembler },
+  'ensamblador_doc_p6': { 'F4_P6_GENERATE_DOCUMENT': handleDocumentP6Assembler },
+  'ensamblador_doc_p7': { 'F4_P7_GENERATE_DOCUMENT': handleDocumentP7Assembler },
+  'ensamblador_doc_p8': { 'F4_P8_GENERATE_DOCUMENT': handleDocumentP8Assembler },
   'ensamblador_p2': { 'F4_P2': handleP2 },
   'ensamblador_p3': { 'F4_P3': handleP3 },
   'ensamblador_p4': { 'F4_P4': handleP4 },
@@ -73,5 +71,7 @@ export async function handleF4Events(event: PipelineEvent): Promise<string | voi
     }
   }
 
-  console.log(`[f4.phase] Evento no manejado: agentName=${agentName}, promptId=${promptId}`);
+  if (agentName.startsWith('ensamblador_')) {
+    console.warn(`[f4.phase] ⚠️ Sin handler para assembler "${agentName}" promptId="${promptId}". Verifica que el nombre en el template coincida con el registro en productHandlers.`);
+  }
 }

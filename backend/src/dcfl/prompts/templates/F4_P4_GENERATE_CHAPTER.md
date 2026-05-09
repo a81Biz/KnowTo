@@ -48,7 +48,7 @@ pipeline_steps:
       - 3 bullet points with the essential takeaways.
 
       CRITICAL RULES:
-      1. CHAPTER TITLE MUST BE THE EXACT UNIT NAME from the form. If the unit is "Técnicas avanzadas de contraste", the chapter MUST be "Técnicas avanzadas de contraste". Never invent a different title.
+      1. CHAPTER TITLE MUST BE THE EXACT UNIT NAME from the form. If the unit is named "[nombre exacto del formulario]", the chapter title MUST be that exact name. Never invent or paraphrase the title.
       2. NO FAKE THEORY. Every claim in Marco Teórico must be traceable to the Tavily research data.
       3. MINIMUM 800 characters of substantive content beyond the form fields.
       4. NO RAW JSON WRAPPING in the output. The response is a clean Markdown chapter.

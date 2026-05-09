@@ -65,7 +65,11 @@ pipeline_steps:
     task: |
       YOU ARE A JSON PARSER. Compare MILESTONES.
       SELECTION: logical order, dependencies included.
-      OUTPUT: {"seleccion": "A"|"B", "razon": "one-line"}
+      VETO CRITERIA — Output "RECHAZADO" ONLY IF BOTH of the following are true for BOTH A and B:
+      1. Both have 0 items in the "hitos" array.
+      2. Both have "tarea" fields that are empty or are generic placeholders ("Task name", "Tarea").
+      If RECHAZADO, "razon" MUST describe the specific shared deficiency.
+      OUTPUT: {"seleccion": "A"|"B"|"RECHAZADO", "razon": "one-line"}
 
   # ═══════════════════════════════════════════════════════════════════════
   # SECCIÓN 2: RIESGOS Y CALIDAD
@@ -76,6 +80,10 @@ pipeline_steps:
     include_template: false
     task: |
       ROLE: Risk Manager. TASK: Identify risks and quality gates.
+      
+      CRITICAL — "compuertas_calidad" MUST be an array of plain STRINGS.
+      CORRECT:   "compuertas_calidad": ["Guiones aprobados por facilitador", "Manual revisado"]
+      PROHIBITED: "compuertas_calidad": [{"gate": "Guiones aprobados"}, {"nombre": "Manual revisado"}]
       
       OUTPUT ONLY THIS JSON:
       {
@@ -93,8 +101,9 @@ pipeline_steps:
     include_template: false
     task: |
       SAME AS AGENT A. ADD: "impacto" (Bajo/Medio/Alto) and "probabilidad".
+      CRITICAL: "compuertas_calidad" MUST be an array of plain STRINGS (not objects).
       OUTPUT ONLY THIS JSON:
-      {"riesgos_calidad": {"riesgos": [{"riesgo": "...", "mitigacion": "...", "impacto": "...", "probabilidad": "..."}], "compuertas_calidad": [...]}}
+      {"riesgos_calidad": {"riesgos": [{"riesgo": "...", "mitigacion": "...", "impacto": "...", "probabilidad": "..."}], "compuertas_calidad": ["Gate 1", "Gate 2"]}}
 
   - agent: juez_riesgos
     model: "qwen2.5:14b"
@@ -103,7 +112,11 @@ pipeline_steps:
     task: |
       YOU ARE A JSON PARSER. Compare RISKS.
       SELECTION: specific to module content, realistic mitigation.
-      OUTPUT: {"seleccion": "A"|"B", "razon": "one-line"}
+      VETO CRITERIA — Output "RECHAZADO" ONLY IF BOTH of the following are true for BOTH A and B:
+      1. Both have 0 items in "riesgos" AND 0 items in "compuertas_calidad".
+      2. Both have "mitigacion" fields that are empty or generic ("acción correctiva", "mitigación").
+      If RECHAZADO, "razon" MUST describe the specific shared deficiency.
+      OUTPUT: {"seleccion": "A"|"B"|"RECHAZADO", "razon": "one-line"}
 
   # ═══════════════════════════════════════════════════════════════════════
   # ASSEMBLER

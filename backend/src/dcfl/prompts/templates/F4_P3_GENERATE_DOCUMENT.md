@@ -21,7 +21,13 @@ pipeline_steps:
       - "_nombre_video": human-readable video name (string)
       - "p4_secciones": JSON object with P4 chapter sections (already structured — pass through as-is)
       
-      Extract "duracion" from guion_unidad_N (look for a pattern like "5 min", "10 min"). Default: "5 min".
+      VIDEO DURATION CAP (CRITICAL RULE):
+      The "duracion" field represents the VIDEO length — NOT the class/module duration.
+      Videos for e-learning must NEVER exceed 15 minutes (industry standard: 5-12 min optimal).
+      If guion_unidad_N mentions a duration > 15 min (e.g., "60 min", "2 horas", "1 hora"), that refers to the CLASS duration. Use 10 min for the video instead.
+      FORMULA: if extracted_duration > 15 → use "10 min". If ≤ 15 → use as-is.
+      If no duration found: Default = "8 min".
+      EXAMPLES: "5 min" → "5 min" | "12 min" → "12 min" | "60 min" → "10 min" | "2 horas" → "10 min" | not found → "8 min".
       
       OUTPUT ONLY VALID JSON:
       {
@@ -90,8 +96,13 @@ pipeline_steps:
       2. Specific and logical physical 'equipamiento'.
       3. Strict JSON structure compliance.
       
-      OUTPUT ONLY THIS EXACT JSON (Choose ONLY 'A' or 'B'):
-      {"seleccion": "A", "razon": "1-line explanation"}
+      VETO CRITERIA — Output "RECHAZADO" ONLY IF BOTH of the following are true for BOTH A and B:
+      1. Both objetivo_aprendizaje contain forbidden verb roots (aprender, comprender, entender, saber, conocer).
+      2. Both "recursos" fields contain nested objects instead of simple strings.
+      If RECHAZADO, "razon" MUST describe the specific shared deficiency so the agents can correct it.
+      
+      OUTPUT ONLY THIS EXACT JSON:
+      {"seleccion": "A" | "B" | "RECHAZADO", "razon": "1-line explanation"}
 
   # ═══════════════════════════════════════════════════════════════════════
   # SECCIÓN 2: ESCALETA
@@ -151,8 +162,13 @@ pipeline_steps:
       2. Consecutive and ascending time ranges.
       3. The "accion" field contains highly specific visual descriptions retaining P4 details, not generic summaries.
       
-      OUTPUT ONLY THIS EXACT JSON (Choose ONLY 'A' or 'B'):
-      {"seleccion": "B", "razon": "1-line explanation"}
+      VETO CRITERIA — Output "RECHAZADO" ONLY IF BOTH of the following are true for BOTH A and B:
+      1. Both have fewer than 9 rows.
+      2. OR both have time ranges that do not sum to {duracion}.
+      If RECHAZADO, "razon" MUST describe the specific structural failure (e.g., "ambas escaletas tienen 7 filas").
+      
+      OUTPUT ONLY THIS EXACT JSON:
+      {"seleccion": "A" | "B" | "RECHAZADO", "razon": "1-line explanation"}
 
   # ═══════════════════════════════════════════════════════════════════════
   # SECCIÓN 3: GUION LITERARIO (ANTI-LOSS COMPRESSION)
@@ -177,9 +193,17 @@ pipeline_steps:
       3. PROHIBIDO escribir "se explica el proceso" — escribe EL proceso con sus términos exactos.
       
       REGLA DE FIDELIDAD EXTREMA (ZERO LOSS): 
-      IT IS STRICTLY FORBIDDEN to summarize or generalize the P4 content. If the P4 manual mentions specific tools, physical steps, materials, or technical names (e.g., 'veladuras', 'pincel seco'), YOU MUST USE THOSE EXACT WORDS in the spoken narration.
+      IT IS STRICTLY FORBIDDEN to summarize or generalize the P4 content. If the P4 manual mentions specific tools, physical steps, materials, or technical names, YOU MUST USE THOSE EXACT WORDS in the spoken narration. Copy technical terminology verbatim — do not paraphrase or substitute synonyms.
       
       STRICT SCHEMA — YOU MUST NOT INVENT OR RENAME MARCADORES. Output exactly these 9 rows:
+      
+      FINAL OUTPUT CHECKLIST — Verify BEFORE outputting:
+      [ ] guion_literario has EXACTLY 9 objects. Count them: 1.Apertura-Gancho 2.Agenda 3.Concepto_1 4.Ejemplo_1 5.Concepto_2 6.Ejemplo_2 7.Practica_guiada 8.Error_comun 9.Cierre
+      [ ] Every object has BOTH "marcador" AND "texto" fields present and non-empty
+      [ ] KEY NAME RULE: "marcador" MUST be lowercase. "Marcador", "Marker", "label", "scene" are FORBIDDEN.
+      [ ] Verify object 7 specifically: does {"marcador": "Practica_guiada", "texto": "..."} have both fields? If not, fix before outputting.
+      [ ] PROHIBITED: empty strings, null, or undefined in any field
+      
       OUTPUT ONLY THIS JSON:
       {
         "guion_literario": [
@@ -203,6 +227,14 @@ pipeline_steps:
       SAME AS AGENT A. APPLY SAME TIME DENSITY STRICT RULE (word count ~{duracion} × 130), SAME REGLA DE DENSIDAD DE CONTENIDO (transcribe all specific P4 steps), SAME ZERO LOSS RULE (retain exact technical terms).
       DIFFERENT: use "I do, we do, you do" pedagogy INSIDE the "texto" fields.
       STRICT RULE: DO NOT CHANGE THE "marcador" NAMES. You MUST use exactly these 9 marcadores in this order: Apertura-Gancho, Agenda, Concepto_1, Ejemplo_1, Concepto_2, Ejemplo_2, Practica_guiada, Error_comun, Cierre.
+      
+      FINAL OUTPUT CHECKLIST — Verify BEFORE outputting:
+      [ ] guion_literario has EXACTLY 9 objects. Count them: 1.Apertura-Gancho 2.Agenda 3.Concepto_1 4.Ejemplo_1 5.Concepto_2 6.Ejemplo_2 7.Practica_guiada 8.Error_comun 9.Cierre
+      [ ] Every object has BOTH "marcador" AND "texto" fields present and non-empty
+      [ ] KEY NAME RULE: "marcador" MUST be lowercase. "Marcador", "Marker", "label", "scene" are FORBIDDEN.
+      [ ] Verify object 7 specifically: does {"marcador": "Practica_guiada", "texto": "..."} have both fields? If not, fix before outputting.
+      [ ] PROHIBITED: empty strings, null, or undefined in any field
+      
       OUTPUT ONLY THIS JSON:
       {"guion_literario": [{"marcador": "Apertura-Gancho", "texto": "..."}, {"marcador": "Agenda", "texto": "..."}, {"marcador": "Concepto_1", "texto": "..."}, {"marcador": "Ejemplo_1", "texto": "..."}, {"marcador": "Concepto_2", "texto": "..."}, {"marcador": "Ejemplo_2", "texto": "..."}, {"marcador": "Practica_guiada", "texto": "..."}, {"marcador": "Error_comun", "texto": "..."}, {"marcador": "Cierre", "texto": "..."}]}
 
@@ -213,16 +245,40 @@ pipeline_steps:
     task: |
       YOU ARE A JSON PARSER AND STRICT AUDITOR. DO NOT CONVERSE. DO NOT SYNTHESIZE OR MERGE.
       
+      INTEGRITY PRE-CHECK (runs BEFORE all other criteria):
+      For each output A and B, inspect every object in the "guion_literario" array:
+      - Does it have a "marcador" field (lowercase, non-empty string)?
+      - Does it have a "texto" field (non-empty string)?
+      If ANY object is missing "marcador" or "texto":
+        - That output has an INTEGRITY FAILURE.
+        - If BOTH outputs have integrity failures → emit RECHAZADO immediately with the broken marcador name.
+        - If ONLY ONE has an integrity failure → select the other immediately, skip all other criteria.
+      ONLY IF BOTH outputs pass the integrity check → proceed to the Selection Criteria below.
+      
       Compare the Guion Literario from A and B. 
-      CRITICAL FIDELITY CHECK: Read the "texto" fields. Which agent actually used specific technical terms, tools, and examples from the P4? If an agent wrote generic fluff like "el contraste es clave" without explaining the specific technique, it loses.
+      CRITICAL FIDELITY CHECK: Read the "texto" fields. Which agent actually used specific technical terms, tools, and examples from the P4? If an agent wrote generic fluff without naming the specific techniques, tools, or steps from the source material, it loses.
+      
+      WORD COUNT CHECK (APPLY BEFORE SELECTING):
+      For each output, estimate the total word count by summing words across all 9 "texto" fields.
+      Target: approximately {duracion} × 130 words total (e.g., "8 min" → ~1040 words minimum).
+      Minimum acceptable: 80% of target (e.g., "8 min" → 832 words minimum).
+      If one output clearly has more total words AND both contain relevant P4 content, select the one with more words.
+      If one output meets the word count minimum and the other does not, auto-select the one that meets the minimum.
       
       Select the BEST ONE based on:
-      1. Highest retention of specific technical details from the source.
-      2. Conversational tone.
-      3. Exactly 9 required rows.
+      1. WORD COUNT: meets the {duracion} × 104 words minimum (80% of 130 wpm target).
+      2. FIDELITY: highest retention of specific technical details from the source.
+      3. CONVERSATIONAL: natural narrator tone, not robotic or list-like.
+      4. Exactly 9 required rows.
       
-      OUTPUT ONLY THIS EXACT JSON (Choose ONLY 'A' or 'B'):
-      {"seleccion": "A", "razon": "1-line explanation"}
+      VETO CRITERIA — Output "RECHAZADO" ONLY IF BOTH of the following are true for BOTH A and B:
+      1. Both have fewer than 9 marcadores.
+      2. OR both have marcadores renamed away from the 9 required names.
+      3. OR both have "texto" fields averaging under 20 words each (extreme summarization).
+      If RECHAZADO, "razon" MUST describe the specific failure so the agents can correct it.
+      
+      OUTPUT ONLY THIS EXACT JSON:
+      {"seleccion": "A" | "B" | "RECHAZADO", "razon": "1-line explanation"}
 
   # ═══════════════════════════════════════════════════════════════════════
   # SECCIÓN 4: GUION TÉCNICO
@@ -235,9 +291,31 @@ pipeline_steps:
       YOU ARE AN API ENDPOINT. YOU DO NOT CONVERSE. YOU ONLY OUTPUT RAW JSON.
       ROLE: Production Director. TASK: Generate GUION TÉCNICO as array of exactly 9 objects.
       
-      STRICT RULE: The "escena" field MUST MATCH EXACTLY these 9 names in this order: Apertura-Gancho, Agenda, Concepto_1, Ejemplo_1, Concepto_2, Ejemplo_2, Practica_guiada, Error_comun, Cierre. DO NOT invent new scene names.
+      AUDIO LOCUCIÓN RULE (HIGHEST PRIORITY):
+      "audio_locucion" de CADA fila DEBE contener la narración COMPLETA del narrador para esa escena,
+      derivada VERBATIM de p4_secciones según el tema del marcador correspondiente.
+      PROHIBIDO: resúmenes, "first and last 10 words", frases genéricas ("Bienvenidos...", "descubrirán cómo...").
+      Escribe lo que el narrador REALMENTE DICE durante esa escena, en español conversacional natural.
       
-      MANDATORY: EVERY field must be filled with specific data. "notas_duracion" MUST be a number followed by "s". "notas_color" MUST exist.
+      UNIQUENESS RULE (AUDIO LOCUCIÓN): Antes de finalizar, verifica que ningún par de filas comparte más de 10 palabras consecutivas en su "audio_locucion". Cada escena debe narrar una SECCIÓN DISTINTA de p4_secciones:
+      - Apertura-Gancho → p4_secciones.introduccion
+      - Agenda → vista general de lo que se verá
+      - Concepto_1 → p4_secciones.marco_teorico (primera mitad)
+      - Ejemplo_1 → p4_secciones.ejemplo_practico
+      - Concepto_2 → p4_secciones.marco_teorico (segunda mitad) o conceptos_clave[0]
+      - Ejemplo_2 → p4_secciones.desarrollo (primeros pasos)
+      - Practica_guiada → p4_secciones.ejercicio_practico
+      - Error_comun → advertencia técnica específica del proceso
+      - Cierre → p4_secciones.puntos_recordar
+      Si detectas que dos escenas tienen la misma narración, reescribe la duplicada con contenido de otra sección.
+      
+      STRICT TABLE SCHEMA — LOS 10 CAMPOS SON OBLIGATORIOS EN LAS 9 FILAS:
+      escena, imagen_tipo_plano, imagen_descripcion, audio_locucion, audio_musica, audio_sfx,
+      notas_camara, notas_transicion, notas_duracion, notas_color.
+      Si no tienes datos, usa defaults razonables: audio_musica "Ambiental instrumental 40%", notas_camara "tripod".
+      PROHIBIDO: strings vacíos, null, o campos omitidos.
+      
+      STRICT RULE: The "escena" field MUST MATCH EXACTLY these 9 names in this order: Apertura-Gancho, Agenda, Concepto_1, Ejemplo_1, Concepto_2, Ejemplo_2, Practica_guiada, Error_comun, Cierre. DO NOT invent new scene names.
       
       OUTPUT ONLY THIS JSON:
       {
@@ -246,7 +324,7 @@ pipeline_steps:
             "escena": "Apertura-Gancho",
             "imagen_tipo_plano": "close_up|medium_shot|wide_shot|insert_shot|split_screen",
             "imagen_descripcion": "What camera sees: elements, lighting setup, text overlays, animation type",
-            "audio_locucion": "First and last 10 words of narration for this scene",
+            "audio_locucion": "Narración completa derivada de p4_secciones.introduccion para esta escena",
             "audio_musica": "Music style and volume %",
             "audio_sfx": "SFX description with timing",
             "notas_camara": "tripod|handheld",
@@ -263,10 +341,11 @@ pipeline_steps:
     inputs_from: [extractor_p3]
     include_template: false
     task: |
-      SAME AS AGENT A. DIFFERENT: Add b_roll_sugerencias field with 1-2 B-roll ideas per scene derived from p4_secciones.conceptos_clave.
+      SAME AS AGENT A. APPLY SAME AUDIO LOCUCIÓN RULE (full verbatim narration per scene from p4_secciones), SAME STRICT TABLE SCHEMA (all 10 fields mandatory), AND SAME UNIQUENESS RULE (no two audio_locucion fields share more than 10 consecutive words).
+      DIFFERENT: Add b_roll_sugerencias field with 1-2 B-roll ideas per scene derived from p4_secciones.conceptos_clave.
       STRICT RULE: Use exactly the 9 required scene names in order.
       OUTPUT ONLY THIS JSON:
-      {"guion_tecnico": [{"escena": "Apertura-Gancho", "imagen_tipo_plano": "...", ...9 rows with b_roll_sugerencias}]}
+      {"guion_tecnico": [{"escena": "Apertura-Gancho", "imagen_tipo_plano": "...", "audio_locucion": "narración completa...", ...9 rows with b_roll_sugerencias}]}
 
   - agent: juez_tecnico
     model: "qwen2.5:14b"
@@ -280,9 +359,17 @@ pipeline_steps:
       1. NO empty fields, nulls, or "undefined".
       2. Exactly 9 rows matching the required scenes.
       3. Specificity in "imagen_descripcion" holding true to the P4 content.
+      4. LANGUAGE CHECK: ALL field values must be in Spanish. If any field (especially "notas_color", "imagen_descripcion", "audio_sfx") contains English text, that output FAILS the language check. Prefer the output with fewer or no English values.
+      5. UNIQUENESS CHECK: Prefer the output where no two "audio_locucion" fields share more than 10 consecutive words. Duplicated narrations are a critical deficiency.
       
-      OUTPUT ONLY THIS EXACT JSON (Choose ONLY 'A' or 'B'):
-      {"seleccion": "B", "razon": "1-line explanation"}
+      VETO CRITERIA — Output "RECHAZADO" ONLY IF BOTH of the following are true for BOTH A and B:
+      1. Both have NULL, empty strings, or "undefined" in 3 or more fields per row.
+      2. OR both have fewer than 9 rows.
+      3. OR both use wrong scene names that don't match the 9 required names.
+      If RECHAZADO, "razon" MUST describe the specific failure so the agents can correct it.
+      
+      OUTPUT ONLY THIS EXACT JSON:
+      {"seleccion": "A" | "B" | "RECHAZADO", "razon": "1-line explanation"}
 
   # ═══════════════════════════════════════════════════════════════════════
   # SECCIÓN 5: STORYBOARD
@@ -295,7 +382,13 @@ pipeline_steps:
       YOU ARE AN API ENDPOINT. YOU DO NOT CONVERSE. YOU ONLY OUTPUT RAW JSON.
       ROLE: Production Director. TASK: Generate STORYBOARD as array of 4 scene objects.
       
-      LANGUAGE: ALL 6 field VALUES MUST be written in SPANISH. JSON keys stay in English.
+      LANGUAGE: ALL field VALUES MUST be written in SPANISH. JSON keys stay in English.
+      
+      "subject" RULE: MUST be a concrete noun describing WHO or WHAT is being filmed.
+      Derive from p4_secciones content for the matching scene topic.
+      Examples: "Instructor demostrando el procedimiento sobre el equipo de trabajo", "Herramienta posicionada en el punto de aplicación", "Resultado final mostrando el criterio de calidad esperado".
+      FORBIDDEN: null, undefined, empty string, or repeating the scene name verbatim.
+      If uncertain, use the most relevant tool or material from p4_secciones.
       
       OUTPUT ONLY THIS JSON:
       {
@@ -303,7 +396,7 @@ pipeline_steps:
           {
             "escena": "Apertura",
             "framing": "shot type, angle, distance",
-            "subject": "what/who, position, action",
+            "subject": "concrete noun: who/what is filmed, derived from p4_secciones",
             "lighting": "direction, quality (hard/soft), color temp",
             "environment": "background, setting, props",
             "color_palette": "dominant colors, contrast level",
@@ -335,8 +428,13 @@ pipeline_steps:
       2. No missing fields, no english values.
       3. Exactly 4 scenes.
       
-      OUTPUT ONLY THIS EXACT JSON (Choose ONLY 'A' or 'B'):
-      {"seleccion": "B", "razon": "1-line explanation"}
+      VETO CRITERIA — Output "RECHAZADO" ONLY IF BOTH of the following are true for BOTH A and B:
+      1. Both have fewer than 4 scenes.
+      2. OR both have "subject" fields that are null, "undefined", or repeat the scene name verbatim.
+      If RECHAZADO, "razon" MUST describe the specific failure so the agents can correct it.
+      
+      OUTPUT ONLY THIS EXACT JSON:
+      {"seleccion": "A" | "B" | "RECHAZADO", "razon": "1-line explanation"}
 
   # ═══════════════════════════════════════════════════════════════════════
   # ASSEMBLER

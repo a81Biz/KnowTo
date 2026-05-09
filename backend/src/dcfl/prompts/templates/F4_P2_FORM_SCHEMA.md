@@ -89,7 +89,7 @@ pipeline_steps:
       2. Read the corresponding P3 script to ensure visual content aligns with the audio narration.
       3. Design a visual narrative with 4 components:
          - Apertura: A visual hook or triggering question to capture attention.
-         - Desarrollo: 3-5 concrete visual points. Each point must be a full sentence describing what the slide SHOWS, not a verb list. Example of GOOD: "Comparación visual de una miniatura con alto contraste vs. bajo contraste usando fotografías lado a lado". Example of BAD: "Diseñar, Comparar, Explicar".
+         - Desarrollo: 3-5 concrete visual points. Each point must be a full sentence describing what the slide SHOWS, not a verb list. Example of GOOD: "Comparación visual del procedimiento correcto vs. incorrecto usando fotografías lado a lado del resultado esperado". Example of BAD: "Diseñar, Comparar, Explicar".
          - Ejemplo visual: A specific suggested case, image, diagram, or demonstration.
          - Cierre: The unit's key message in one memorable sentence.
       

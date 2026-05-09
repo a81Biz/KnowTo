@@ -65,7 +65,11 @@ pipeline_steps:
     task: |
       YOU ARE A JSON PARSER. Compare EXPLANATIONS.
       SELECTION: accessibility, practical workplace focus.
-      OUTPUT: {"seleccion": "A"|"B", "razon": "one-line"}
+      VETO CRITERIA — Output "RECHAZADO" ONLY IF BOTH of the following are true for BOTH A and B:
+      1. Both have "que_es" that is empty or fewer than 20 characters.
+      2. Both have "relacion_puesto" that is empty or fewer than 20 characters.
+      If RECHAZADO, "razon" MUST describe the specific shared deficiency.
+      OUTPUT: {"seleccion": "A"|"B"|"RECHAZADO", "razon": "one-line"}
 
   # ═══════════════════════════════════════════════════════════════════════
   # SECCIÓN 2: CONCEPTOS Y NORMATIVA
@@ -76,6 +80,16 @@ pipeline_steps:
     include_template: false
     task: |
       ROLE: Technical Auditor. TASK: Define concepts and standards.
+      
+      KEY NAMES ARE MANDATORY (case-sensitive, no alternatives allowed):
+        "termino"   → the term or keyword
+        "definicion" → the official definition
+        "ejemplo"   → a concrete workplace example
+      PROHIBITED key alternatives: "term", "nombre", "name", "concept", "definition", "descripcion", "example", "caso"
+      
+      CRITICAL — "normativa" MUST be an array of plain STRINGS.
+      CORRECT:   "normativa": ["NOM-026-STPS-2008", "EC0366 CONOCER"]
+      PROHIBITED: "normativa": [{"norma": "NOM-026-STPS-2008"}, {"codigo": "EC0366"}]
       
       OUTPUT ONLY THIS JSON:
       {
@@ -93,8 +107,10 @@ pipeline_steps:
     include_template: false
     task: |
       SAME AS AGENT A. ADD: "indicador_dominio" (How to know if you master this).
+      KEY NAMES MANDATORY: "termino", "definicion", "ejemplo" (no alternatives).
+      CRITICAL: "normativa" MUST be an array of plain STRINGS (not objects).
       OUTPUT ONLY THIS JSON:
-      {"tecnico": {"conceptos": [...], "normativa": [...], "indicador_dominio": "..."}}
+      {"tecnico": {"conceptos": [{"termino": "...", "definicion": "...", "ejemplo": "..."}], "normativa": ["Standard 1", "Standard 2"], "indicador_dominio": "..."}}
 
   - agent: juez_conceptos
     model: "qwen2.5:14b"
@@ -103,7 +119,11 @@ pipeline_steps:
     task: |
       YOU ARE A JSON PARSER. Compare TECHNICAL data.
       SELECTION: term clarity, verifiable normative codes.
-      OUTPUT: {"seleccion": "A"|"B", "razon": "one-line"}
+      VETO CRITERIA — Output "RECHAZADO" ONLY IF BOTH of the following are true for BOTH A and B:
+      1. Both have 0 items in the "conceptos" array.
+      2. Both have 0 items in the "normativa" array.
+      If RECHAZADO, "razon" MUST describe the specific shared deficiency.
+      OUTPUT: {"seleccion": "A"|"B"|"RECHAZADO", "razon": "one-line"}
 
   # ═══════════════════════════════════════════════════════════════════════
   # ASSEMBLER

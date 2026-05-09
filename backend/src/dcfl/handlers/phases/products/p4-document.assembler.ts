@@ -119,13 +119,16 @@ export async function handleDocumentP4Assembler(context: ProductContext): Promis
     console.log(`[p4-assembler] Ejecutando agente B para capítulo ${unidadNum}...`);
     const rawB = await services.ai.runAgent(promptUnidad.replace('agente_capitulo_A', 'agente_capitulo_B'), 'qwen2.5:14b', '');
 
-    // Juez: elegir el mejor
+    // Juez: elegir el mejor (con DOMAIN LOCK check)
     console.log(`[p4-assembler] Ejecutando juez para capítulo ${unidadNum}...`);
-    const juezPrompt = buildJudgePrompt(rawA, rawB, nombreUnidad);
+    const juezPrompt = buildJudgePrompt(rawA, rawB, nombreUnidad, formContent);
     const rawJuez = await services.ai.runAgent(juezPrompt, 'qwen2.5:14b', '');
 
     const juezMatch = rawJuez.match(/\{[\s\S]*\}/);
     const decision = juezMatch ? parseJsonSafely(juezMatch[0], { seleccion: 'A' }) : { seleccion: 'A' };
+    if (decision.seleccion === 'RECHAZADO') {
+      console.warn(`[p4-assembler] Capítulo ${unidadNum}: RECHAZADO por DOMAIN LOCK (ambos agentes introdujeron materiales fuera del formulario). Razón: ${decision.razon}. Usando agente A como fallback.`);
+    }
     const seleccion = decision.seleccion === 'B' ? 'B' : 'A';
 
     // Extraer documento_md del ganador
@@ -149,8 +152,8 @@ export async function handleDocumentP4Assembler(context: ProductContext): Promis
       }
     }
 
-    // Extraer términos para el glosario
-    const termMatches = chapterMd.matchAll(/\|\s*([^|]+)\s*\|\s*([^|]+)\s*\|/g);
+    // Extraer términos para el glosario (trailing | opcional para cubrir última fila de tabla)
+    const termMatches = chapterMd.matchAll(/\|\s*([^|\n]+?)\s*\|\s*([^|\n]+?)\s*(?:\||$)/gm);
     for (const match of termMatches) {
       const termino = match[1].trim();
       const definicion = match[2].trim();
@@ -164,7 +167,7 @@ export async function handleDocumentP4Assembler(context: ProductContext): Promis
       // Si el término tiene más de 60 caracteres, es una definición, no un término
       if (termino.length > 60) continue;
       // Si el término empieza con minúscula, verbo, artículo o preposición, es una definición
-      if (/^[a-záéíóú]/.test(termino)) continue;
+      // filtro de minúsculas eliminado: términos técnicos compuestos son válidos en minúscula
       if (/^(el |la |los |las |un |una |proceso |método |técnica |diferencia |importancia )/i.test(termino)) continue;
       // Si el término contiene markdown (negrita sin cerrar), limpiarlo
       const terminoLimpio = termino.replace(/\*\*/g, '').trim();
@@ -213,8 +216,20 @@ export async function handleDocumentP4Assembler(context: ProductContext): Promis
 
   // 4. Generar Bibliografía
   let bibliografiaMd = '\n## Bibliografía\n\n';
-  // Deduplicar URLs
-  const uniqueRefs = [...new Set(allReferences)];
+  // Deduplicar por dominio: solo una URL por hostname (evita múltiples URLs del mismo blog)
+  const domainsSeen = new Set<string>();
+  const uniqueRefs: string[] = [];
+  for (const url of allReferences) {
+    try {
+      const domain = new URL(url).hostname.replace('www.', '');
+      if (!domainsSeen.has(domain)) {
+        domainsSeen.add(domain);
+        uniqueRefs.push(url);
+      }
+    } catch {
+      if (!uniqueRefs.includes(url)) uniqueRefs.push(url);
+    }
+  }
   if (uniqueRefs.length > 0) {
     const refLinks: string[] = [];
     for (const url of uniqueRefs) {
@@ -249,7 +264,11 @@ export async function handleDocumentP4Assembler(context: ProductContext): Promis
 
   // 5. Ensamblar documento final
   // Normalizar títulos de capítulo: asegurar espacio después de ###
-  const capitulosNormalizados = capitulos.map(cap => cap.replace(/^###(\S)/gm, '### $1'));
+  const capitulosNormalizados = capitulos.map(cap =>
+    cap
+      .replace(/^#\s+(Capítulo\s)/gm, '## $1')
+      .replace(/^###(\S)/gm, '### $1')
+  );
   const documentoMd = '# Manual del Participante\n\n' +
     capitulosNormalizados.join('\n\n') +
     glosarioMd +
@@ -371,11 +390,18 @@ UNIT DATA:
 - Form content:
 ${formContent}
 
-RESEARCH DATA (from web search):
+RESEARCH DATA (from web search — secondary source only):
 - Best practices: ${JSON.stringify((researchData as any).practicas || [])}
 - Trends: ${JSON.stringify((researchData as any).tendencias || [])}
 - References: ${JSON.stringify((researchData as any).referencias || [])}
 - Industry context: ${(researchData as any).contexto_industria || 'Not available'}
+
+⚠️ DOMAIN LOCK — MANDATORY. READ BEFORE WRITING ANYTHING:
+You are writing for the course "${proyecto}" — unit "${nombre}".
+STEP 1 — BUILD YOUR INVENTORY: Scan the FORM CONTENT above. List every tool, material, instrument, and technique explicitly named there. That list is your AUTHORIZED INVENTORY.
+STEP 2 — RESEARCH SCOPE: Research data may only deepen HOW to use inventory items (detail, safety tips, step order). It CANNOT introduce tools, materials, or techniques absent from the form.
+STEP 3 — SELF-CHECK before outputting: For each tool/material you cite in the chapter, confirm it appears in the form content. If it does not appear, REMOVE it.
+VIOLATION EXAMPLE: Form lists "adjustable torque wrench" → chapter introduces "calibration bench" → DOMAIN VIOLATION. Remove "calibration bench".
 
 CHAPTER BOUNDARIES — WHAT THIS CHAPTER MUST COVER AND WHAT IT MUST NOT:
 - This chapter is about: ${nombre}
@@ -394,17 +420,31 @@ Real theory from the research data. 4-6 sentences with sourced facts. Do NOT wri
 
 ### Conceptos Clave
 Markdown table: | Término | Definición | Ejemplo |
-Include at least 3 conceptos. Each must have all 3 columns filled (Término, Definición, Ejemplo). The Término column must contain the concept NAME, not its definition. Example of GOOD: | Contraste | Diferencia entre luces y sombras | Miniatura con zonas brillantes y oscuras |. Example of BAD: | Diferencia entre... | (missing term name) | ... |
-3-5 terms from BOTH form content and research.
+MINIMUM 5 terms. MANDATORY: include EVERY technical term introduced for the first time in the Desarrollo section.
+Each must have all 3 columns filled. The Término column must contain the concept NAME, not its definition.
+Example of GOOD: | Contraste | Diferencia entre luces y sombras | Miniatura con zonas brillantes y oscuras |.
+Example of BAD: | Diferencia entre... | (missing term name) | ... |
+Do NOT use generic terms already known by the target audience (e.g., "Color", "Pincel").
+DO include domain-specific compound terms (e.g., "Pincel seco", "Referencia cenital", "Dilución al agua").
+Terms from BOTH form content and research data.
 
 ### Desarrollo
 The procedure step by step. Expand form steps with details from research. Numbered steps.
+PROHIBIDO: copiar o parafrasear el texto del objetivo o la introducción.
+STRICT VERB POLICY: every step MUST start with an active, observable verb. FORBIDDEN: "Aprender", "Entender", "Conocer", "Saber". USE: "Instalar", "Aplicar", "Ajustar", "Verificar", "Seleccionar", "Medir", "Colocar", "Activar".
+Each step MUST specify: exact tool or instrument, quantity or measure, physical action, and expected verifiable result at that step's completion.
+CORRECTO: "1. Coloca la herramienta en la posición indicada ajustando hasta que el indicador marque el valor especificado en la ficha técnica."
+INCORRECTO: "1. Realiza el proceso correctamente para obtener el resultado deseado."
 
 ### Ejemplo Práctico
 One concrete scenario from the research practices or trends.
 
 ### Ejercicio Práctico
 The practice activity from the form.
+RULE: This section MUST be a concrete activity with: (1) materials or tools needed, (2) numbered steps (minimum 3), (3) an observable product or result at the end.
+FORBIDDEN: rhetorical questions, self-assessment prompts, or reflection questions without physical steps.
+WRONG: "¿Puedes realizar el procedimiento de forma adecuada para lograr el resultado esperado?"
+RIGHT: "Con [materiales de la unidad]: 1. [Acción física observable]... 2. [Acción con medida o herramienta]... 3. Verifica que [resultado observable y medible]..."
 
 ### Puntos a Recordar
 - 3 bullet points.
@@ -414,6 +454,7 @@ Real references with clickable URLs from the research data. Format each as: "- [
 
 CRITICAL:
 - ALL text must be in Spanish. This includes Introducción, Marco Teórico, Conceptos Clave, Desarrollo, Ejemplo Práctico, Ejercicio Práctico, and Puntos a Recordar. NO English sections.
+- SPELLING: Copy technical terms EXACTLY as they appear in the form content and unit data. Do not rephrase, abbreviate, or alter their spelling.
 - Chapter title MUST BE EXACTLY "${nombre}". Never change it.
 - Every theory claim must come from the RESEARCH DATA above.
 - Minimum 800 characters of substantive content beyond the form fields.
@@ -424,17 +465,20 @@ OUTPUT ONLY THIS JSON:
 `;
 }
 
-function buildJudgePrompt(rawA: string, rawB: string, unitName: string): string {
+function buildJudgePrompt(rawA: string, rawB: string, unitName: string, formContent: string): string {
   return `
 YOU ARE A JSON PARSER. DO NOT CONVERSE.
 
 Compare two chapters for the unit "${unitName}".
 
+AUTHORIZED INVENTORY — tools, materials, instruments, and techniques from the form content:
+${formContent.slice(0, 1500)}
+
 CHAPTER A:
-${rawA.slice(0, 2000)}
+${rawA.slice(0, 3200)}
 
 CHAPTER B:
-${rawB.slice(0, 2000)}
+${rawB.slice(0, 3200)}
 
 SELECTION CRITERIA:
 1. ACCURACY: Does the chapter title match "${unitName}" exactly? Penalize invented titles.
@@ -442,8 +486,13 @@ SELECTION CRITERIA:
 3. RESEARCH GROUNDING: Are claims backed by research data? Penalize unsourced claims.
 4. COMPLETENESS: Are all required sections present?
 5. ACCESSIBILITY: Can a new worker understand this?
+6. DOMAIN LOCK: Extract every tool, material, and technique cited in each chapter. Cross-check each against the AUTHORIZED INVENTORY above.
+   - A chapter that cites ANY item absent from the authorized inventory has a DOMAIN VIOLATION.
+   - If ONLY one chapter has a domain violation → select the other.
+   - If BOTH chapters have domain violations → emit RECHAZADO.
+   - If neither has violations → apply criteria 1-5.
 
 OUTPUT ONLY THIS JSON:
-{"seleccion": "A" | "B", "razon": "brief explanation"}
+{"seleccion": "A" | "B" | "RECHAZADO", "razon": "brief explanation"}
 `;
 }

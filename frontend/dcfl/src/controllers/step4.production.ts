@@ -379,6 +379,29 @@ class Step5ProductionController extends BaseStep {
     });
   }
 
+  private async _cargarProductosPrevios(): Promise<Record<string, any>> {
+    const projectId = wizardStore.getState().projectId;
+    if (!projectId) return {};
+    try {
+      const res = await getData<{ productos: F4ProductoBD[] }>(
+        buildEndpoint(ENDPOINTS.wizard.fase4Productos(projectId))
+      );
+      const productos = res.data?.productos ?? [];
+      const previos: Record<string, any> = {};
+      for (const p of productos) {
+        if (p.datos_producto) {
+          previos[p.producto] = p.datos_producto;
+        } else if (p.documento_final) {
+          previos[p.producto] = { documento_final: p.documento_final };
+        }
+      }
+      return previos;
+    } catch (err) {
+      console.warn('[F4] No se pudieron cargar productos previos:', err);
+      return {};
+    }
+  }
+
   private async _loadProductsFromBD(projectId: string): Promise<void> {
     try {
       const res = await getData<{ productos: F4ProductoBD[] }>(
@@ -679,8 +702,8 @@ class Step5ProductionController extends BaseStep {
                 _modulo_actual: moduloNum,
                 _nombre_modulo: nombreModulo,
                 _producto: 'P2',
-                p3_escaleta: p3Data.escaleta || [],
-                p3_guion_literario: p3Data.guion_literario || [],
+                p3_escaleta: p3Data.escaleta_json || [],
+                p3_guion_literario: p3Data.guion_literario_json || [],
                 p4_secciones: p4CapituloData,
               },
             }
@@ -733,6 +756,8 @@ class Step5ProductionController extends BaseStep {
           }
         }
 
+        const productosPreviosP5 = await this._cargarProductosPrevios();
+
         for (let i = 0; i < moduloKeys.length; i++) {
           const key = moduloKeys[i];
           const moduloNum = parseInt(key.replace('actividad_unidad_', ''), 10);
@@ -752,6 +777,7 @@ class Step5ProductionController extends BaseStep {
                 _modulo_actual: moduloNum,
                 _nombre_actividad: nombreActividad,
                 _producto: 'P5',
+                productos_previos: productosPreviosP5,
               },
             }
           );
@@ -803,6 +829,8 @@ class Step5ProductionController extends BaseStep {
           }
         }
 
+        const productosPreviosP6 = await this._cargarProductosPrevios();
+
         for (let i = 0; i < moduloKeys.length; i++) {
           const key = moduloKeys[i];
           const moduloNum = parseInt(key.replace('sesion_unidad_', ''), 10);
@@ -822,6 +850,7 @@ class Step5ProductionController extends BaseStep {
                 _modulo_actual: moduloNum,
                 _nombre_sesion: nombreSesion,
                 _producto: 'P6',
+                productos_previos: productosPreviosP6,
               },
             }
           );
@@ -873,6 +902,8 @@ class Step5ProductionController extends BaseStep {
           }
         }
 
+        const productosPreviosP7 = await this._cargarProductosPrevios();
+
         for (let i = 0; i < moduloKeys.length; i++) {
           const key = moduloKeys[i];
           const moduloNum = parseInt(key.replace('informacion_unidad_', ''), 10);
@@ -892,6 +923,7 @@ class Step5ProductionController extends BaseStep {
                 _modulo_actual: moduloNum,
                 _nombre_tema: nombreTema,
                 _producto: 'P7',
+                productos_previos: productosPreviosP7,
               },
             }
           );
@@ -943,6 +975,8 @@ class Step5ProductionController extends BaseStep {
           }
         }
 
+        const productosPreviosP8 = await this._cargarProductosPrevios();
+
         for (let i = 0; i < moduloKeys.length; i++) {
           const key = moduloKeys[i];
           const moduloNum = parseInt(key.replace('cronograma_unidad_', ''), 10);
@@ -962,6 +996,7 @@ class Step5ProductionController extends BaseStep {
                 _modulo_actual: moduloNum,
                 _nombre_modulo: nombreModulo,
                 _producto: 'P8',
+                productos_previos: productosPreviosP8,
               },
             }
           );

@@ -69,6 +69,22 @@ function extractAny(raw: string, key: string): any {
   return null;
 }
 
+// ── Normalizadores ─────────────────────────────────────────────────────────
+
+function normalizarStringArray(items: any[]): string[] {
+  const TEXT_KEYS = ['texto', 'text', 'nombre', 'name', 'valor', 'value', 'descripcion', 'description', 'item', 'content', 'contenido'];
+  return (items || []).map((item: any) => {
+    if (typeof item === 'string') return item.trim();
+    if (typeof item === 'object' && item !== null) {
+      for (const k of TEXT_KEYS) {
+        if (item[k] && typeof item[k] === 'string' && item[k].trim()) return item[k].trim();
+      }
+      return Object.values(item).filter((v): v is string => typeof v === 'string' && v.trim().length > 0).join(' — ') || '';
+    }
+    return String(item).trim();
+  }).filter((s: string) => s.length > 0);
+}
+
 // ── Ensamblador principal ──────────────────────────────────────────────────
 
 export async function handleDocumentP8Assembler(context: ProductContext): Promise<string> {
@@ -89,7 +105,8 @@ export async function handleDocumentP8Assembler(context: ProductContext): Promis
 
     const rawJuez = await services.pipelineService.getAgentOutput(jobId, juezNombre) || '';
     const juezMatch = rawJuez.match(/\{[\s\S]*\}/);
-    const decision = juezMatch ? JSON.parse(juezMatch[0]) : { seleccion: 'A' };
+    let decision: { seleccion?: string } = { seleccion: 'A' };
+    try { if (juezMatch) decision = JSON.parse(juezMatch[0]); } catch {}
     const seleccion: 'A' | 'B' = decision?.seleccion === 'B' ? 'B' : 'A';
 
     const agenteGanador = seleccion === 'A' ? `agente_${seccion}_A` : `agente_${seccion}_B`;
@@ -97,6 +114,10 @@ export async function handleDocumentP8Assembler(context: ProductContext): Promis
 
     (partes as any)[parteClave] = extractAny(rawGanador, parteClave) ?? ((partes as any)[parteClave]);
     console.log(`[p8-assembler] Sección ${seccion}: juez=${seleccion}`);
+  }
+
+  if (partes.riesgos_calidad) {
+    partes.riesgos_calidad.compuertas_calidad = normalizarStringArray(partes.riesgos_calidad.compuertas_calidad);
   }
 
   // Formatear a markdown

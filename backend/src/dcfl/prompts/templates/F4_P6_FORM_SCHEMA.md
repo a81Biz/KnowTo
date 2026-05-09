@@ -18,10 +18,26 @@ pipeline_steps:
       Extract ALL units and the volume of content generated across P1-P5.
       SOURCE: The context contains fase3.unidades (F2/F3) and P1-P5 data from productos_previos or userInputs.
       
+      MANDATORY — Extract P5 activity data from "productos_previos.P5":
+      Look in "productos_previos.P5.partesAcumuladas" (or top-level keys matching "modulo_N").
+      For each unit's module key (e.g. "modulo_1"), extract from the activity's "ficha":
+        - "objetivo": activity objective string
+        - "duracion": estimated duration string
+      Also extract the activity's "logistica.materiales" array.
+      Build "p5_actividades" as a dict keyed by "unidad_N" (e.g. "unidad_1", "unidad_2").
+      If "productos_previos.P5" is absent or a module key is missing, output empty objects.
+      DO NOT invent data — copy only what literally appears in the P5 datos_producto.
+      
       DO NOT TRUNCATE. Return every unit.
       
       OUTPUT ONLY VALID JSON — EXACT STRUCTURE:
-      {"unidades": [{"modulo": 1, "nombre": "...", "objetivo": "..."}, {"modulo": 2, "nombre": "...", "objetivo": "..."}]}
+      {
+        "unidades": [{"modulo": 1, "nombre": "...", "objetivo": "..."}, {"modulo": 2, "nombre": "...", "objetivo": "..."}],
+        "p5_actividades": {
+          "unidad_1": {"objetivo": "...", "duracion": "45 minutos", "materiales": ["item from P5"]},
+          "unidad_2": {"objetivo": "", "duracion": "", "materiales": []}
+        }
+      }
 
   # ── AGENTE A: SCHEDULE PLANNER ───────────────────────────────────────────
   - agent: agente_form_A

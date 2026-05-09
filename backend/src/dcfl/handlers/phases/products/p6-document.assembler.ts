@@ -95,6 +95,42 @@ function extractAny(raw: string, key: string): any {
   return null;
 }
 
+// ── Normalizadores ─────────────────────────────────────────────────────────
+
+function normalizarStringArray(items: any[]): string[] {
+  const TEXT_KEYS = ['texto', 'text', 'nombre', 'name', 'valor', 'value', 'descripcion', 'description', 'item', 'content', 'contenido'];
+  return (items || []).map((item: any) => {
+    if (typeof item === 'string') return item.trim();
+    if (typeof item === 'object' && item !== null) {
+      for (const k of TEXT_KEYS) {
+        if (item[k] && typeof item[k] === 'string' && item[k].trim()) return item[k].trim();
+      }
+      return Object.values(item).filter((v): v is string => typeof v === 'string' && v.trim().length > 0).join(' — ') || '';
+    }
+    return String(item).trim();
+  }).filter((s: string) => s.length > 0);
+}
+
+function normalizarActividades(items: any[]): ActividadCalendario[] {
+  const HORA_KEYS      = ['hora', 'time', 'horario', 'hora_inicio', 'start_time'];
+  const ACTIVIDAD_KEYS = ['actividad', 'activity', 'nombre', 'name', 'tarea', 'task', 'descripcion'];
+  const DURACION_KEYS  = ['duracion', 'duration', 'tiempo', 'duration_time', 'minutos'];
+  const TIPO_KEYS      = ['tipo', 'type', 'categoria', 'category', 'modalidad'];
+  const RESP_KEYS      = ['responsable', 'responsible', 'facilitador', 'instructor'];
+  return (items || []).map((item: any): ActividadCalendario | null => {
+    if (typeof item !== 'object' || item === null) return null;
+    const actividad = ACTIVIDAD_KEYS.map(k => item[k]).find(v => v && typeof v === 'string') || '';
+    if (!actividad) return null;
+    return {
+      hora:        HORA_KEYS.map(k => item[k]).find(v => v && typeof v === 'string') || '',
+      actividad,
+      duracion:    DURACION_KEYS.map(k => item[k]).find(v => v && typeof v === 'string') || '',
+      tipo:        TIPO_KEYS.map(k => item[k]).find(v => v && typeof v === 'string') || '',
+      responsable: RESP_KEYS.map(k => item[k]).find(v => v && typeof v === 'string') || 'Facilitador',
+    };
+  }).filter((a): a is ActividadCalendario => a !== null);
+}
+
 // ── Ensamblador principal ──────────────────────────────────────────────────
 
 export async function handleDocumentP6Assembler(context: ProductContext): Promise<string> {
@@ -116,7 +152,8 @@ export async function handleDocumentP6Assembler(context: ProductContext): Promis
 
     const rawJuez = await services.pipelineService.getAgentOutput(jobId, juezNombre) || '';
     const juezMatch = rawJuez.match(/\{[\s\S]*\}/);
-    const decision = juezMatch ? JSON.parse(juezMatch[0]) : { seleccion: 'A' };
+    let decision: { seleccion?: string } = { seleccion: 'A' };
+    try { if (juezMatch) decision = JSON.parse(juezMatch[0]); } catch {}
     const seleccion: 'A' | 'B' = decision?.seleccion === 'B' ? 'B' : 'A';
 
     const agenteGanador = seleccion === 'A' ? `agente_${seccion}_A` : `agente_${seccion}_B`;
@@ -124,6 +161,11 @@ export async function handleDocumentP6Assembler(context: ProductContext): Promis
 
     (partes as any)[parteClave] = extractAny(rawGanador, parteClave) ?? ((partes as any)[parteClave]);
     console.log(`[p6-assembler] Sección ${seccion}: juez=${seleccion}`);
+  }
+
+  if (partes.plan) {
+    partes.plan.actividades = normalizarActividades(partes.plan.actividades);
+    partes.plan.recursos = normalizarStringArray(partes.plan.recursos);
   }
 
   // Formatear a markdown
@@ -150,25 +192,39 @@ export async function handleDocumentP6Assembler(context: ProductContext): Promis
     horas: horasMd,
     plan: planMd,
     entrega: entregaMd,
+    horario_raw: partes.horario,
   };
 
   const modulosOrdenados = Object.keys(partesAcumuladas).sort();
   let documentoFinal = '# Calendario General del Curso\n\n';
-  
-  // Agregar tabla resumen al inicio
+
+  // Tabla resumen poblada desde horario_raw acumulado
   documentoFinal += '## Resumen de Distribución Horaria\n\n';
   documentoFinal += '| Sesión | Horas Teóricas | Horas Prácticas | Total |\n|---|---|---|---|\n';
   let totalT = 0, totalP = 0, totalG = 0;
-  
-  // Para la tabla resumen necesitamos extraer los números de los MDs acumulados (un poco feo pero funcional por ahora)
-  // O podríamos guardar los datos crudos en datos_producto. Por ahora haremos lo segundo mejor: guardar datos crudos.
-  
+  for (const key of modulosOrdenados) {
+    const m = partesAcumuladas[key];
+    const h = m.horario_raw as typeof partes.horario;
+    if (h) {
+      documentoFinal += `| ${m.nombre} | ${h.horas_teoricas ?? '—'} h | ${h.horas_practicas ?? '—'} h | ${h.total_horas ?? '—'} h |\n`;
+      totalT += Number(h.horas_teoricas) || 0;
+      totalP += Number(h.horas_practicas) || 0;
+      totalG += Number(h.total_horas) || 0;
+    } else {
+      documentoFinal += `| ${m.nombre} | — | — | — |\n`;
+    }
+  }
+  documentoFinal += `| **Total del Curso** | **${totalT.toFixed(1)} h** | **${totalP.toFixed(1)} h** | **${totalG.toFixed(1)} h** |\n\n`;
+  documentoFinal += '---\n\n';
+
   for (const key of modulosOrdenados) {
     const m = partesAcumuladas[key];
     documentoFinal += `## ${key.replace('modulo_', 'Sesión ')}: ${m.nombre}\n\n`;
+    documentoFinal += `### Distribución Horaria\n\n`;
     documentoFinal += m.horas;
-    documentoFinal += '\n';
+    documentoFinal += `\n### Plan de la Sesión\n\n`;
     documentoFinal += m.plan;
+    documentoFinal += `### Entregables\n\n`;
     documentoFinal += m.entrega;
     documentoFinal += '\n\n---\n\n';
   }

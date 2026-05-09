@@ -111,19 +111,53 @@ export class AIService {
     for (const [k, v] of Object.entries(options.context)) {
       if (typeof v === 'string') compactContextObj[k] = v;
     }
-    const isF4DocPipeline = options.promptId?.startsWith('F4_P') && options.promptId?.includes('_GENERATE_DOCUMENT');
+    const isF4Pipeline = options.promptId?.startsWith('F4_P');
+    const isF4DocPipeline = isF4Pipeline && (
+      options.promptId?.includes('_GENERATE_DOCUMENT') ||
+      options.promptId?.includes('_GENERATE_CHAPTER')
+    );
     if (options.context.previousData && !isF4DocPipeline) {
       compactContextObj.previousData = options.context.previousData;
     }
     if (options.context.webSearchResults) compactContextObj.webSearchResults = options.context.webSearchResults;
-    // Incluir fase3 (objeto, no string) para pipelines F4 que usan inputs_from + task
-    if (options.context.fase3) compactContextObj.fase3 = options.context.fase3;
-    if (options.context.productos_previos) compactContextObj.productos_previos = options.context.productos_previos;
+
+    // fase3: inyección quirúrgica según el tipo de pipeline
+    // - F4 GENERATE_DOCUMENT/CHAPTER: los datos llegan vía userInputs (p4_secciones, p3_escaleta, etc.)
+    //   fase3 es ruido innecesario → excluir completamente
+    // - F4 FORM_SCHEMA / ORCHESTRATOR: solo necesita la lista de módulos
+    //   → incluir solo { unidades } sin calculo_duracion ni metadata extra
+    // - Non-F4: incluir fase3 completo
+    if (options.context.fase3) {
+      if (!isF4Pipeline) {
+        compactContextObj.fase3 = options.context.fase3;
+      } else if (!isF4DocPipeline) {
+        const f3 = options.context.fase3 as Record<string, unknown>;
+        compactContextObj.fase3 = { unidades: f3.unidades };
+      }
+      // isF4DocPipeline: no incluir fase3
+    }
+
+    // productos_previos: excluir en todos los F4 (datos relevantes vienen vía userInputs)
+    if (options.context.productos_previos && !isF4Pipeline) {
+      compactContextObj.productos_previos = options.context.productos_previos;
+    }
     if (options.userInputs && Object.keys(options.userInputs).length > 0) {
       compactContextObj.userInputs = options.userInputs;
     }
-    params.compactContext = JSON.stringify(compactContextObj);
 
+    // Dos versiones de compactContext:
+    // - fullContext  → extractor (inputs_from: []) → necesita userInputs para mapear el formulario
+    // - baseContext  → especialistas, jueces → reciben datos vía TRABAJO PREVIO (output del extractor)
+    //                  userInputs sería duplicado e innecesario para ellos
+    const fullContext = JSON.stringify(compactContextObj);
+    const baseContext = isF4DocPipeline ? (() => {
+      const { userInputs: _omit, ...rest } = compactContextObj;
+      return JSON.stringify(rest);
+    })() : fullContext;
+
+    params.compactContext = fullContext; // default; se sobreescribe por paso más abajo
+
+    const stepsMap = new Map(steps.map(s => [s.agent, s]));
     const out: Record<string, string> = {};
     const totalSteps = steps.length;
     let stepIndex = 0;
@@ -147,7 +181,9 @@ export class AIService {
         const assembled = await this._handleAssemblyAgent(step.agent, out, step, options, template);
         out[step.agent] = assembled;
         if (options.onAgentOutput) {
-          const override = await options.onAgentOutput(step.agent, assembled, out).catch(() => { });
+          const override = await options.onAgentOutput(step.agent, assembled, out).catch((err) => {
+            console.error(`[PIPELINE] assembler ${step.agent} falló:`, err instanceof Error ? err.message : err);
+          });
           if (typeof override === 'string') {
             out[step.agent] = override;
           }
@@ -157,19 +193,25 @@ export class AIService {
       }
 
       let promptText = '';
+      const isExtractorStep = Array.isArray(step.inputs_from) && step.inputs_from.length === 0;
+
       if (step.inputs_from !== undefined) {
         const relevantOutputs = step.inputs_from
           .filter((k) => (out[k] ?? '').trim().length > 0)
           .map((k) => `=== RESULTADO DE '${k.toUpperCase()}' ===\n${out[k]}`)
           .join('\n\n');
 
+        // Extractor (inputs_from: []): contexto completo con userInputs
+        // Especialistas y jueces (inputs_from: [prev_agent]): contexto mínimo sin userInputs
+        // — ya tienen los datos mapeados en TRABAJO PREVIO
+        const stepContext = isExtractorStep ? fullContext : baseContext;
+
         promptText =
           `TAREA ASIGNADA:\n${step.task ?? ''}\n\n` +
           `TRABAJO PREVIO:\n${relevantOutputs}\n\n` +
-          `CONTEXTO:\n{{compactContext}}\n` +
+          `CONTEXTO:\n${stepContext}\n` +
           (step.include_template !== false ? `\nPLANTILLA / REGLAS:\n${template}` : '');
       } else {
-        // Fallback switches can go here or keep it generic
         promptText = this._buildGenericPrompt(step, out, template);
       }
 
@@ -182,8 +224,8 @@ export class AIService {
         rendered = rendered.replace(/\{\{\s*userInputs\.notas\s*\}\}/g, String(options.userInputs.notas || 'Ninguna'));
       }
 
-      console.log(`[PIPELINE] Ejecutando agente: ${step.agent} (Step ${stepIndex + 1}/${totalSteps})`);
-      console.log(`[PIPELINE] Prompt size: ${rendered.length} chars. Preview: ${rendered.substring(0, 300)}...`);
+      const ctxType = isExtractorStep ? 'full' : (isF4DocPipeline ? 'base(no-userInputs)' : 'full');
+      console.log(`[PIPELINE] Ejecutando agente: ${step.agent} (Step ${stepIndex + 1}/${totalSteps}) ctx=${ctxType} prompt=${rendered.length}chars`);
 
       let raw = '';
       if (step.tools && step.tools.length > 0) {
@@ -197,12 +239,74 @@ export class AIService {
 
       let cleaned = this._clean(raw);
 
-      // Para agentes de F0, extraer JSON puro del texto
-      if (step.agent.startsWith('agente_') && (step.agent.includes('_A') || step.agent.includes('_B'))) {
+      // Extraer JSON puro del texto solo cuando el output realmente es JSON
+      // (agents de P1 generan markdown puro → no aplicar extracción JSON)
+      const looksLikeJson = cleaned.trimStart().startsWith('{') || cleaned.trimStart().startsWith('[');
+      if (looksLikeJson && step.agent.startsWith('agente_') && (step.agent.includes('_A') || step.agent.includes('_B'))) {
         cleaned = this._extractJsonFromText(cleaned);
       }
 
       out[step.agent] = cleaned;
+
+      // Judge veto retry: when judge outputs "RECHAZADO", re-run specialist agents + judge (max 2x)
+      if (step.agent.startsWith('juez_') && Array.isArray(step.inputs_from)) {
+        let decision = this._parseJudgeDecision(out[step.agent]);
+        if (decision.seleccion === 'RECHAZADO') {
+          const MAX_RETRIES = 2;
+          let retries = 0;
+          while (decision.seleccion === 'RECHAZADO' && retries < MAX_RETRIES) {
+            retries++;
+            console.warn(`[PIPELINE] ${step.agent} RECHAZADO (intento ${retries}/${MAX_RETRIES}). Razón: ${decision.razon}`);
+            const correctionHint = `\n\n⚠️ CORRECCIÓN OBLIGATORIA (Intento ${retries}/${MAX_RETRIES}):\nEl juez evaluador rechazó todos los borradores anteriores.\nRazón del rechazo: "${decision.razon}"\nCorrige específicamente ese problema antes de responder.`;
+
+            for (const inputAgentName of step.inputs_from) {
+              const inputStep = stepsMap.get(inputAgentName);
+              if (!inputStep) continue;
+              const isInputExtractor = Array.isArray(inputStep.inputs_from) && inputStep.inputs_from.length === 0;
+              const inputRelevantOutputs = (inputStep.inputs_from || [])
+                .filter((k: string) => (out[k] ?? '').trim().length > 0)
+                .map((k: string) => `=== RESULTADO DE '${k.toUpperCase()}' ===\n${out[k]}`)
+                .join('\n\n');
+              const retryTask = (inputStep.task ?? '') + correctionHint;
+              const retryPrompt =
+                `TAREA ASIGNADA:\n${retryTask}\n\n` +
+                `TRABAJO PREVIO:\n${inputRelevantOutputs}\n\n` +
+                `CONTEXTO:\n${isInputExtractor ? fullContext : baseContext}\n` +
+                (inputStep.include_template !== false ? `\nPLANTILLA / REGLAS:\n${template}` : '');
+              const retryRendered = this.registry.render(retryPrompt, params);
+              console.log(`[PIPELINE] RETRY agente ${inputAgentName} (${retryRendered.length}chars)`);
+              const retryRaw = await this.provider.generate(retryRendered, inputStep.model);
+              let retryCleaned = this._clean(retryRaw);
+              if (inputAgentName.includes('_A') || inputAgentName.includes('_B')) {
+                retryCleaned = this._extractJsonFromText(retryCleaned);
+              }
+              out[inputAgentName] = retryCleaned;
+              if (options.onAgentOutput) {
+                await options.onAgentOutput(inputAgentName, retryCleaned, out).catch(() => {});
+              }
+            }
+
+            const judgeRelevantOutputs = step.inputs_from
+              .filter((k: string) => (out[k] ?? '').trim().length > 0)
+              .map((k: string) => `=== RESULTADO DE '${k.toUpperCase()}' ===\n${out[k]}`)
+              .join('\n\n');
+            const judgeRetryPrompt =
+              `TAREA ASIGNADA:\n${step.task ?? ''}\n\n` +
+              `TRABAJO PREVIO:\n${judgeRelevantOutputs}\n\n` +
+              `CONTEXTO:\n${baseContext}\n` +
+              (step.include_template !== false ? `\nPLANTILLA / REGLAS:\n${template}` : '');
+            const judgeRetryRendered = this.registry.render(judgeRetryPrompt, params);
+            console.log(`[PIPELINE] RETRY juez ${step.agent} (intento ${retries}/${MAX_RETRIES})`);
+            const judgeRetryRaw = await this.provider.generate(judgeRetryRendered, step.model);
+            out[step.agent] = this._clean(judgeRetryRaw);
+            decision = this._parseJudgeDecision(out[step.agent]);
+          }
+          if (decision.seleccion === 'RECHAZADO') {
+            console.warn(`[PIPELINE] ${step.agent} sigue RECHAZADO tras ${MAX_RETRIES} reintentos. Forzando 'A'.`);
+            out[step.agent] = JSON.stringify({ seleccion: 'A', razon: `Forzado tras ${MAX_RETRIES} rechazos: ${decision.razon}` });
+          }
+        }
+      }
 
       if (options.onAgentOutput) {
         const outputValue = out[step.agent] ?? '';
@@ -230,6 +334,17 @@ export class AIService {
     const lastStep = steps[steps.length - 1];
     if (!lastStep) return '';
     return out[lastStep.agent] ?? '';
+  }
+
+  private _parseJudgeDecision(output: string): { seleccion: string; razon: string } {
+    try {
+      const match = output.match(/\{[\s\S]*\}/);
+      if (match) {
+        const obj = JSON.parse(match[0]);
+        return { seleccion: obj.seleccion || '', razon: obj.razon || '' };
+      }
+    } catch {}
+    return { seleccion: '', razon: '' };
   }
 
   private _isAssemblyAgent(name: string): boolean {

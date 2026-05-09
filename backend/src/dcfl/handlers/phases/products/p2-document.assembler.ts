@@ -52,10 +52,27 @@ interface Cierre {
   recursos_adicionales?: string;
 }
 
+// ── Helpers ────────────────────────────────────────────────────────────────
+
+// Coerce an array whose items may be LLM objects (e.g. {paso:"text"}) to plain strings.
+function toStringArray(arr: any): string[] {
+  if (!Array.isArray(arr)) return [];
+  return arr.map((item: any) => {
+    if (typeof item === 'string') return item;
+    if (typeof item === 'object' && item !== null) {
+      const val = item.paso || item.instruccion || item.descripcion || item.texto
+        || item.nombre || item.material || item.item || item.accion
+        || Object.values(item).find((v): v is string => typeof v === 'string');
+      return typeof val === 'string' ? val : JSON.stringify(item);
+    }
+    return String(item ?? '');
+  });
+}
+
 // ── Formateadores ──────────────────────────────────────────────────────────
 
 function formatearPresentacionCompleta(items: PresentacionItem[]): string {
-  let md = '';
+  let md = '### Presentación de Diapositivas\n\n';
   for (const item of items) {
     const num = item.numero;
     const s = item.slide || {};
@@ -83,9 +100,11 @@ function formatearPresentacionCompleta(items: PresentacionItem[]): string {
 function formatearActividades(acts: Actividad[]): string {
   let md = '### Actividades de Aprendizaje\n\n';
   for (const a of acts) {
+    const instrucciones = toStringArray(a.instrucciones);
+    const materiales = toStringArray(a.materiales);
     md += `#### ${a.nombre} (${a.duracion})\n`;
-    md += `**Instrucciones:**\n${a.instrucciones.map(i => `1. ${i}`).join('\n')}\n\n`;
-    md += `**Materiales:** ${a.materiales.join(', ')}\n`;
+    md += `**Instrucciones:**\n${instrucciones.map(i => `1. ${i}`).join('\n')}\n\n`;
+    md += `**Materiales:** ${materiales.join(', ')}\n`;
     md += `**Resultado:** ${a.resultado_esperado}\n\n`;
     if (a.versiones) {
       md += `*Adaptaciones:* Virtual (${a.versiones.virtual}), Individual (${a.versiones.individual})\n\n`;
@@ -97,7 +116,7 @@ function formatearActividades(acts: Actividad[]): string {
 function formatearCierre(c: Cierre): string {
   let md = '### Cierre y Próximos Pasos\n\n';
   md += `**Puntos Clave:**\n${c.puntos_clave.map(p => `- ${p}`).join('\n')}\n\n`;
-  md += `**Transición:** ${c.puente.facilitador_dice}\n`;
+  md += `**Transición:** ${c.puente?.facilitador_dice || ''}\n`;
   if (c.autoevaluacion) md += `**Autoevaluación:** ${c.autoevaluacion}\n\n`;
   md += `> **Mensaje Final:** ${c.mensaje_final}\n`;
   return md;
@@ -132,9 +151,23 @@ function sanitizeArray(value: any): any[] {
 
 function sanitizeObject(value: any): any {
   if (!value || typeof value !== 'object') return {};
+  // Fields in Cierre that must be strings — if LLM returns a nested object, stringify it
+  const STRING_FIELDS = new Set(['autoevaluacion', 'vista_previa', 'recursos_adicionales', 'mensaje_final', 'facilitador_dice', 'slide_muestra']);
   const cleaned: any = {};
   for (const [k, v] of Object.entries(value)) {
-    cleaned[k] = (v === null || v === undefined || v === 'undefined') ? '' : v;
+    if (v === null || v === undefined || v === 'undefined') {
+      cleaned[k] = '';
+    } else if (Array.isArray(v) && STRING_FIELDS.has(k)) {
+      // LLM returned an array for a string field — join items as text
+      cleaned[k] = (v as any[]).join('\n');
+    } else if (typeof v === 'object' && !Array.isArray(v) && STRING_FIELDS.has(k)) {
+      // LLM returned a nested object for a string field — prefer .pregunta semantic key, fallback to JSON
+      cleaned[k] = (v as any).pregunta || JSON.stringify(v);
+    } else if (typeof v === 'object' && !Array.isArray(v)) {
+      cleaned[k] = sanitizeObject(v);
+    } else {
+      cleaned[k] = v;
+    }
   }
   return cleaned;
 }

@@ -69,6 +69,38 @@ function extractAny(raw: string, key: string): any {
   return null;
 }
 
+// ── Normalizadores ─────────────────────────────────────────────────────────
+
+function normalizarStringArray(items: any[]): string[] {
+  const TEXT_KEYS = ['texto', 'text', 'nombre', 'name', 'valor', 'value', 'descripcion', 'description', 'item', 'content', 'contenido'];
+  return (items || []).map((item: any) => {
+    if (typeof item === 'string') return item.trim();
+    if (typeof item === 'object' && item !== null) {
+      for (const k of TEXT_KEYS) {
+        if (item[k] && typeof item[k] === 'string' && item[k].trim()) return item[k].trim();
+      }
+      return Object.values(item).filter((v): v is string => typeof v === 'string' && v.trim().length > 0).join(' — ') || '';
+    }
+    return String(item).trim();
+  }).filter((s: string) => s.length > 0);
+}
+
+function normalizarConceptos(items: any[]): Concepto[] {
+  const TERMINO_KEYS   = ['termino', 'term', 'nombre', 'name', 'concepto', 'concept', 'keyword'];
+  const DEFINICION_KEYS = ['definicion', 'definition', 'descripcion', 'description', 'significado', 'meaning'];
+  const EJEMPLO_KEYS   = ['ejemplo', 'example', 'caso', 'case', 'aplicacion', 'application', 'uso'];
+  return (items || []).map((item: any): Concepto | null => {
+    if (typeof item !== 'object' || item === null) return null;
+    const termino = TERMINO_KEYS.map(k => item[k]).find(v => v && typeof v === 'string') || '';
+    if (!termino) return null;
+    return {
+      termino,
+      definicion: DEFINICION_KEYS.map(k => item[k]).find(v => v && typeof v === 'string') || '',
+      ejemplo:    EJEMPLO_KEYS.map(k => item[k]).find(v => v && typeof v === 'string') || '',
+    };
+  }).filter((c): c is Concepto => c !== null);
+}
+
 // ── Ensamblador principal ──────────────────────────────────────────────────
 
 export async function handleDocumentP7Assembler(context: ProductContext): Promise<string> {
@@ -89,7 +121,8 @@ export async function handleDocumentP7Assembler(context: ProductContext): Promis
 
     const rawJuez = await services.pipelineService.getAgentOutput(jobId, juezNombre) || '';
     const juezMatch = rawJuez.match(/\{[\s\S]*\}/);
-    const decision = juezMatch ? JSON.parse(juezMatch[0]) : { seleccion: 'A' };
+    let decision: { seleccion?: string } = { seleccion: 'A' };
+    try { if (juezMatch) decision = JSON.parse(juezMatch[0]); } catch {}
     const seleccion: 'A' | 'B' = decision?.seleccion === 'B' ? 'B' : 'A';
 
     const agenteGanador = seleccion === 'A' ? `agente_${seccion}_A` : `agente_${seccion}_B`;
@@ -97,6 +130,11 @@ export async function handleDocumentP7Assembler(context: ProductContext): Promis
 
     (partes as any)[parteClave] = extractAny(rawGanador, parteClave) ?? ((partes as any)[parteClave]);
     console.log(`[p7-assembler] Sección ${seccion}: juez=${seleccion}`);
+  }
+
+  if (partes.tecnico) {
+    partes.tecnico.conceptos = normalizarConceptos(partes.tecnico.conceptos);
+    partes.tecnico.normativa = normalizarStringArray(partes.tecnico.normativa);
   }
 
   // Formatear a markdown
@@ -121,23 +159,42 @@ export async function handleDocumentP7Assembler(context: ProductContext): Promis
     nombre: nombreTema,
     descripcion: descMd,
     tecnico: tecnicoMd,
+    tecnico_raw: partes.tecnico,
   };
 
   const modulosOrdenados = Object.keys(partesAcumuladas).sort();
   let documentoFinal = '# Documento de Información General\n\n';
-  
-  // Agregar sección de materiales producidos (glosario consolidado)
+
+  // Glosario Consolidado poblado desde tecnico_raw.conceptos acumulado
   documentoFinal += '## Glosario Consolidado del Curso\n\n| Término | Definición |\n|---|---|\n';
   const glosario: Record<string, string> = {};
   for (const key of modulosOrdenados) {
-    // Esto es simplificado, en una implementación real extraeríamos los conceptos de los datos crudos
+    const m = partesAcumuladas[key];
+    const tRaw = m.tecnico_raw as typeof partes.tecnico;
+    if (tRaw?.conceptos && Array.isArray(tRaw.conceptos)) {
+      for (const c of tRaw.conceptos) {
+        if (c?.termino && c?.definicion && !glosario[c.termino]) {
+          glosario[c.termino] = c.definicion;
+        }
+      }
+    }
+  }
+  const glosarioEntries = Object.entries(glosario).sort(([a], [b]) => a.localeCompare(b, 'es'));
+  if (glosarioEntries.length > 0) {
+    for (const [termino, definicion] of glosarioEntries) {
+      documentoFinal += `| ${termino} | ${definicion} |\n`;
+    }
+  } else {
+    documentoFinal += '| (Sin términos aún) | — |\n';
   }
   documentoFinal += '\n---\n\n';
 
   for (const key of modulosOrdenados) {
     const m = partesAcumuladas[key];
     documentoFinal += `## Tema ${key.replace('tema_', '')}: ${m.nombre}\n\n`;
+    documentoFinal += `### Descripción y Utilidad\n\n`;
     documentoFinal += m.descripcion;
+    documentoFinal += `### Fundamentos Técnicos\n\n`;
     documentoFinal += m.tecnico;
     documentoFinal += '\n\n---\n\n';
   }

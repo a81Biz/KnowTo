@@ -67,7 +67,11 @@ pipeline_steps:
     task: |
       YOU ARE A JSON PARSER. Compare TIMING.
       SELECTION: mathematical consistency (T+P=Total), alignment to F3.
-      OUTPUT: {"seleccion": "A"|"B", "razon": "one-line"}
+      VETO CRITERIA — Output "RECHAZADO" ONLY IF BOTH of the following are true for BOTH A and B:
+      1. Both have horas_teoricas + horas_practicas ≠ total_horas (mathematical inconsistency).
+      2. Both have total_horas ≤ 0 or total_horas > 16 (impossible session length).
+      If RECHAZADO, "razon" MUST describe the specific shared deficiency.
+      OUTPUT: {"seleccion": "A"|"B"|"RECHAZADO", "razon": "one-line"}
 
   # ═══════════════════════════════════════════════════════════════════════
   # SECCIÓN 2: ACTIVIDADES Y RECURSOS
@@ -78,6 +82,10 @@ pipeline_steps:
     include_template: false
     task: |
       ROLE: Logistics Manager. TASK: List activities and items.
+      
+      CRITICAL — STRING ARRAYS: "recursos" MUST be an array of plain STRINGS.
+      CORRECT:   "recursos": ["Proyector", "Pizarrón", "Marcadores"]
+      PROHIBITED: "recursos": [{"item": "Proyector"}, {"nombre": "Pizarrón"}]
       
       OUTPUT ONLY THIS JSON:
       {
@@ -96,8 +104,9 @@ pipeline_steps:
     include_template: false
     task: |
       SAME AS AGENT A. ADD for each activity: "responsable" (Facilitador/Participante).
+      CRITICAL — STRING ARRAYS: "recursos" MUST be an array of plain STRINGS (not objects).
       OUTPUT ONLY THIS JSON:
-      {"plan": {"actividades": [{"hora": "...", "actividad": "...", "duracion": "...", "tipo": "...", "responsable": "..."}], "recursos": [...]}}
+      {"plan": {"actividades": [{"hora": "...", "actividad": "...", "duracion": "...", "tipo": "...", "responsable": "..."}], "recursos": ["Item 1", "Item 2"]}}
 
   - agent: juez_plan
     model: "qwen2.5:14b"
@@ -106,7 +115,11 @@ pipeline_steps:
     task: |
       YOU ARE A JSON PARSER. Compare PLAN.
       SELECTION: logical flow, responsible parties assigned, resources match activities.
-      OUTPUT: {"seleccion": "A"|"B", "razon": "one-line"}
+      VETO CRITERIA — Output "RECHAZADO" ONLY IF BOTH of the following are true for BOTH A and B:
+      1. Both have 0 items in the "actividades" array.
+      2. Both have 0 items in the "recursos" array.
+      If RECHAZADO, "razon" MUST describe the specific shared deficiency.
+      OUTPUT: {"seleccion": "A"|"B"|"RECHAZADO", "razon": "one-line"}
 
   # ═══════════════════════════════════════════════════════════════════════
   # SECCIÓN 3: ENTREGABLES Y EVALUACIÓN
@@ -143,7 +156,11 @@ pipeline_steps:
     task: |
       YOU ARE A JSON PARSER. Compare DELIVERABLES.
       SELECTION: alignment to P1, clear acceptance criteria.
-      OUTPUT: {"seleccion": "A"|"B", "razon": "one-line"}
+      VETO CRITERIA — Output "RECHAZADO" ONLY IF BOTH of the following are true for BOTH A and B:
+      1. Both have "producto" that is empty or a generic placeholder.
+      2. Both have "criterio_aceptacion" that is empty or fewer than 10 characters.
+      If RECHAZADO, "razon" MUST describe the specific shared deficiency.
+      OUTPUT: {"seleccion": "A"|"B"|"RECHAZADO", "razon": "one-line"}
 
   # ═══════════════════════════════════════════════════════════════════════
   # ASSEMBLER
