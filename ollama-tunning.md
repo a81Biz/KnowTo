@@ -1,150 +1,150 @@
-# Auditoría P5 v2 — Análisis de Segunda Pasada
-
-> Fecha: 2026-05-08 | Estado: Post-implementación de Factibility Matrix y Heritage Lock v1
-
----
-
-## Veredicto General
-
-La versión regenerada representa un salto cualitativo real respecto a la versión anterior:
-
-| Dimensión | v1 (antes) | v2 (actual) |
-|---|---|---|
-| Contaminación de dominio grave | "lienzo de malla", "aplastador", "Corta una capa base" | Eliminados |
-| Coherencia verbo-material | "Corta el pegamento", "Abre el aplastador" | Aplica, Extiende, Mezcla, Diluye ✓ |
-| Herencia de materiales desde P4 | 0% (inventado) | ~70% (Pinturas, Barnices, Pinceles) |
-| Evidencia EC0366-válida | Documento académico | Mixto — 1 unidad correcta, 1 con leakage |
-
-Sin embargo, persisten **dos clases de defectos estructurales** con raíces distintas.
+# Plan de Correcciones F4 — Enfoque Agnóstico de Dominio
+> Estándar: **EC0366** | Fecha: 2026-05-09 | Commit de implementación: pendiente tras esta sesión
 
 ---
 
-## Defecto 1: Evidence Leakage (Crítico — Unidad 2)
+## Principio Rector
 
-### Qué ocurre
-
-El campo `evidencia_producto` de Unidad 2 contiene:
-
-> *"El contenido del curso incluye tres capítulos que abordan las técnicas de pintura para miniaturas desde una perspectiva teórica y práctica. Cada capítulo tiene estructuras claramente definidas con introducciones, marcos teóricos, conceptos clave, desarrollos prácticos, ejemplos y ejercicios."*
-
-Y la rúbrica tiene un único criterio:
-
-> *"Estructura del contenido — El curso contiene tres capítulos bien estructurados..."* → 5 pts
-
-Esto NO es evidencia de aprendizaje. Es una descripción del Manual P4.
-
-### Cadena causal
-
-```
-extractor_p5 expone {inventario_p4} (capítulos, secciones_json)
-    ↓
-agente_evaluacion recibe {instrumentos_p1} pero ve TODO el contexto del extractor
-    ↓
-El agente confunde "P4 tiene 3 capítulos" con "la evidencia que entrega el learner"
-    ↓
-evidencia_producto ← descripción curricular del manual, no producto físico del alumno
-    ↓
-juez_evaluacion pasa el integrity check (tiene "criterio"/"puntos"/"indicador_exito")
-    porque los campos existen estructuralmente — el juez no valida el CONTENIDO semántico
-```
-
-### Por qué el juez no lo atrapó
-
-El `juez_evaluacion` tiene un INTEGRITY PRE-CHECK sobre nombres de claves y un VETO si `rubrica` está vacía. Pero NO tiene:
-- Filtro de palabras que indican fuga semántica ("curso", "capítulo", "contenido")
-- Límite de longitud en `evidencia_producto`
-- Verificación de que la evidencia sea un producto físico del alumno y no una descripción del curso
-
-### Fix requerido
-
-**En agente_evaluacion_A y agente_evaluacion_B:**
-- `evidencia_producto` ← máximo 8 palabras, sustantivo + adjetivo que describe lo que el alumno entrega físicamente
-- Lista de palabras PROHIBIDAS en evidencia: "curso", "capítulo", "contenido", "abordan", "incluye", "estructura", "marco teórico", "perspectiva"
-- MÍNIMO DE CRITERIOS proporcional a la duración de la actividad: ≤30 min → 1, 31-60 min → 2, >60 min → mínimo 3 criterios con suma ≥ 15 pts
-- Los criterios evalúan LA CONDUCTA DEL ALUMNO durante la actividad — no la calidad del curso
-
-**En juez_evaluacion:**
-- LEAKAGE FILTER pre-check: si `evidencia_producto` contiene "curso", "capítulo", "contenido", "abordan" → esa opción FALLA automáticamente
-- Si ambas opciones fallan el leakage filter → RECHAZADO
+Las correcciones NO deben mencionar dominios específicos (miniaturas, soldadura, programación). El sistema debe funcionar para cualquier curso técnico sin cambios en el código. Todo el conocimiento del dominio lo aporta el `productos_previos` (heredado de P1, P4, etc.), nunca el prompt.
 
 ---
 
-## Defecto 2: Domain Infiltration Residual (Menor — Materiales Atípicos)
+## Corrección 1 — Protocolo de Inventario Dual (agente_materiales)
 
-### Qué ocurre
+### Problema
 
-En Unidad 2, Herramientas/Consumibles aparecen:
-- "**Cinta adhesiva para crear líneas rectas**" — técnica de enmascaramiento (masking tape), legítima en modelismo pero NO declarada en P4
-- "**Bolsitas de plástico para guardar pinturas**" — solución de almacenamiento, lógica pero sin herencia P4
+El prompt anterior creaba una contradicción irresoluble:
+- Si `inventario_p4` estaba vacío → el agente hacía fallback a `contenido_form`
+- Pero el MANDATORY FINAL CHECK exigía eliminar todo ítem no verbatim en `inventario_p4`
+- Resultado: cuando P4 estaba vacío, TODOS los materiales del fallback se eliminaban → sección vacía
 
-### Cadena causal
+### Solución implementada
 
-```
-agente_materiales recibe {inventario_p4.materiales} con pinturas, pinceles, barnices
-    ↓
-DOMAIN LOCK dice "PRIORITY SOURCE: inventario_p4" y "STEP 3: verify and remove"
-    ↓
-El modelo razona: "Cinta adhesiva se usa CON pinturas" → plausibilidad alta
-    ↓
-"Verify each item appears in the chosen source" → modelo hace soft-check (¿compatible?) en lugar de hard-check (¿presente exactamente?)
-    ↓
-juez_materiales solo recibe salidas de A y B, no tiene acceso a inventario_p4
-    → no puede detectar la violación de herencia
-```
+Reemplazado por **INVENTORY PROTOCOL con dos modos mutuamente excluyentes**:
 
-### Diferencia con v1
+**MODE A — INHERITANCE** (cuando `inventario_p4` tiene ítems):
+- Verbatim check: solo ítems presentes literalmente en el inventario autorizado
+- Elimina accesorios plausibles que no estén declarados explícitamente
 
-En v1 el problema era GRAVE (lienzo de malla, aplastador — objetos de dominio completamente diferente).  
-En v2 es RESIDUAL (cinta adhesiva, bolsitas — objetos plausibles en el contexto pero no heredados).
+**MODE B — INFERENCE** (cuando `inventario_p4` está vacío):
+- Derivar materiales mínimos de `contenido_form` y `nombre` de la actividad
+- Sin verbatim check — inferencia lógica por verbos de acción
+- Máximo 5 ítems, genéricos y directamente ligados a las acciones descritas
+- NO inventa marcas ni materiales de nicho
 
-La diferencia es que el modelo ahora aplica razonamiento de plausibilidad de nicho en lugar de conocimiento enciclopédico general. El DOMAIN LOCK redujo la severidad pero no eliminó la filtración porque la instrucción "verify each item" permite al modelo hacer verificación de compatibilidad en lugar de verificación de presencia exacta.
+**Fallback defensivo en assembler** (`p5-document.assembler.ts`):
+Si el agente produjo texto libre en lugar de JSON y `partes.logistica === null`, el assembler genera una entrada mínima con referencia al manual P4 en lugar de dejar la sección vacía.
 
-### Fix requerido
+### Impacto de la corrección en futuros dominios
 
-**En agente_materiales_A y agente_materiales_B:**
-- Cambiar la verificación de "soft" a "hard": "Para cada ítem en tu output, pregunta: ¿Estas palabras exactas aparecen en {inventario_p4.materiales} o {inventario_p4.herramientas}? Si la respuesta es NO → ELIMINA el ítem. Lista vacía es aceptable. Esto no es negociable."
-- El ejemplo de violación debe actualizarse para reflejar el nuevo patrón: no solo objetos de dominio ajeno sino también accesorios plausibles sin herencia
-
-**En juez_materiales:**
-- Agregar `extractor_p5` a `inputs_from` para que el juez pueda ver `{inventario_p4}`
-- HERITAGE CHECK: antes de seleccionar, el juez lista los ítems no-heredados y los descarta de ambas opciones antes de emitir su selección
+Un curso de soldadura con `inventario_p4.materiales: ["varilla de electrodo 6013", "careta de soldar"]` aplicará MODE A y solo listará esos materiales. Un curso nuevo sin P4 generado aplicará MODE B e inferirá materiales del nombre de la actividad. Ninguna mención a soldadura, pinceles ni otro dominio en el prompt.
 
 ---
 
-## Defecto 3: Chapter-Reference Leakage en Procedimientos (Unidad 3)
+## Corrección 2 — Mínimo de Pasos por Tipo de Actividad (agente_procedimiento)
 
-### Qué ocurre (no mencionado por el usuario, detectado en auditoría)
+### Problema
 
-Los pasos de ejecución de Unidad 3 contienen referencias académicas a capítulos:
-- "siguiendo las técnicas del pincel seco y veladura **del capítulo 1**"
-- "como se describe **en el Capítulo 2**"
-- Preparación: "**Revisar los conceptos claves del Capítulo 1**" — verbo mental + referencia académica
+El prompt no tenía mínimos de pasos. Para actividades de 120 min con tipo PRÁCTICA se generaban solo 2 pasos de ejecución — insuficiente para EC0366 y para que el instructor pueda facilitar la sesión.
 
-EC0366 exige que cada paso sea una ACCIÓN FÍSICA observable. "Revisa el Capítulo 1" es una instrucción de estudio, no de ejecución laboral.
+### Solución implementada
 
-### Fix requerido
-
-**En agente_procedimiento_A y agente_procedimiento_B:**
-- Agregar prohibición explícita: NINGÚN paso puede contener referencias a capítulos, manuales, libros o material de estudio ("Capítulo N", "el manual", "el libro", "como se vio en")
-- El paso debe describir la acción física completa sin depender de referencia externa
-
----
-
-## Tabla de Fixes y Archivos Afectados
-
-| Defecto | Agente(s) a modificar | Tipo de cambio | Prioridad |
+**STEP 6 — MINIMUM STEP COUNT** (en agente_procedimiento_A y B):
+| Tipo | preparacion | ejecucion | cierre_limpieza |
 |---|---|---|---|
-| Evidence Leakage | agente_evaluacion_A, agente_evaluacion_B | Constraint longitud + palabras prohibidas + mínimo criterios | CRÍTICA |
-| Evidence Leakage | juez_evaluacion | LEAKAGE FILTER pre-check | CRÍTICA |
-| Domain Infiltration | agente_materiales_A, agente_materiales_B | Hard-check replace soft-check | ALTA |
-| Domain Infiltration | juez_materiales | inputs_from + HERITAGE CHECK | ALTA |
-| Chapter References | agente_procedimiento_A, agente_procedimiento_B | Prohibición de referencias a capítulos | MEDIA |
+| PRÁCTICA / hands-on | ≥ 2 | ≥ 4 | ≥ 2 |
+| DEMOSTRACIÓN | ≥ 2 | ≥ 3 | ≥ 1 |
+
+Cada paso de ejecución debe especificar: WHAT action + WITH WHICH tool/material + ON WHICH part of the work object.
+
+**STEP 7 — PROHIBITION OF CIRCULAR STEPS**:
+Prohibición explícita de pasos tautológicos ("según sea necesario", "ajusta lo que corresponda"). Todo paso debe especificar la condición, la herramienta y el objeto.
+
+### Por qué es agnóstico
+
+Las reglas son sobre ESTRUCTURA (número de pasos, especificidad de verbos), no sobre CONTENIDO. Aplican igual a una actividad de torno CNC que a una de cocina o de atención al cliente.
 
 ---
 
-## Estado del Documento v2 por Unidad
+## Corrección 3 — Rúbricas por Tipo de Actividad, sin dependencia de duración (agente_evaluacion)
 
-| Unidad | Ficha | Materiales | Procedimiento | Evaluación | Veredicto |
-|---|---|---|---|---|---|
-| 2 — Dilución | ✓ objetivo físico, 90 min | ⚠ 2 ítems sin herencia P4 | ✓ verbos coherentes | ✗ evidencia = descripción P4, 1 criterio/5pts insuficiente | Rechazable |
-| 3 — Técnicas avanzadas | ✓ | ✓ pinceles, tintas (herencia P4) | ⚠ referencias a capítulos en pasos | ✓ "Miniatura pintada", 2 criterios | Aceptable con ajuste |
+### Problema raíz
+
+La regla anterior usaba `{ficha.duracion}` para calcular el mínimo de criterios. Pero `agente_evaluacion` tiene `inputs_from: [extractor_p5]` — nunca ve la salida de `agente_ficha`. La variable `{ficha.duracion}` no existe en su contexto, por lo que el modelo ignoraba la regla y generaba 1 criterio.
+
+### Solución implementada
+
+La regla ya no depende de duración (que el agente no puede ver). Depende del **tipo de actividad** que SÍ está en `contenido_form`:
+
+| Tipo | Mínimo | Total pts | Dimensiones obligatorias |
+|---|---|---|---|
+| PRÁCTICA / hands-on | 3 criterios | ≥ 15 pts | Técnica + Resultado + Proceso |
+| DEMOSTRACIÓN | 2 criterios | ≥ 10 pts | Técnica + Resultado |
+| Tipo desconocido | Default PRÁCTICA | ≥ 15 pts | — |
+
+Las 3 dimensiones son agnósticas: "Técnica" es cómo aplica el método (válido en soldadura, cocina, software), "Resultado" es el producto observable, "Proceso" es orden y cuidado de materiales.
+
+### Impacto en el juez
+
+`juez_evaluacion` ya tiene RUBRICA MINIMUM CHECK que penaliza opciones con criterios insuficientes. Ahora el criterio mínimo es consistente entre agente y juez.
+
+---
+
+## Corrección 4 — Inyección Universal de Predecesores (step4.production.ts)
+
+### Problema
+
+P2 y P3 cargaban predecesores con lógica específica:
+- P3: extraía `p4Capitulos` y pasaba `p4_secciones` (formato específico)
+- P2: extraía `p3Partes` y `p4Capitulos`, pasaba `p3_escaleta`, `p3_guion_literario`, `p4_secciones`
+
+Esta lógica de extracción vivía en el controller, era frágil y no escalaba.
+
+### Solución implementada
+
+**`_cargarProductosPrevios()`** ahora se usa universalmente para P2, P3, P5, P6, P7 y P8.
+
+```typescript
+// ANTES (P3) — extracción específica de P4:
+const p4CapituloData = p4Capitulos.find(c => c.unidad === moduloNum)?.secciones_json || {};
+userInputs: { p4_secciones: p4CapituloData }
+
+// DESPUÉS (P3) — predecesores universales:
+const productosPreviosP3 = await this._cargarProductosPrevios();
+userInputs: { productos_previos: productosPreviosP3 }
+```
+
+`_cargarProductosPrevios()` retorna `{ P1: datos_producto, P3: datos_producto, P4: datos_producto, ... }` — todos los productos aprobados con sus datos. Los templates acceden a `productos_previos.P4.capitulos` para P4, o a `productos_previos.P3.partes` para P3, sin código adicional en el controller.
+
+### Nota: templates P2 y P3 requieren actualización
+
+Los templates `F4_P2_GENERATE_DOCUMENT.md` y `F4_P3_GENERATE_DOCUMENT.md` actualmente usan variables `{p4_secciones}`, `{p3_escaleta}`, `{p3_guion_literario}`. Con la estandarización, deben leer de `productos_previos.P4.capitulos[N].secciones_json` etc. **Esta es la siguiente tarea después de validar P5.**
+
+---
+
+## Estado de Implementación
+
+| Corrección | Archivo | Estado |
+|---|---|---|
+| Protocolo dual de inventario | `F4_P5_GENERATE_DOCUMENT.md` — agente_materiales | ✅ Implementado |
+| Fallback defensivo de logística | `p5-document.assembler.ts` | ✅ Implementado |
+| Mínimo de pasos + anti-circulares | `F4_P5_GENERATE_DOCUMENT.md` — agente_procedimiento | ✅ Implementado |
+| Rúbricas por tipo (no por duración) | `F4_P5_GENERATE_DOCUMENT.md` — agente_evaluacion | ✅ Implementado |
+| Predecesores universales en controller | `step4.production.ts` — P3, P2 | ✅ Implementado |
+| Templates P2 y P3 usando productos_previos | `F4_P2_GENERATE_DOCUMENT.md`, `F4_P3_GENERATE_DOCUMENT.md` | ⏳ Pendiente |
+
+---
+
+## Reglas de Calidad Generales (para cualquier producto F4)
+
+Estas reglas se aplican a todos los agentes de procedimiento y evaluación de cualquier producto:
+
+1. **Verbos de acción físicos** — cada paso usa un verbo observable (aplica, conecta, mide, coloca). Nunca verbos mentales (analiza, comprende, reflexiona).
+
+2. **Objeto de trabajo explícito** — el receptor del verbo es siempre el objeto que produce el alumno (la pieza, el ensamble, el documento generado), nunca la superficie de trabajo, el manual o el instructor.
+
+3. **Heredar antes de inventar** — materiales de `inventario_p4` tienen prioridad absoluta. Solo en ausencia total de inventario se usa inferencia por verbos de acción.
+
+4. **Tres dimensiones en rúbrica** — para PRÁCTICA: Técnica (cómo) + Resultado (qué produce) + Proceso (orden y cuidado). Son agnósticas: aplican a cualquier disciplina.
+
+5. **Sin referencias académicas** — ningún paso menciona capítulos, manuales, temas o el nombre del instructor. Cada paso es autónomo.

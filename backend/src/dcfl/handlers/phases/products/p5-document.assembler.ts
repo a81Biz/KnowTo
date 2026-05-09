@@ -187,6 +187,17 @@ export async function handleDocumentP5Assembler(context: ProductContext): Promis
     console.log(`[p5-assembler] Sección ${seccion}: juez=${seleccion}`);
   }
 
+  // Fallback defensivo: si el agente_materiales no produjo JSON válido (inventario vacío
+  // o texto libre), generar logística mínima derivada del nombre de la actividad.
+  if (!partes.logistica) {
+    const nombreAct = nombreActividad.toLowerCase();
+    const esDigital = /digital|software|código|programar|diseño|editar/.test(nombreAct);
+    partes.logistica = esDigital
+      ? { materiales: [], herramientas: ['Computadora', 'Software de diseño'], consumibles: [], especificaciones_tecnicas: undefined }
+      : { materiales: ['Materiales de la actividad (ver manual P4)'], herramientas: ['Herramientas de la actividad (ver manual P4)'], consumibles: [], especificaciones_tecnicas: undefined };
+    console.log(`[p5-assembler] Logística vacía — usando fallback defensivo para "${nombreActividad}"`);
+  }
+
   if (partes.procedimiento) {
     partes.procedimiento.preparacion = normalizarPasos(partes.procedimiento.preparacion);
     partes.procedimiento.ejecucion = normalizarPasos(partes.procedimiento.ejecucion);

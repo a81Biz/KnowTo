@@ -573,26 +573,13 @@ class Step5ProductionController extends BaseStep {
           }
         }
 
-        // Cargar capítulos de P4 para inyectarlos como contexto por módulo
-        let p4Capitulos: Array<{ unidad: number; contenido_md: string; secciones_json?: Record<string, any> }> = [];
-        try {
-          const p4Res = await getData<{ productos: F4ProductoBD[] }>(
-            buildEndpoint(ENDPOINTS.wizard.fase4Productos(state.projectId!))
-          );
-          const p4Producto = p4Res.data?.productos?.find(p => p.producto === 'P4');
-          const caps = (p4Producto?.datos_producto as any)?.capitulos;
-          if (Array.isArray(caps)) p4Capitulos = caps;
-        } catch (err) {
-          console.warn('[F4] No se pudo cargar P4 para contexto de P3:', err);
-        }
+        const productosPreviosP3 = await this._cargarProductosPrevios();
 
         for (let i = 0; i < moduloKeys.length; i++) {
           const key = moduloKeys[i];
           const moduloNum = parseInt(key.replace('guion_unidad_', ''), 10);
           const nombreVideo = labelMap[key] || `Módulo ${moduloNum}`;
           showLoading(`⏳ Generando Guiones P3... Módulo ${i + 1}/${moduloKeys.length}: ${nombreVideo}`);
-
-          const p4CapituloData = p4Capitulos.find(c => c.unidad === moduloNum)?.secciones_json || {};
 
           const res = await postData<{ jobId: string }>(
             buildEndpoint(ENDPOINTS.wizard.generateAsync),
@@ -607,7 +594,7 @@ class Step5ProductionController extends BaseStep {
                 _modulo_actual: moduloNum,
                 _nombre_video: nombreVideo,
                 _producto: 'P3',
-                p4_secciones: p4CapituloData,
+                productos_previos: productosPreviosP3,
               },
             }
           );
@@ -659,35 +646,13 @@ class Step5ProductionController extends BaseStep {
           }
         }
 
-        // Cargar P3 y P4 para inyectar datos estructurados como contexto
-        let p3Partes: Record<string, any> = {};
-        let p4Capitulos: Array<{ unidad: number; contenido_md: string; secciones_json?: Record<string, any> }> = [];
-        try {
-          const res = await getData<{ productos: F4ProductoBD[] }>(
-            buildEndpoint(ENDPOINTS.wizard.fase4Productos(state.projectId!))
-          );
-          const productos = res.data?.productos ?? [];
-          const p3Producto = productos.find(p => p.producto === 'P3');
-          if (p3Producto?.datos_producto) {
-            p3Partes = (p3Producto.datos_producto as any)?.partes || {};
-          }
-          const p4Producto = productos.find(p => p.producto === 'P4');
-          const caps = (p4Producto?.datos_producto as any)?.capitulos;
-          if (Array.isArray(caps)) p4Capitulos = caps;
-        } catch (err) {
-          console.warn('[F4] No se pudo cargar P3/P4 para contexto de P2:', err);
-        }
+        const productosPreviosP2 = await this._cargarProductosPrevios();
 
         for (let i = 0; i < moduloKeys.length; i++) {
           const key = moduloKeys[i];
           const moduloNum = parseInt(key.replace('presentacion_unidad_', ''), 10);
           const nombreModulo = labelMap[key] || `Módulo ${moduloNum}`;
           showLoading(`⏳ Generando Presentación P2... Módulo ${i + 1}/${moduloKeys.length}: ${nombreModulo}`);
-
-          // Datos estructurados de P3 y P4 para este módulo (JSON puro, sin concatenar)
-          const p3ModuloKey = `modulo_${moduloNum}`;
-          const p3Data = p3Partes[p3ModuloKey] || {};
-          const p4CapituloData = p4Capitulos.find(c => c.unidad === moduloNum)?.secciones_json || {};
 
           const res = await postData<{ jobId: string }>(
             buildEndpoint(ENDPOINTS.wizard.generateAsync),
@@ -702,9 +667,7 @@ class Step5ProductionController extends BaseStep {
                 _modulo_actual: moduloNum,
                 _nombre_modulo: nombreModulo,
                 _producto: 'P2',
-                p3_escaleta: p3Data.escaleta_json || [],
-                p3_guion_literario: p3Data.guion_literario_json || [],
-                p4_secciones: p4CapituloData,
+                productos_previos: productosPreviosP2,
               },
             }
           );

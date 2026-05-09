@@ -100,18 +100,22 @@ pipeline_steps:
     task: |
       ROLE: Logistic Planner. TASK: Generate lists.
       
-      ⚠️ DOMAIN LOCK — READ BEFORE LISTING ANYTHING:
-      PRIORITY SOURCE: {inventario_p4.materiales} and {inventario_p4.herramientas} are your AUTHORIZED INVENTORY — these come from the approved course manual.
-      STEP 1: List ONLY items found in the AUTHORIZED INVENTORY. Do NOT add items from general knowledge or domain expertise.
-      STEP 2: If {inventario_p4.materiales} is empty, fall back to items explicitly named in {contenido_form}.
+      ⚠️ INVENTORY PROTOCOL — TWO MODES, CHOOSE ONE:
       
-      MANDATORY FINAL CHECK — NON-NEGOTIABLE:
-      For EACH item in your output, ask: "Do these exact words appear verbatim in {inventario_p4.materiales} or {inventario_p4.herramientas}?"
-      If the answer is NO → DELETE the item. Do not replace it. Do not explain. Simply remove it.
-      Empty array is acceptable. Plausibility is NOT sufficient — only verbatim presence in the authorized inventory qualifies.
-      VIOLATION EXAMPLES:
-        P4 has "pinturas acrílicas"; you include "cinta adhesiva" → DELETE (not in inventory, no matter how plausible).
-        P4 has "pinturas acrílicas"; you include "bolsitas de plástico" → DELETE (storage accessory not declared in P4).
+      MODE A — INHERITANCE (use when {inventario_p4.materiales} has at least one item):
+        STEP 1: Copy ONLY items found verbatim in {inventario_p4.materiales} and {inventario_p4.herramientas}.
+        STEP 2: For each item you list, confirm it appears word-for-word in the authorized inventory. If NOT → DELETE.
+        STEP 3: Do NOT add plausibility-based accessories not in the inventory (no matter how logical they seem).
+        VIOLATION EXAMPLES (MODE A):
+          Inventory has "pinturas acrílicas"; you add "cinta adhesiva" → DELETE (not in inventory).
+          Inventory has "pinceles"; you add "bolsitas de plástico" → DELETE (plausible but not declared).
+      
+      MODE B — INFERENCE (use ONLY when {inventario_p4.materiales} is empty or absent):
+        STEP 1: Read {contenido_form} and {nombre} to understand what physical actions the activity requires.
+        STEP 2: Derive the MINIMAL materials needed to execute those actions. Maximum 5 items total across all lists.
+        STEP 3: Do NOT apply verbatim check in this mode — use logical inference from the activity description.
+        STEP 4: Keep materials generic and tied to the action verbs (if activity says "apply", list an applicator tool; if "mix", list a container).
+        DO NOT invent brand names or domain-specific items beyond what the activity description requires.
       
       OUTPUT ONLY THIS JSON:
       {
@@ -127,9 +131,8 @@ pipeline_steps:
     inputs_from: [extractor_p5]
     include_template: false
     task: |
-      SAME AS AGENT A. ADD: "especificaciones_tecnicas" (e.g. "Voltaje 110V", "Luz natural").
-      ⚠️ DOMAIN LOCK — Same rules as Agent A: PRIORITY SOURCE is {inventario_p4.materiales}; fall back to {contenido_form} only if P4 inventory is empty.
-      MANDATORY FINAL CHECK — IDENTICAL to Agent A: for each item, verbatim presence in inventory is required. DELETE any item not found verbatim. No exceptions for plausible or related accessories.
+      SAME AS AGENT A — apply the full INVENTORY PROTOCOL (MODE A if inventory populated, MODE B if empty).
+      ADD: "especificaciones_tecnicas" (e.g. "Voltaje 110V", "Luz natural directa") derived from the materials listed.
       OUTPUT ONLY THIS JSON:
       {"logistica": {"materiales": [...], "herramientas": [...], "consumibles": [...], "especificaciones_tecnicas": "..."}}
 
@@ -183,6 +186,14 @@ pipeline_steps:
       STEP 5: PROHIBITED academic references in any step — FORBIDDEN phrases:
         • "del capítulo N", "el Capítulo N", "como se describe en", "según el manual", "revisar los conceptos", "como se vio en"
         Each step MUST be a standalone physical instruction. No references to study materials.
+      STEP 6: MINIMUM STEP COUNT (EC0366 normative):
+        • PRÁCTICA or hands-on activity: preparacion ≥ 2, ejecucion ≥ 4, cierre_limpieza ≥ 2.
+        • DEMOSTRACIÓN activity: preparacion ≥ 2, ejecucion ≥ 3, cierre_limpieza ≥ 1.
+        Each ejecucion step must specify: WHAT action + WITH WHICH tool/material + ON WHICH part of the work object.
+      STEP 7: PROHIBITION OF CIRCULAR STEPS:
+        A step is circular if it uses vague qualifiers without specifying the criterion.
+        FORBIDDEN: "Adjust tools as needed", "repeat if necessary", "do as appropriate"
+        REQUIRED: specify the condition, tool, and object explicitly in every step.
       
       CRITICAL — ARRAY FORMAT: Each item in "preparacion", "ejecucion", "cierre_limpieza" MUST be a plain STRING.
       PROHIBITED: nested objects like {"paso": 1, "descripcion": "..."} or {"step": "...", "detail": "..."}
@@ -259,10 +270,14 @@ pipeline_steps:
       CORRECT examples: "Miniatura pintada", "Pieza con dilución aplicada", "Modelo terminado con sombreado"
       PROHIBITED content in evidencia_producto: "curso", "capítulo", "contenido", "abordan", "incluye", "estructura", "marco teórico", "perspectiva", "manual". If any of these words appear → your evidencia_producto is WRONG. Rewrite it as a physical product name.
       
-      MINIMUM RUBRIC CRITERIA (proportional to activity duration from {ficha.duracion}):
-        • ≤ 30 minutes → minimum 1 criterion, total points ≥ 5
-        • 31–60 minutes → minimum 2 criteria, total points ≥ 10
-        • > 60 minutes → minimum 3 criteria, total points ≥ 15
+      MINIMUM RUBRIC CRITERIA (EC0366 normative — non-negotiable):
+        • PRÁCTICA or hands-on activity: minimum 3 criteria covering these 3 dimensions:
+            1. TECHNIQUE: how the learner applies the method or procedure
+            2. RESULT: what the produced piece visually or functionally shows
+            3. PROCESS: order, material care, work area organization
+          Total points ≥ 15.
+        • DEMOSTRACIÓN activity: minimum 2 criteria (Technique + Result). Total points ≥ 10.
+        • If activity type is unclear → default to PRÁCTICA rules (minimum 3 criteria).
       RUBRIC SCOPE: Each "criterio" MUST evaluate the LEARNER'S PHYSICAL PERFORMANCE during the activity — NOT the course content, NOT the manual structure, NOT the instructor's materials. The criterio must start with an action verb (Aplica, Mezcla, Coloca, Ejecuta...).
       
       OUTPUT ONLY THIS JSON:
@@ -283,7 +298,7 @@ pipeline_steps:
     task: |
       SAME AS AGENT A. ADD: "errores_comunes" (What to watch for).
       KEY NAMES MANDATORY: "criterio", "puntos", "indicador_exito" (no alternatives — see Agent A for full rules).
-      APPLY ALL CONSTRAINTS FROM AGENT A: EVIDENCE CONSTRAINT (max 8 words, no prohibited words) + MINIMUM RUBRIC CRITERIA (proportional to duration) + RUBRIC SCOPE (learner's physical performance only).
+      APPLY ALL CONSTRAINTS FROM AGENT A: EVIDENCE CONSTRAINT (max 8 words, no prohibited words) + MINIMUM RUBRIC CRITERIA (3 for PRÁCTICA, 2 for DEMOSTRACIÓN) + RUBRIC SCOPE (learner's physical performance only).
       OUTPUT ONLY THIS JSON:
       {"evaluacion": {"evidencia_producto": "Short physical product name", "rubrica": [{"criterio": "...", "puntos": 5, "indicador_exito": "..."}], "errores_comunes": ["Error 1", "Error 2"]}}
 
