@@ -125,3 +125,82 @@ Ordered SQL files in `supabase/migrations/` (prefix `NNN_name.sql`). Applied aut
 4. **Battle pattern** — Complex cognitive tasks use: Specialist A + Specialist B → Judge (returns `{"seleccion": "A"|"B", "razon": "..."}`) → Assembler (pure TS, picks winner and builds final document).
 
 5. **Audit before modifying shared services** — Before changing functions in `supabase.service.ts` or any shared parser, grep for all callers in the project to avoid breaking existing pipelines.
+
+---
+
+## Fase 4 — Productos (F4_P1 … F4_P8)
+
+### Flujo de datos F4
+
+Cada producto F4 corre como un job independiente por módulo/unidad. El frontend lanza N jobs (uno por unidad) y al completar todos llama `_loadProductsFromBD` para mostrar el documento ensamblado.
+
+```
+Frontend (step4.production.ts)
+  └─ por cada unidad: POST /dcfl/wizard/generate (jobId único)
+       └─ ai.service.ts: detecta agente ensamblador → llama _handleAssemblyAgent (retorna '')
+            └─ onAgentOutput callback → dispatchAgentEvent (pipeline-router.helper.ts)
+                 └─ handleF4Events (f4.phase.ts) → handler específico del assembler
+                      └─ lee outputs de agentes A/B/juez desde pipeline_agent_outputs
+                           └─ guarda documento ensamblado en fase4_productos
+                                └─ retorna documentoFinal (string)
+  └─ al terminar todos los jobs: _loadProductsFromBD → muestra documento
+```
+
+### Registro de assemblers (f4.phase.ts — productHandlers)
+
+El nombre del agente en el template YAML **debe coincidir exactamente** con la clave en `productHandlers`. Este fue el bug original de P5-P8.
+
+| Template prompt | agent name en YAML | Handler registrado |
+|---|---|---|
+| F4_P1_GENERATE_DOCUMENT | `ensamblador_doc_p1` | `handleDocumentP1Assembler` |
+| F4_P2_GENERATE_DOCUMENT | `ensamblador_doc_p2` | `handleDocumentP2Assembler` |
+| F4_P3_GENERATE_DOCUMENT | `ensamblador_doc_p3` | `handleDocumentP3Assembler` |
+| F4_P4_GENERATE_DOCUMENT | `ensamblador_doc_generic` | `handleDocumentP4Assembler` |
+| F4_P5_GENERATE_DOCUMENT | `ensamblador_doc_p5` | `handleDocumentP5Assembler` |
+| F4_P6_GENERATE_DOCUMENT | `ensamblador_doc_p6` | `handleDocumentP6Assembler` |
+| F4_P7_GENERATE_DOCUMENT | `ensamblador_doc_p7` | `handleDocumentP7Assembler` |
+| F4_P8_GENERATE_DOCUMENT | `ensamblador_doc_p8` | `handleDocumentP8Assembler` |
+
+### Reglas críticas de los assemblers F4
+
+- **JSON.parse del juez siempre en try-catch** — El LLM a veces produce `{seleccion: "A"}` con claves sin comillas, lo que es JSON inválido. Patrón correcto:
+  ```typescript
+  let decision: { seleccion?: string } = { seleccion: 'A' };
+  try { if (juezMatch) decision = JSON.parse(juezMatch[0]); } catch {}
+  ```
+  Si se escribe `const decision = juezMatch ? JSON.parse(juezMatch[0]) : { seleccion: 'A' }` **sin try-catch**, el assembler explota silenciosamente y el producto no se guarda.
+
+- **extractAny siempre con try-catch** — Mismo problema: el output de los especialistas puede contener `{variable_no_resuelta}` que el regex matchea pero JSON.parse no puede parsear.
+
+- **pipeline-router.helper.ts re-guarda el resultado** — El `dispatchAgentEvent` para F4 (branch C) debe hacer `saveAgentOutput(jobId, agentName, result)` con el string devuelto por el assembler. Sin esto, `pipeline_agent_outputs.output` queda vacío para el agente ensamblador y el job puede parecer completado con contenido vacío.
+
+- **Acumulación por módulos en BD** — Los assemblers P5-P8 leen el registro anterior de `fase4_productos` (campo `datos_producto.partes`), agregan el módulo actual y reescriben el documento final completo. `saveF4Produto` hace DELETE del registro 'aprobado' existente antes del INSERT.
+
+- **validacion_estado VARCHAR(30)** — Migration 035 amplió la columna de 20 a 30 chars para soportar `'aprobado_por_fallback'` (21 chars) usado en fallbacks de p1 y document-generic assemblers.
+
+### Cómo diagnosticar problemas F4
+
+```bash
+# Ver si el assembler corrió y qué guardó
+docker exec knowto-supabase-db psql -U postgres -d postgres \
+  -c "SELECT producto, validacion_estado, created_at FROM fase4_productos ORDER BY created_at DESC LIMIT 10;"
+
+# Ver outputs de todos los agentes de un job
+docker exec knowto-supabase-db psql -U postgres -d postgres \
+  -c "SELECT agent_name, LEFT(output,100) FROM pipeline_agent_outputs WHERE job_id='<UUID>' ORDER BY created_at;"
+
+# Ver logs del assembler en tiempo real
+docker logs knowto-backend 2>&1 | grep -E "p5-assembler|p6-assembler|p7-assembler|p8-assembler|assembler.*falló"
+```
+
+**Señal de bug**: `[PIPELINE] assembler ensamblador_doc_pN falló: Expected property name or '}' in JSON at position 1` → JSON.parse sin try-catch en el assembler.
+
+**Señal de bug**: assembler no aparece en logs pero el job completa → el nombre del agente en el template no coincide con `productHandlers` en `f4.phase.ts`.
+
+### Docker — backend NO usa nodemon
+
+El backend corre con `tsx` directamente (no nodemon). **Requiere reinicio manual** para cargar cambios:
+```bash
+docker compose restart backend
+```
+Los cambios en archivos `.ts` no se recargan automáticamente.
