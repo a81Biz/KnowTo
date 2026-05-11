@@ -7,6 +7,7 @@ interface FichaActividad {
   duracion: string;
   modalidad: string;
   tipo: string;
+  unidad_competencia?: string;
   pre_requisitos?: string;
   complejidad?: string;
 }
@@ -29,6 +30,9 @@ interface RubricaItem {
   criterio: string;
   puntos: number;
   indicador_exito: string;
+  nivel_a?: string;
+  nivel_b?: string;
+  nivel_c?: string;
 }
 
 interface Evaluacion {
@@ -59,6 +63,7 @@ const CLAVE_PARTE: Record<Seccion, keyof ParteActividad> = {
 function formatearFicha(f: FichaActividad): string {
   let md = '| Campo | Valor |\n|---|---|\n';
   md += `| **Objetivo** | ${f.objetivo} |\n`;
+  md += `| **Unidad de Competencia EC0366** | ${f.unidad_competencia || '—'} |\n`;
   md += `| **Duración** | ${f.duracion} |\n`;
   md += `| **Modalidad** | ${f.modalidad} |\n`;
   md += `| **Tipo** | ${f.tipo} |\n`;
@@ -90,10 +95,25 @@ function formatearProcedimiento(p: Procedimiento): string {
 function formatearEvaluacion(e: Evaluacion): string {
   let md = '#### Evaluación de la Actividad\n\n';
   md += `**Evidencia a entregar:** ${e.evidencia_producto}\n\n`;
-  md += '**Rúbrica de Desempeño:**\n\n';
-  md += '| Criterio | Indicador de Éxito | Puntos |\n|---|---|---|\n';
-  for (const item of e.rubrica) {
-    md += `| ${item.criterio} | ${item.indicador_exito} | ${item.puntos} |\n`;
+
+  // EC0366 requires observable, reproducible rubrics — use multi-level format if descriptors present
+  const hasLevels = e.rubrica.some(item => item.nivel_a || item.nivel_b || item.nivel_c);
+  if (hasLevels) {
+    md += '**Rúbrica de Desempeño (niveles observables):**\n\n';
+    md += '| Criterio | Completo (100%) | Parcial (60%) | Insuficiente (0%) | Puntos |\n|---|---|---|---|---|\n';
+    for (const item of e.rubrica) {
+      const nivelA = item.nivel_a || item.indicador_exito || 'Cumple completamente el criterio';
+      const nivelB = item.nivel_b || 'Cumple parcialmente el criterio con observaciones menores';
+      const nivelC = item.nivel_c || 'No cumple el criterio o presenta errores críticos';
+      md += `| ${item.criterio} | ${nivelA} | ${nivelB} | ${nivelC} | ${item.puntos} |\n`;
+    }
+  } else {
+    // Generate levels from indicador_exito as fallback — always output 3-level format
+    md += '**Rúbrica de Desempeño:**\n\n';
+    md += '| Criterio | Completo | Parcial | Insuficiente | Puntos |\n|---|---|---|---|---|\n';
+    for (const item of e.rubrica) {
+      md += `| ${item.criterio} | ${item.indicador_exito} | Cumple con 1-2 observaciones menores | No cumple o presenta errores críticos | ${item.puntos} |\n`;
+    }
   }
   if (e.errores_comunes?.length) {
     md += `\n**Errores comunes a observar:**\n${e.errores_comunes.map(err => `- ${err}`).join('\n')}\n`;
@@ -133,10 +153,16 @@ function normalizarPasos(items: any[]): string[] {
 function normalizarRubrica(items: any[]): RubricaItem[] {
   const INDICADOR_KEYS = ['indicador_exito', 'indicador', 'indicator', 'criterio_exito', 'descripcion_exito', 'success_indicator'];
   const PUNTOS_KEYS = ['puntos', 'puntos_posibles', 'points', 'score', 'valor', 'puntaje'];
+  const NIVEL_A_KEYS = ['nivel_a', 'nivel_completo', 'completo', 'excelente', 'nivel_1', 'level_a', 'full'];
+  const NIVEL_B_KEYS = ['nivel_b', 'nivel_parcial', 'parcial', 'satisfactorio', 'nivel_2', 'level_b', 'partial'];
+  const NIVEL_C_KEYS = ['nivel_c', 'nivel_insuficiente', 'insuficiente', 'nivel_3', 'level_c', 'insufficient'];
   return (items || []).map((item: any) => ({
     criterio: String(item.criterio || item.criterion || item.nombre || item.name || ''),
     indicador_exito: String(INDICADOR_KEYS.map((k: string) => item[k]).find((v: any) => v && typeof v === 'string') || ''),
     puntos: Number(PUNTOS_KEYS.map((k: string) => item[k]).find((v: any) => v !== undefined && v !== null) ?? 0),
+    nivel_a: NIVEL_A_KEYS.map(k => item[k]).find(v => v && typeof v === 'string') || undefined,
+    nivel_b: NIVEL_B_KEYS.map(k => item[k]).find(v => v && typeof v === 'string') || undefined,
+    nivel_c: NIVEL_C_KEYS.map(k => item[k]).find(v => v && typeof v === 'string') || undefined,
   })).filter((item: RubricaItem) => item.criterio.trim().length > 0);
 }
 
@@ -198,6 +224,11 @@ export async function handleDocumentP5Assembler(context: ProductContext): Promis
     console.log(`[p5-assembler] Logística vacía — usando fallback defensivo para "${nombreActividad}"`);
   }
 
+  // P5-B invariant: inject unidad_competencia from unit name (always present in ficha)
+  if (partes.ficha && !partes.ficha.unidad_competencia) {
+    partes.ficha.unidad_competencia = nombreActividad;
+  }
+
   if (partes.procedimiento) {
     partes.procedimiento.preparacion = normalizarPasos(partes.procedimiento.preparacion);
     partes.procedimiento.ejecucion = normalizarPasos(partes.procedimiento.ejecucion);
@@ -205,14 +236,69 @@ export async function handleDocumentP5Assembler(context: ProductContext): Promis
     if (partes.procedimiento.medidas_seguridad) {
       partes.procedimiento.medidas_seguridad = normalizarPasos(partes.procedimiento.medidas_seguridad);
     }
+    if (partes.procedimiento.ejecucion.length < 2) {
+      console.warn(`[p5-assembler] ⚠️ Unidad ${moduloActual} "${nombreActividad}": solo ${partes.procedimiento.ejecucion.length} paso(s) de ejecución (mínimo recomendado: 2 para cobertura EC0366)`);
+    }
+
+    // P5-D invariant: inject safety warnings when materials contain risk patterns
+    const inventarioP4: string[] = (event as any)?.body?.userInputs?.productos_previos?.P4?.inventario_materiales || [];
+    const inventarioStr = inventarioP4.join(' ').toLowerCase();
+    const RISK_PATTERNS = /\b(solvente|disolvente|eléctric|electrico|cortante|cuchilla|sierra|soldadura|soldar|químico|quimico|ácido|acido|alcalino|barniz|laca|thinner|acetona|resina|isocianato|pegamento|adhesivo)\b/;
+    if (RISK_PATTERNS.test(inventarioStr) && (!partes.procedimiento.medidas_seguridad || partes.procedimiento.medidas_seguridad.length === 0)) {
+      const warnings: string[] = [];
+      if (/solvente|disolvente|thinner|acetona|barniz|laca/.test(inventarioStr)) warnings.push('Trabajar en área ventilada. Evitar inhalar vapores de solventes.');
+      if (/eléctric|electrico|soldadura|soldar/.test(inventarioStr)) warnings.push('Verificar conexiones a tierra antes de operar equipo eléctrico.');
+      if (/cortante|cuchilla|sierra/.test(inventarioStr)) warnings.push('Usar guantes de protección al manipular herramientas cortantes.');
+      if (/ácido|acido|alcalino|químico|quimico/.test(inventarioStr)) warnings.push('Usar guantes y lentes de protección al manipular sustancias químicas.');
+      if (/resina|isocianato/.test(inventarioStr)) warnings.push('Evitar contacto prolongado con piel. Usar guantes de nitrilo.');
+      partes.procedimiento.medidas_seguridad = warnings;
+      console.log(`[p5-assembler] Medidas de seguridad inyectadas invariantemente para unidad ${moduloActual} (materiales de riesgo detectados)`);
+    }
   }
   if (partes.evaluacion?.rubrica) {
     partes.evaluacion.rubrica = normalizarRubrica(partes.evaluacion.rubrica);
+
+    // Check P1 alignment: at least one rubrica criterio should reference the P1 instrument type
+    try {
+      const instrumentosP1: Array<{unidad: number, tipo: string}> =
+        (event as any)?.body?.userInputs?.productos_previos?.P1?.instrumentos || [];
+      const instrP1 = instrumentosP1.find((i: any) => Number(i.unidad) === Number(moduloActual));
+      if (instrP1?.tipo && partes.evaluacion.rubrica.length > 0) {
+        const tipoKeyword = instrP1.tipo.split(/\s+/)[0].toLowerCase();
+        const hayAlineacion = partes.evaluacion.rubrica.some(r =>
+          r.criterio.toLowerCase().includes(tipoKeyword) ||
+          r.indicador_exito.toLowerCase().includes(tipoKeyword)
+        );
+        if (!hayAlineacion) {
+          console.warn(`[p5-assembler] ⚠️ Rúbrica de unidad ${moduloActual} no menciona el instrumento P1 ("${instrP1.tipo}") — revisar alineación P5-P1`);
+        }
+      }
+    } catch {}
   }
   if (partes.logistica) {
     partes.logistica.materiales = normalizarStringArray(partes.logistica.materiales);
     partes.logistica.herramientas = normalizarStringArray(partes.logistica.herramientas);
     partes.logistica.consumibles = normalizarStringArray(partes.logistica.consumibles);
+  }
+
+  // P5-E: Slot coherence — compare P5 activity duration against P6 session slot
+  if (partes.ficha?.duracion) {
+    try {
+      const p6Partes = (event as any)?.body?.userInputs?.productos_previos?.P6?.partes || {};
+      const sesionP6 = p6Partes[`modulo_${moduloActual}`];
+      const slotHoras = sesionP6?.horario_raw?.total_horas;
+      if (slotHoras) {
+        const durStr = partes.ficha.duracion.toLowerCase();
+        const horasMatch = durStr.match(/(\d+(?:\.\d+)?)\s*hora/);
+        const minMatch = durStr.match(/(\d+)\s*min/);
+        const actHoras = horasMatch
+          ? parseFloat(horasMatch[1])
+          : minMatch ? Math.ceil(parseInt(minMatch[1]) / 60) : 0;
+        if (actHoras > 0 && actHoras > Number(slotHoras)) {
+          console.warn(`[p5-assembler] ⚠️ COHERENCIA DE SLOT: Actividad "${nombreActividad}" (${partes.ficha.duracion}) excede el slot P6 de ${slotHoras}h para esta sesión — revisar duración o ajustar calendario.`);
+        }
+      }
+    } catch {}
   }
 
   // Formatear a markdown

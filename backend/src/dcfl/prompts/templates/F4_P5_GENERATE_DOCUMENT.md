@@ -19,9 +19,12 @@ pipeline_steps:
       Also check "fase3.unidades" and "productos_previos.P1" for context.
       
       MANDATORY — Extract inventario_p4 from "productos_previos.P4":
-      Look in "productos_previos.P4.capitulos" for the chapter where chapter.unidad === _modulo_actual.
-      From that chapter's "secciones_json", extract arrays named "materiales" and "herramientas".
-      If "productos_previos.P4" is absent or the chapter is not found, output empty arrays.
+      Use productos_previos.P4.inventario_materiales — this is the COMPLETE flat array of ALL authorized terms
+      (tools, materials, instruments, and techniques declared in the participant manual).
+      Copy it verbatim into inventario_p4.materiales.
+      For inventario_p4.herramientas: look in productos_previos.P4.capitulos for the chapter where
+      chapter.unidad === _modulo_actual; extract chapter.secciones_json.conceptos_clave[].termino as strings.
+      If "productos_previos.P4" is absent or inventario_materiales is missing: output empty arrays.
       DO NOT invent materials. Only copy what literally appears in the P4 data.
       
       OUTPUT ONLY VALID JSON:
@@ -30,8 +33,8 @@ pipeline_steps:
         "nombre": "string",
         "contenido_form": "verbatim text from form",
         "inventario_p4": {
-          "materiales": ["item exactly as written in P4"],
-          "herramientas": ["tool exactly as written in P4"]
+          "materiales": ["all items from productos_previos.P4.inventario_materiales verbatim"],
+          "herramientas": ["conceptos_clave.termino from the chapter matching modulo_actual, or []"]
         },
         "instrumentos_p1": [
           {"unidad": 1, "tipo": "Guía de Observación", "reactivos": ["..."]}
@@ -280,13 +283,27 @@ pipeline_steps:
         • If activity type is unclear → default to PRÁCTICA rules (minimum 3 criteria).
       RUBRIC SCOPE: Each "criterio" MUST evaluate the LEARNER'S PHYSICAL PERFORMANCE during the activity — NOT the course content, NOT the manual structure, NOT the instructor's materials. The criterio must start with an action verb (Aplica, Mezcla, Coloca, Ejecuta...).
       
+      PERFORMANCE LEVELS — EC0366 NORMATIVE REQUIREMENT:
+      Each rubrica item MUST include observable descriptors for 3 performance levels:
+      - "nivel_a": What COMPLETE/EXCELLENT performance looks like — the learner does X fully, without errors, on the first attempt.
+      - "nivel_b": What PARTIAL performance looks like — 1-2 minor deviations observed, correctable with guidance.
+      - "nivel_c": What INSUFFICIENT performance looks like — critical error, omission, or unsafe behavior.
+      These descriptors must be OBSERVABLE — an evaluator must be able to distinguish them without subjective interpretation.
+      WRONG nivel_a: "Performs well" — RIGHT nivel_a: "Applies all 4 layers in the specified order without skipping any step"
+      
       OUTPUT ONLY THIS JSON:
       {
         "evaluacion": {
           "evidencia_producto": "Short physical product name (max 8 words)",
           "rubrica": [
-            {"criterio": "Specific observable action by the learner", "puntos": 5, "indicador_exito": "Description of success"},
-            {"criterio": "...", "puntos": 5, "indicador_exito": "..."}
+            {
+              "criterio": "Specific observable action by the learner",
+              "puntos": 5,
+              "indicador_exito": "Description of success",
+              "nivel_a": "Completo: [observable descriptor of full compliance]",
+              "nivel_b": "Parcial: [observable descriptor of partial compliance]",
+              "nivel_c": "Insuficiente: [observable descriptor of non-compliance or critical error]"
+            }
           ]
         }
       }
@@ -297,10 +314,10 @@ pipeline_steps:
     include_template: false
     task: |
       SAME AS AGENT A. ADD: "errores_comunes" (What to watch for).
-      KEY NAMES MANDATORY: "criterio", "puntos", "indicador_exito" (no alternatives — see Agent A for full rules).
-      APPLY ALL CONSTRAINTS FROM AGENT A: EVIDENCE CONSTRAINT (max 8 words, no prohibited words) + MINIMUM RUBRIC CRITERIA (3 for PRÁCTICA, 2 for DEMOSTRACIÓN) + RUBRIC SCOPE (learner's physical performance only).
+      KEY NAMES MANDATORY: "criterio", "puntos", "indicador_exito", "nivel_a", "nivel_b", "nivel_c" (no alternatives — see Agent A for full rules).
+      APPLY ALL CONSTRAINTS FROM AGENT A: EVIDENCE CONSTRAINT (max 8 words, no prohibited words) + MINIMUM RUBRIC CRITERIA (3 for PRÁCTICA, 2 for DEMOSTRACIÓN) + RUBRIC SCOPE (learner's physical performance only) + PERFORMANCE LEVELS (nivel_a/b/c observable descriptors).
       OUTPUT ONLY THIS JSON:
-      {"evaluacion": {"evidencia_producto": "Short physical product name", "rubrica": [{"criterio": "...", "puntos": 5, "indicador_exito": "..."}], "errores_comunes": ["Error 1", "Error 2"]}}
+      {"evaluacion": {"evidencia_producto": "Short physical product name", "rubrica": [{"criterio": "...", "puntos": 5, "indicador_exito": "...", "nivel_a": "Completo: ...", "nivel_b": "Parcial: ...", "nivel_c": "Insuficiente: ..."}], "errores_comunes": ["Error 1", "Error 2"]}}
 
   - agent: juez_evaluacion
     model: "qwen2.5:14b"

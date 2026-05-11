@@ -30,8 +30,9 @@ pipeline_steps:
       
       P4 data:
         - Search productos_previos.P4.capitulos (array) for the entry where entry.unidad === _modulo_actual
-        - p4_secciones = that entry's "secciones_json" field           (object — pass as-is; use {} if absent)
-        - If productos_previos.P4 is absent or no matching chapter found: use {}
+        - p4_secciones  = that entry's "secciones_json" field              (object — pass as-is; use {} if absent)
+        - inventario_p4 = productos_previos.P4.inventario_materiales        (array  — pass as-is; use [] if absent)
+        - If productos_previos.P4 is absent or no matching chapter found: use {} for p4_secciones, [] for inventario_p4
       
       OUTPUT ONLY VALID JSON:
       {
@@ -42,7 +43,8 @@ pipeline_steps:
           "escaleta": {p3_escaleta as-is},
           "literario": {p3_guion_literario as-is}
         },
-        "p4_secciones": {p4_secciones as-is}
+        "p4_secciones": {p4_secciones as-is},
+        "inventario_p4": {inventario_p4 as-is}
       }
 
   # ═══════════════════════════════════════════════════════════════════════
@@ -57,9 +59,10 @@ pipeline_steps:
       
       Crea la Presentación Electrónica completa basándote en {p4_secciones} y sincronizándola con p3_guion.escaleta y p3_guion.literario.
       
-      REGLA DE LONGITUD DINÁMICA (ZERO LOSS):
-      - Crea TANTAS diapositivas como sean necesarias para abarcar el 100% de {p4_secciones} sin omitir nada.
-      - Una diapositiva por sección del P4 (introduccion, marco_teorico, cada concepto_clave, cada paso de desarrollo, ejemplo_practico, ejercicio_practico, puntos_recordar).
+      REGLA DE LONGITUD DINÁMICA (ZERO LOSS + MAX CAP):
+      - Crea las diapositivas necesarias para cubrir el 100% de {p4_secciones} sin omitir nada de contenido.
+      - MÁXIMO 20 DIAPOSITIVAS POR MÓDULO. Si el P4 tiene más secciones/conceptos, agrúpalos en diapositivas mixtas y delega la profundidad a 'nota_facilitador.diga'. PROHIBIDO superar 20 slides.
+      - Una diapositiva por sección del P4 (introduccion, marco_teorico, conceptos_clave agrupados, pasos de desarrollo agrupados en 2-3 por slide, ejemplo_practico, ejercicio_practico, puntos_recordar).
       - PROHIBIDO hacer muros de texto en 'slide.contenido' — usa viñetas breves (máx. 6 palabras por viñeta).
       - La 'nota_facilitador.diga' debe contener TODA la profundidad técnica: si el P4 menciona 10 pasos, el facilitador los dice todos.
       
@@ -110,7 +113,8 @@ pipeline_steps:
       YOU ARE AN API ENDPOINT. OUTPUT ONLY RAW JSON.
       
       SAME TASK AS AGENT A: Create the complete presentation from {p4_secciones}.
-      APPLY SAME ZERO LOSS RULE: same slide count, same coverage of all P4 sections, same word depth in nota_facilitador.diga.
+      APPLY SAME ZERO LOSS RULE: same coverage of all P4 sections, same word depth in nota_facilitador.diga.
+      APPLY SAME MAX CAP: MAXIMUM 20 SLIDES PER MODULE. Group related concepts into single slides if needed.
       APPLY SAME ANTI-LOOP RULE: before writing slide N, list internally all previous slide titles. If the topic already appears in a prior slide, SKIP it and move to the next P4 section.
       
       DIFFERENT PEDAGOGICAL STYLE — use the "I do, we do, you do" framework:
@@ -145,6 +149,8 @@ pipeline_steps:
       1. ZERO LOSS: Which agent covered MORE sections of p4_secciones without omitting content?
       2. DEPTH: Which agent's nota_facilitador.diga entries are longer and more specific?
       3. STRUCTURE: Does every slide have slide, nota_facilitador, AND recurso_visual filled?
+      4. P3 SYNC: Count how many escaleta scene markers from p3_guion appear as slide titles or in nota_facilitador.diga.
+         Prefer the agent with HIGHER P3 scene coverage. If one agent covers 0 P3 scenes and the other covers ≥1, select the latter regardless of criteria 1-3.
       
       VETO CRITERIA — Output "RECHAZADO" ONLY IF BOTH of the following are true for BOTH A and B:
       1. Both outputs have fewer than 5 slides total.
@@ -152,7 +158,7 @@ pipeline_steps:
       If RECHAZADO, "razon" MUST describe the specific shared deficiency so the agents can correct it.
       
       OUTPUT ONLY THIS JSON:
-      {"seleccion": "A" | "B" | "RECHAZADO", "razon": "one-line explanation"}
+      {"seleccion": "A" | "B" | "RECHAZADO", "razon": "one-line explanation including P3 scene coverage count, e.g. 'A cubre 4/5 escenas P3 vs B cubre 2/5'"}
 
   # ═══════════════════════════════════════════════════════════════════════
   # SECCIÓN 2: ACTIVIDADES DIDÁCTICAS
@@ -171,11 +177,12 @@ pipeline_steps:
       Add warm-up FROM p4_secciones.introduccion.
       Add reflection FROM p4_secciones.puntos_recordar.
       
-      MATERIALES RULE (STRICT):
-      "materiales" MUST be copied VERBATIM from p4_secciones.ejercicio_practico.
-      FORBIDDEN: adding, substituting, or inventing materials not listed in p4_secciones.
-      If p4_secciones.ejercicio_practico does not list materials, use p4_secciones.desarrollo as fallback.
-      NEVER use materials from prior course modules or from general domain knowledge.
+      DOMAIN LOCK — MATERIALES (STRICT):
+      inventario_p4 is the COMPLETE authorized inventory for this course (all tools, materials, instruments, and techniques approved in the participant manual).
+      "materiales" in every activity MUST come EXCLUSIVELY from inventario_p4 or p4_secciones.ejercicio_practico.
+      FORBIDDEN: adding, substituting, or inventing materials absent from both inventario_p4 and p4_secciones.
+      If p4_secciones.ejercicio_practico does not list materials, use p4_secciones.desarrollo as fallback — still within inventario_p4.
+      NEVER use materials from general domain knowledge, internet research, or other modules.
       
       MINIMUM ACTIVITIES: Generate AT LEAST 2 activities per module. A single activity is never enough for effective learning — always include at least a warm-up activity AND the core practice activity.
       TIME CONSTRAINT: each activity MUST be "15 min", "20 min", "30 min", or "45 min". Total across all activities MUST NOT exceed "90 min" (1.5 hours).
@@ -200,7 +207,7 @@ pipeline_steps:
     inputs_from: [extractor_p2]
     include_template: false
     task: |
-      SAME AS AGENT A. ADD for each activity:
+      SAME AS AGENT A INCLUDING THE DOMAIN LOCK MATERIALES RULE (inventario_p4 is the authority). ADD for each activity:
       - "versiones": {"pares": "...", "grupos_pequenos": "...", "individual": "...", "virtual": "..."}
       - "gestion_tiempo": {"si_falta": "...", "si_sobra": "..."}
       OUTPUT ONLY THIS JSON:
@@ -212,17 +219,22 @@ pipeline_steps:
     include_template: false
     task: |
       YOU ARE A JSON PARSER. Compare ACTIVITIES.
+      
+      FIRST: Compute total activity time for each agent by summing the numeric value from each actividad.duracion field.
+      Example: ["30 min", "20 min", "15 min"] → total = 65 min.
+      
       SELECTION (apply in order, first failure eliminates):
-      1. TIME: total activity time ≤ 90 min. If exceeds → auto-select other.
+      1. TIME SUM: total activity time ≤ 90 min. If A exceeds → select B. If B exceeds → select A. If both exceed → select the one closest to 90 min.
       2. SINGLE ACTIVITY MAX: no single activity > 60 min. If any exceeds → auto-select other.
       3. CONCRETE STEPS: each actividad has 2-5 instrucciones that are executable actions, not abstract descriptions.
       4. P4 ALIGNMENT: activities derive from p4_secciones.ejercicio_practico.
+      5. DOMAIN LOCK: every material in actividades[N].materiales must exist in inventario_p4 or p4_secciones. Prefer the agent with fewer unauthorized materials.
       VETO CRITERIA — Output "RECHAZADO" ONLY IF ALL of the following are true for BOTH A and B:
       1. Total activity time exceeds 120 min in both outputs.
       2. "instrucciones" arrays in both outputs contain abstract descriptions instead of executable actions.
       If RECHAZADO, "razon" MUST describe the specific shared deficiency so the agents can correct it.
       
-      OUTPUT: {"seleccion": "A"|"B"|"RECHAZADO", "razon": "one-line"}
+      OUTPUT: {"seleccion": "A"|"B"|"RECHAZADO", "razon": "one-line including computed totals, e.g. 'A: 65 min total (dentro del límite), B: 95 min (excede 90 min)'"}
 
   # ═══════════════════════════════════════════════════════════════════════
   # SECCIÓN 3: CIERRE Y TRANSICIÓN

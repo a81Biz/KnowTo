@@ -40,8 +40,10 @@ pipeline_steps:
          - Physical action verbs (aplicar, construir, soldar, pintar, ensamblar) → the evaluator OBSERVES the candidate performing the task.
          - Production verbs (diseñar, desarrollar, programar, calcular, entregar) → the evaluator REVIEWS a deliverable product.
          - Knowledge verbs (identificar, clasificar, explicar, diferenciar) → the evaluator REVIEWS tangible evidence (document, presentation, solved exercise).
-      3. Write the Instrucción describing what the candidate DOES in front of the evaluator.
-      4. Write 2 reactivos. Each reactivo must describe a verifiable fact that the evaluator can answer "Yes/No" without ambiguity. No subjective adjectives (adecuado, correcto, bien, efectivo).
+      3. Write the Instrucción as a directive for the evaluator. It MUST include:
+         - Condición de inicio: A starting trigger (e.g., "ANTES de que el candidato inicie...", "Una vez que el candidato haya preparado el área de trabajo..."). This defines exactly when the evaluator begins observing.
+         - What the candidate must do in the evaluator's presence.
+      4. Write MINIMUM 3 reactivos (and up to 5 for complex units). Each reactivo must describe a verifiable fact that the evaluator can answer "Yes/No" without ambiguity. No subjective adjectives (adecuado, correcto, bien, efectivo). FORBIDDEN: only 2 reactivos — that is insufficient coverage for EC0366 criteria.
       5. Specify the Evidence type: Desempeño (observed action), Producto (deliverable), or Documento (written).
       
       RULES:
@@ -55,7 +57,7 @@ pipeline_steps:
         {
           "name": "instrumento_unidad_1",
           "label": "Evaluación: [Unit name]",
-          "suggested_value": "Instrucción: ...\nReactivos:\n1. ...\n2. ...\nEvidencia: [Desempeño / Producto / Documento]",
+          "suggested_value": "Instrucción:\nCondición de inicio: Una vez que el candidato haya [preparado el área / reunido los materiales / ...], el evaluador iniciará la observación.\nEl candidato deberá: ...\nReactivos:\n1. ...\n2. ...\n3. ...\nEvidencia: [Desempeño / Producto / Documento]",
           "type": "textarea"
         }
       ]
@@ -78,8 +80,10 @@ pipeline_steps:
          - If the objective requires the candidate to DO something physically → direct observation instrument.
          - If the objective requires the candidate to PRODUCE something → product review instrument.
          - If the objective requires the candidate to DEMONSTRATE understanding → documentary evidence review.
-      3. Write the Instrucción as a clear directive for the evaluator.
-      4. Write 2 reactivos as verifiable quality conditions. Each must be specific to the unit content.
+      3. Write the Instrucción as a clear directive for the evaluator. It MUST include:
+         - Condición de inicio: The starting trigger that defines when evaluation begins (e.g., "ANTES de iniciar, el evaluador verificará que el candidato tenga todos los materiales disponibles", or "Una vez que el candidato haya demostrado conocimiento previo del proceso, el evaluador solicitará...").
+         - The specific action the candidate must perform.
+      4. Write MINIMUM 3 reactivos as verifiable quality conditions (up to 5 for complex units). Each must be specific to the unit content. FORBIDDEN: only 2 reactivos — EC0366 requires sufficient criterion coverage.
       5. Specify the Evidence type.
       
       RULES:
@@ -94,7 +98,7 @@ pipeline_steps:
         {
           "name": "instrumento_unidad_1",
           "label": "Evaluación: [Unit name]",
-          "suggested_value": "Instrucción: ...\nReactivos:\n1. ...\n2. ...\nEvidencia: [Desempeño / Producto / Documento]",
+          "suggested_value": "Instrucción:\nCondición de inicio: Una vez que el candidato haya [acción previa], el evaluador iniciará la observación.\nEl candidato deberá: ...\nReactivos:\n1. ...\n2. ...\n3. ...\nEvidencia: [Desempeño / Producto / Documento]",
           "type": "textarea"
         }
       ]

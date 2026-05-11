@@ -184,7 +184,8 @@ export async function handleDocumentP2Assembler(context: ProductContext): Promis
   // ── Sección 1: Presentación Completa (agente unificado) ──────────────────
   const rawJuezPresentacion = await services.pipelineService.getAgentOutput(jobId, 'juez_presentacion') || '';
   const juezPresMatch = rawJuezPresentacion.match(/\{[\s\S]*\}/);
-  const decisionPres = juezPresMatch ? JSON.parse(juezPresMatch[0]) : { seleccion: 'A' };
+  let decisionPres: { seleccion?: string } = { seleccion: 'A' };
+  try { if (juezPresMatch) decisionPres = JSON.parse(juezPresMatch[0]); } catch {}
   const selPres: 'A' | 'B' = decisionPres?.seleccion === 'B' ? 'B' : 'A';
   const agentePresGanador = selPres === 'A' ? 'agente_presentacion_A' : 'agente_presentacion_B';
   const rawPresGanador = await services.pipelineService.getAgentOutput(jobId, agentePresGanador) || '';
@@ -194,23 +195,62 @@ export async function handleDocumentP2Assembler(context: ProductContext): Promis
   // ── Sección 2: Actividades ────────────────────────────────────────────────
   const rawJuezAct = await services.pipelineService.getAgentOutput(jobId, 'juez_actividades') || '';
   const juezActMatch = rawJuezAct.match(/\{[\s\S]*\}/);
-  const decisionAct = juezActMatch ? JSON.parse(juezActMatch[0]) : { seleccion: 'A' };
+  let decisionAct: { seleccion?: string } = { seleccion: 'A' };
+  try { if (juezActMatch) decisionAct = JSON.parse(juezActMatch[0]); } catch {}
   const selAct: 'A' | 'B' = decisionAct?.seleccion === 'B' ? 'B' : 'A';
   const agenteActGanador = selAct === 'A' ? 'agente_actividades_A' : 'agente_actividades_B';
   const rawActGanador = await services.pipelineService.getAgentOutput(jobId, agenteActGanador) || '';
   const actividades: Actividad[] = sanitizeArray(extractAny(rawActGanador, 'actividades'));
   console.log(`[p2-assembler] Actividades: juez=${selAct}, ${actividades.length} actividades`);
 
+  // Domain lock: advertir materiales no autorizados según inventario de P4
+  const inventarioP4: string[] = (event?.body?.userInputs as any)?.productos_previos?.P4?.inventario_materiales || [];
+  if (inventarioP4.length > 0) {
+    for (const act of actividades) {
+      const actMateriales = toStringArray(act.materiales);
+      const noAutorizados = actMateriales.filter(m => {
+        const mLow = m.toLowerCase().trim();
+        return mLow.length > 3 && !inventarioP4.some(inv => {
+          const iLow = inv.toLowerCase().trim();
+          return iLow.includes(mLow) || mLow.includes(iLow);
+        });
+      });
+      if (noAutorizados.length > 0) {
+        console.warn(`[p2-assembler] DOMAIN LOCK: materiales no autorizados en "${act.nombre}": ${noAutorizados.join(', ')}`);
+      }
+    }
+  }
+
   // ── Sección 3: Cierre ─────────────────────────────────────────────────────
   const rawJuezCierre = await services.pipelineService.getAgentOutput(jobId, 'juez_cierre') || '';
   const juezCierreMatch = rawJuezCierre.match(/\{[\s\S]*\}/);
-  const decisionCierre = juezCierreMatch ? JSON.parse(juezCierreMatch[0]) : { seleccion: 'A' };
+  let decisionCierre: { seleccion?: string } = { seleccion: 'A' };
+  try { if (juezCierreMatch) decisionCierre = JSON.parse(juezCierreMatch[0]); } catch {}
   const selCierre: 'A' | 'B' = decisionCierre?.seleccion === 'B' ? 'B' : 'A';
   const agenteCierreGanador = selCierre === 'A' ? 'agente_cierre_A' : 'agente_cierre_B';
   const rawCierreGanador = await services.pipelineService.getAgentOutput(jobId, agenteCierreGanador) || '';
   const cierreRaw = extractAny(rawCierreGanador, 'cierre_transicion');
   const cierre: Cierre | null = cierreRaw ? sanitizeObject(cierreRaw) as Cierre : null;
   console.log(`[p2-assembler] Cierre: juez=${selCierre}`);
+
+  // 2.5: Ensure puente.facilitador_dice names the next module — inject fallback if absent/generic
+  if (cierre) {
+    const dice = cierre.puente?.facilitador_dice?.trim() || '';
+    if (dice.length < 30) {
+      // Try to get the next unit name from F3 unidades in productos_previos
+      let nextNombre = '';
+      try {
+        const f3Unidades: any[] = (event?.body?.userInputs as any)?.productos_previos?.F3?.unidades || [];
+        const nextUnidad = f3Unidades.find((u: any) => Number(u.modulo) === Number(moduloActual) + 1);
+        if (nextUnidad?.nombre) nextNombre = nextUnidad.nombre;
+      } catch {}
+      if (!cierre.puente) cierre.puente = { facilitador_dice: '', slide_muestra: 'Próxima sesión' };
+      cierre.puente.facilitador_dice = nextNombre
+        ? `Hemos concluido el módulo "${nombreModulo}". En el siguiente módulo exploraremos "${nextNombre}", donde profundizaremos y aplicaremos nuevas técnicas. Les pido que vengan preparados con los materiales del curso.`
+        : `Hemos concluido el módulo "${nombreModulo}". En el siguiente módulo profundizaremos en los conceptos vistos hoy y exploraremos nuevas técnicas. Los espero con los materiales listos.`;
+      console.warn(`[p2-assembler] puente.facilitador_dice vacío — fallback inyectado para módulo ${moduloActual}`);
+    }
+  }
 
   // ── Formatear a Markdown ──────────────────────────────────────────────────
   const presentacionMd = formatearPresentacionCompleta(presentacionCompleta);
@@ -240,7 +280,21 @@ export async function handleDocumentP2Assembler(context: ProductContext): Promis
   };
 
   const modulosOrdenados = Object.keys(partesAcumuladas).sort();
+
+  // P2-A: Count total slides across all accumulated modules and warn if > 60
+  const totalSlides = modulosOrdenados.reduce((acc, key) => {
+    const m = partesAcumuladas[key];
+    const slidesThisModule = Array.isArray(m.presentacion_completa) ? m.presentacion_completa.length : 0;
+    return acc + slidesThisModule;
+  }, 0);
+  if (totalSlides > 60) {
+    console.warn(`[p2-assembler] ⚠️ AVISO PEDAGÓGICO: La presentación acumulada tiene ${totalSlides} diapositivas en total (${modulosOrdenados.length} módulos). Una presentación de más de 60 diapositivas es inviable para impartición presencial real. Revisar densidad de contenido por módulo.`);
+  }
+
   let documentoFinal = '# Presentación Electrónica del Facilitador\n\n';
+  if (totalSlides > 60) {
+    documentoFinal += `> ⚠️ **Aviso de extensión:** Esta presentación acumulada contiene ${totalSlides} diapositivas en ${modulosOrdenados.length} módulos. Se recomienda no superar 60 diapositivas totales para una impartición efectiva. Considere consolidar o eliminar diapositivas de menor impacto antes de presentar a candidatos.\n\n`;
+  }
   for (const key of modulosOrdenados) {
     const m = partesAcumuladas[key];
     documentoFinal += `## ${key.replace('modulo_', 'Módulo ')}: ${m.nombre}\n\n`;

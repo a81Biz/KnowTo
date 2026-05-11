@@ -50,32 +50,90 @@ pipeline_steps:
       
       SOURCE OF TRUTH: The units from the syllabus (F2/F3) and the total weight of P1-P7 deliverables already produced.
       
-      FOR EACH UNIT:
+      MANDATORY FIRST ITEMS — always output these 8 before per-unit items:
+      1. "fecha_inicio_produccion": The date when material production begins (DD/MM/YYYY format). This anchors all "Fecha inicio" and "Fecha entrega" fields.
+      2. "fecha_inicio_formacion": The planned date for the first training session (DD/MM/YYYY format). Production must complete before this date.
+      3. "lugar_imparticion": The physical or virtual location where training will take place (e.g., "Centro de capacitación / Sala de juntas / En línea vía Zoom").
+      4. "modalidad_imparticion": Training modality — "Presencial", "Virtual", or "Híbrido".
+      5. "numero_grupos": Number of candidate groups or total candidate count (e.g., "1 grupo de 12 candidatos").
+      6. "nombre_di": Full name of the Instructional Designer (DI) responsible for this project. Required to assign real accountability in quality gates.
+      7. "nombre_sme": Full name of the Subject Matter Expert (SME / Experto en la Materia) who validates content accuracy.
+      8. "nombre_coordinador": Full name of the project Coordinator responsible for schedule adherence and stakeholder communication.
+      
+      FOR EACH UNIT (items 6 and beyond):
       1. Read its "nombre" and "objetivo".
-      2. Read the corresponding P1-P7 products to identify WHAT was produced for this unit and HOW MUCH effort it represents.
+      2. Read the corresponding P1-P7 products to identify WHAT was produced and HOW MUCH effort it represents.
       3. Design a development task with 6 fields:
-         - Entregable: The material to produce for this unit — list the specific P1-P7 products that exist for it.
-         - Responsable: Who produces the material — diseñador instruccional, experto de contenido, coordinador, productor multimedia.
-         - Fecha inicio: Start week or month — use week numbers (Semana 1, Semana 2...) from a realistic production timeline.
-         - Fecha entrega: Delivery deadline for review-ready material.
-         - Revisión y ajustes: Estimated time for corrections after client/stakeholder review.
-         - Estado: Pendiente / En proceso / Completado — based on whether the P1-P7 product already exists for this unit.
+         - Entregable: The specific P1-P7 products that exist for this unit (list them by name).
+         - Responsable: Who produces — diseñador instruccional, experto de contenido, coordinador, productor multimedia.
+         - Fecha inicio: Real calendar date (DD/MM/YYYY) anchored from fecha_inicio_produccion. Use week offsets.
+         - Fecha entrega: Real delivery deadline (DD/MM/YYYY). Must be before fecha_inicio_formacion.
+         - Revisión y ajustes: Estimated days for corrections after review.
+         - Estado: Pendiente / En proceso / Completado.
       
       RULES:
-      1. SAME NUMBER OF ELEMENTS AS UNITS RECEIVED.
-      2. P1-P7 WEIGHT: The schedule MUST reflect the actual production effort. Units with more products (P1-P7 all present) require more development time than units with fewer.
-      3. PRODUCTION DEPENDENCIES: Respect the production order from the master flow — P3 before P4 for the same unit, P2 before P4, P1 before P5. Schedule accordingly.
-      4. BUSINESS DAYS ONLY: All dates must fall on business days (Mon-Fri). Do not schedule deliveries on weekends.
-      5. REALISTIC DURATION: Each unit's development span must allow enough calendar weeks for the estimated production hours. A 40-hour production cannot be delivered in 2 days.
-      6. field "name" MUST be: "cronograma_unidad_" + modulo.
-      7. USE \n FOR LINE BREAKS in suggested_value.
+      1. OUTPUT LENGTH = 8 + number of units.
+      2. REAL DATES: All dates must be real DD/MM/YYYY dates anchored from fecha_inicio_produccion. No "Semana N" or "Día X".
+      3. BUSINESS DAYS ONLY: Mon-Fri only. No weekend dates.
+      4. PRODUCTION DEPENDENCIES: P3 before P4, P2 before P4, P1 before P5. Schedule accordingly.
+      5. field "name" MUST be: "cronograma_unidad_" + modulo for unit fields.
+      6. USE \n FOR LINE BREAKS in suggested_value.
+      7. RESPONSIBLE PERSONS: Use nombre_di, nombre_sme, nombre_coordinador fields in the "Responsable" column of each unit item. Do not use generic roles — use the actual names from these fields.
       
       EXACT OUTPUT FORMAT:
       [
         {
+          "name": "fecha_inicio_produccion",
+          "label": "Fecha de inicio de producción",
+          "suggested_value": "DD/MM/YYYY",
+          "type": "text"
+        },
+        {
+          "name": "fecha_inicio_formacion",
+          "label": "Fecha de inicio de la formación con candidatos",
+          "suggested_value": "DD/MM/YYYY",
+          "type": "text"
+        },
+        {
+          "name": "lugar_imparticion",
+          "label": "Lugar de impartición",
+          "suggested_value": "Centro de capacitación / Sala de juntas / En línea (Zoom/Teams)",
+          "type": "text"
+        },
+        {
+          "name": "modalidad_imparticion",
+          "label": "Modalidad de impartición",
+          "suggested_value": "Presencial",
+          "type": "text"
+        },
+        {
+          "name": "numero_grupos",
+          "label": "Número de grupos / candidatos",
+          "suggested_value": "1 grupo de [N] candidatos",
+          "type": "text"
+        },
+        {
+          "name": "nombre_di",
+          "label": "Nombre del Diseñador Instruccional (DI)",
+          "suggested_value": "",
+          "type": "text"
+        },
+        {
+          "name": "nombre_sme",
+          "label": "Nombre del Experto en la Materia (SME)",
+          "suggested_value": "",
+          "type": "text"
+        },
+        {
+          "name": "nombre_coordinador",
+          "label": "Nombre del Coordinador del Proyecto",
+          "suggested_value": "",
+          "type": "text"
+        },
+        {
           "name": "cronograma_unidad_1",
           "label": "Desarrollo: [Unit name]",
-          "suggested_value": "Entregable: ...\nResponsable: ...\nFecha inicio: ...\nFecha entrega: ...\nRevisión y ajustes: ...\nEstado: Pendiente",
+          "suggested_value": "Entregable: P1 Instrumento, P2 Presentación, P3 Script, P4 Capítulo, P5 Actividad\nResponsable: [nombre_di]\nFecha inicio: DD/MM/YYYY\nFecha entrega: DD/MM/YYYY\nRevisión y ajustes: 3 días hábiles\nEstado: Pendiente",
           "type": "textarea"
         }
       ]
@@ -88,35 +146,93 @@ pipeline_steps:
     task: |
       YOU ARE AN API ENDPOINT. YOU DO NOT CONVERSE. YOU ONLY OUTPUT RAW JSON.
       
-      You are an EC0366 Resource Manager planning the production resources and validation milestones.
+      You are an EC0366 Resource Manager planning production resources and validation milestones.
       
       SOURCE OF TRUTH: The units from the syllabus (F2/F3) and the total weight of P1-P7 deliverables.
       
-      FOR EACH UNIT:
+      MANDATORY FIRST ITEMS — always output these 8 before per-unit items:
+      1. "fecha_inicio_produccion": Start date for material development (DD/MM/YYYY). All production dates derive from this.
+      2. "fecha_inicio_formacion": First training session date (DD/MM/YYYY). Production must complete before this.
+      3. "lugar_imparticion": Physical or virtual location for training (e.g., "Centro de capacitación / En línea vía Zoom").
+      4. "modalidad_imparticion": Training modality — "Presencial", "Virtual", or "Híbrido".
+      5. "numero_grupos": Number of candidate groups or total candidate count.
+      6. "nombre_di": Full name of the Instructional Designer. Required for named accountability in quality gates.
+      7. "nombre_sme": Full name of the Subject Matter Expert. Required for validation accountability.
+      8. "nombre_coordinador": Full name of the project Coordinator.
+      
+      FOR EACH UNIT (items 6 and beyond):
       1. Read its "nombre" and "objetivo".
-      2. Read the corresponding P1-P7 products to identify types and quantities of materials.
-      3. Design a production plan with 6 fields:
+      2. Read P1-P7 products to identify types and quantities of materials for this unit.
+      3. Design a resource plan with 6 fields:
          - Módulo: Unit name.
-         - Materiales a desarrollar: List of resources — videos, manual chapters, slide decks, activity guides, scripts — with quantities from P1-P7 data.
-         - Horas de producción estimadas: Total design and production time — sum efforts across P2 (slides), P3 (scripts), P4 (manual), P5 (activities).
-         - Recursos necesarios: Equipment, software, content experts — from F3's plataforma and P3's production notes.
-         - Hito de validación: Criterion that indicates the material is ready — from F3's criterios_aceptacion.
-         - Prioridad: Alta / Media / Baja — based on whether this unit is a prerequisite for later units.
+         - Materiales a desarrollar: Resources with quantities (videos, chapters, slide decks, activities).
+         - Horas de producción estimadas: Sum efforts from P2 (slides), P3 (scripts), P4 (manual), P5 (activities).
+         - Recursos necesarios: Equipment, software, SME — from F3's plataforma and P3's production notes.
+         - Hito de validación: Completion criterion from F3's criterios_aceptacion.
+         - Prioridad: Alta / Media / Baja.
       
       RULES:
-      1. SAME NUMBER OF ELEMENTS AS UNITS RECEIVED.
-      2. HOURS FROM PRODUCTS: Horas de producción estimadas must be derived from the actual content volume in P1-P7, not guessed. A unit with 4 P3 scenes + P4 chapter + P5 activity = demonstrably more hours than a unit with only P2 slides.
-      3. VALIDATION FROM F3: Hito de validación must reference specific criteria from F3's criterios_aceptacion (contenido, técnicos, pedagógicos, accesibilidad).
-      4. PRIORITY LOGIC: Earlier units get Alta prioridad (they unlock later units). Final project units get Media. Review/integration gets Alta.
-      5. field "name" MUST be: "cronograma_unidad_" + modulo.
-      6. USE \n FOR LINE BREAKS in suggested_value.
+      1. OUTPUT LENGTH = 8 + number of units.
+      2. HOURS FROM PRODUCTS: Derive hours from actual P1-P7 content volume, not guessed.
+      3. VALIDATION FROM F3: Hito de validación must reference F3's criteria.
+      4. field "name" MUST be: "cronograma_unidad_" + modulo for unit fields.
+      5. USE \n FOR LINE BREAKS in suggested_value.
+      6. RESPONSIBLE PERSONS: Use nombre_di, nombre_sme, nombre_coordinador in the Responsable field.
       
       EXACT OUTPUT FORMAT:
       [
         {
+          "name": "fecha_inicio_produccion",
+          "label": "Fecha de inicio de producción",
+          "suggested_value": "DD/MM/YYYY",
+          "type": "text"
+        },
+        {
+          "name": "fecha_inicio_formacion",
+          "label": "Fecha de inicio de la formación con candidatos",
+          "suggested_value": "DD/MM/YYYY",
+          "type": "text"
+        },
+        {
+          "name": "lugar_imparticion",
+          "label": "Lugar de impartición",
+          "suggested_value": "Centro de capacitación / En línea vía Zoom",
+          "type": "text"
+        },
+        {
+          "name": "modalidad_imparticion",
+          "label": "Modalidad de impartición",
+          "suggested_value": "Presencial",
+          "type": "text"
+        },
+        {
+          "name": "numero_grupos",
+          "label": "Número de grupos / candidatos",
+          "suggested_value": "1 grupo de [N] candidatos",
+          "type": "text"
+        },
+        {
+          "name": "nombre_di",
+          "label": "Nombre del Diseñador Instruccional (DI)",
+          "suggested_value": "",
+          "type": "text"
+        },
+        {
+          "name": "nombre_sme",
+          "label": "Nombre del Experto en la Materia (SME)",
+          "suggested_value": "",
+          "type": "text"
+        },
+        {
+          "name": "nombre_coordinador",
+          "label": "Nombre del Coordinador del Proyecto",
+          "suggested_value": "",
+          "type": "text"
+        },
+        {
           "name": "cronograma_unidad_1",
           "label": "Desarrollo: [Unit name]",
-          "suggested_value": "Módulo: ...\nMateriales a desarrollar: ...\nHoras de producción estimadas: ...\nRecursos necesarios: ...\nHito de validación: ...\nPrioridad: ...",
+          "suggested_value": "Módulo: ...\nMateriales a desarrollar: ...\nHoras de producción estimadas: ...\nRecursos necesarios: ...\nHito de validación: ...\nPrioridad: Alta",
           "type": "textarea"
         }
       ]

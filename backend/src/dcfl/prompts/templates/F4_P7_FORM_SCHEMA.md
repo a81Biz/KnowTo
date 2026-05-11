@@ -1,7 +1,7 @@
 ---
 id: F4_P7_FORM_SCHEMA
-name: Generador de Esquema Dinámico P7 (Documento de Información General)
-version: 2.0.0
+name: Generador de Esquema Dinámico P7 (Ficha Técnica del Programa)
+version: 3.0.0
 tags: [EC0366, formulario, informacion, referencia]
 pipeline_steps:
 
@@ -18,6 +18,16 @@ pipeline_steps:
       Extract ALL units and the synthesized content from all previously generated products.
       SOURCE: The context contains fase3.unidades (F2/F3) and P1-P6 data from productos_previos.
       
+      MANDATORY — Extract perfil_ingreso from F2 analysis (AUTHORITATIVE SOURCE):
+      Look in previousData for the F2 step (may appear as "Análisis de Alcance", "F2", or "Diseño de Alcance").
+      From that step's inputData, extract the "perfil_ingreso" field (an object with keys like
+      conocimientos_previos, habilidades_digitales, escolaridad_minima, etc.).
+      Copy the EXACT values of each "requisito" sub-field. DO NOT rephrase.
+      Build "f2_perfil_ingreso" as a dict: {clave: requisito_value}.
+      IMPORTANT: "f2_perfil_ingreso" is the AUTHORITATIVE source for the participant entry profile.
+      The form agents MUST use this data for the "perfil_ingreso" field — NEVER invent it.
+      If the F2 data is absent, set "f2_perfil_ingreso" to null.
+      
       MANDATORY — Extract P4 concept data from "productos_previos.P4.capitulos":
       For each chapter in the array, read chapter.unidad and chapter.secciones_json.
       From secciones_json, copy arrays or strings named "conceptos_clave", "glosario", or "normativa" if present.
@@ -30,6 +40,12 @@ pipeline_steps:
       OUTPUT ONLY VALID JSON — EXACT STRUCTURE:
       {
         "unidades": [{"modulo": 1, "nombre": "...", "objetivo": "..."}, {"modulo": 2, "nombre": "...", "objetivo": "..."}],
+        "f2_perfil_ingreso": {
+          "conocimientos_previos": "exact requisito value from F2 or null",
+          "habilidades_digitales": "exact requisito value from F2 or null",
+          "escolaridad_minima": "exact requisito value from F2 or null",
+          "disponibilidad_sugerida": "exact requisito value from F2 or null"
+        },
         "p4_conceptos": {
           "unidad_1": {"conceptos_clave": ["term: definition"], "normativa": ["NOM-XXX"]},
           "unidad_2": {"conceptos_clave": [], "normativa": []}
@@ -44,34 +60,56 @@ pipeline_steps:
     task: |
       YOU ARE AN API ENDPOINT. YOU DO NOT CONVERSE. YOU ONLY OUTPUT RAW JSON.
       
-      You are an EC0366 Technical Writer compiling the official course information document (E1219 syllabus equivalent).
+      You are an EC0366 Technical Writer compiling the official Ficha Técnica del Programa (E1219 syllabus equivalent).
       
       SOURCE OF TRUTH: The units from the syllabus (F2/F3) and the full P1-P6 generated materials.
       
-      FOR EACH UNIT:
+      MANDATORY FIRST ITEMS — PROGRAM-LEVEL FIELDS (always output these 3 before per-unit items):
+      1. "perfil_ingreso": Describe who this course is for — required prior knowledge, experience level, job role, minimum education.
+      2. "perfil_egreso": Describe what competencies the participant will have upon completion — reference the EC0366 standard units directly.
+      3. "requisitos_certificacion": List the specific EC0366 certification requirements — evaluation criteria, passing score, evidence types, CONOCER submission requirements.
+      
+      FOR EACH UNIT (items 4 and beyond):
       1. Read its "nombre" and "objetivo".
       2. Read the corresponding P1 instrument (evaluation methods), P4 manual (key concepts), and P3 scripts (narrative context).
       3. Write a reference entry with 6 sections:
          - Tema: Exact unit name.
          - Descripción general: What this topic covers in 2-3 sentences.
          - Conceptos fundamentales: 3-5 key terms with clear definitions — drawn from P4's glossary.
-         - Normativa aplicable: The real standard, law, or procedure this relates to — use official names and codes (NOM, NMX, ISO, AWS). DO NOT invent codes.
+         - Normativa aplicable: Real standard names and codes (NOM, NMX, ISO, AWS). NEVER invent codes. DISCLAIMER: these references require expert validation before official use.
          - Recursos de consulta: Bibliographic reference or support link from F0 or P4.
-         - Relación con el puesto: How this applies in real work — drawn from F0's industry context and P5's scenarios.
+         - Relación con el puesto: How this applies in real work — from F0's industry context and P5's scenarios.
       
       RULES:
-      1. SAME NUMBER OF ELEMENTS AS UNITS RECEIVED.
-      2. P1-P6 BARRIIDO: Use the generated products as source material. Conceptos come from P4. Evaluación context from P1. Real-world application from P5's scenarios. Durations from P6's calendar.
-      3. REAL NORMATIVA: Normativa aplicable must cite real, verifiable standards with their official codes. Do NOT invent standard numbers.
-      4. field "name" MUST be: "informacion_unidad_" + modulo.
-      5. USE \n FOR LINE BREAKS in suggested_value.
+      1. OUTPUT LENGTH = 3 + number of units. (3 program fields + N unit fields)
+      2. REAL NORMATIVA: Use real standard codes. DO NOT invent numbers. Add disclaimer.
+      3. field "name" MUST be: "informacion_unidad_" + modulo for unit fields.
+      4. USE \n FOR LINE BREAKS in suggested_value.
       
       EXACT OUTPUT FORMAT:
       [
         {
+          "name": "perfil_ingreso",
+          "label": "Perfil de Ingreso del Participante",
+          "suggested_value": "Puesto objetivo: ...\nExperiencia previa requerida: ...\nNivel educativo mínimo: ...\nConocimientos previos: ...",
+          "type": "textarea"
+        },
+        {
+          "name": "perfil_egreso",
+          "label": "Perfil de Egreso y Competencias",
+          "suggested_value": "Al completar el programa, el participante será capaz de:\n- [Competencia 1 observable y verificable]\n- [Competencia 2]\nEstándar de referencia: EC0366",
+          "type": "textarea"
+        },
+        {
+          "name": "requisitos_certificacion",
+          "label": "Requisitos de Certificación EC0366",
+          "suggested_value": "Puntaje aprobatorio: 85%\nEvidencias requeridas: ...\nInstrumentos de evaluación: ...\nEntidad certificadora: CONOCER\nVigencia del certificado: ...",
+          "type": "textarea"
+        },
+        {
           "name": "informacion_unidad_1",
           "label": "Información: [Unit name]",
-          "suggested_value": "Tema: ...\nDescripción general: ...\nConceptos fundamentales: ...\nNormativa aplicable: ...\nRecursos de consulta: ...\nRelación con el puesto: ...",
+          "suggested_value": "Tema: ...\nDescripción general: ...\nConceptos fundamentales: ...\nNormativa aplicable: ... [NOTA: requiere validación por experto en la materia]\nRecursos de consulta: ...\nRelación con el puesto: ...",
           "type": "textarea"
         }
       ]
@@ -84,30 +122,52 @@ pipeline_steps:
     task: |
       YOU ARE AN API ENDPOINT. YOU DO NOT CONVERSE. YOU ONLY OUTPUT RAW JSON.
       
-      You are an EC0366 Workplace Training Specialist writing accessible reference sheets for workers with no prior experience.
+      You are an EC0366 Workplace Training Specialist writing the Ficha Técnica del Programa and accessible per-unit reference sheets.
       
       SOURCE OF TRUTH: The units from the syllabus (F2/F3) and the full P1-P6 generated materials.
       
-      FOR EACH UNIT:
+      MANDATORY FIRST ITEMS — PROGRAM-LEVEL FIELDS (always output these 3 before per-unit items):
+      1. "perfil_ingreso": Describe the target participant — prior experience, job role, required knowledge, literacy level.
+      2. "perfil_egreso": What the participant will demonstrably DO after training — use observable action verbs (not "will understand"). Reference EC0366 competencies.
+      3. "requisitos_certificacion": EC0366 certification path — evaluation dates, instruments, minimum scores, evidence portfolio, CONOCER submission steps.
+      
+      FOR EACH UNIT (items 4 and beyond):
       1. Read its "nombre" and "objetivo".
-      2. Read P1-P6 for context — but translate everything into plain, accessible language.
+      2. Read P1-P6 for context — translate into plain, accessible language.
       3. Write a worker-friendly reference card with 6 sections:
          - Unidad: Topic name.
-         - ¿Qué es?: Accessible definition for a worker with no prior experience — no jargon.
-         - ¿Para qué sirve?: Practical utility in the work context — drawn from P5's real-world scenarios.
-         - Ejemplo real: Concrete application case from the workplace — from P5's situación problema or P3's ejemplos.
-         - Errores comunes: 2-3 frequent mistakes to avoid — from P5's facilitator notes or P4's common mistakes.
-         - Indicador de dominio: How the worker knows they learned this — simple, self-verifiable, from P1's reactivos simplified into plain language.
+         - ¿Qué es?: Accessible definition — no jargon. Explain technical terms in parentheses.
+         - ¿Para qué sirve?: Practical utility drawn from P5's real-world scenarios.
+         - Ejemplo real: Concrete case from P5's situación problema or P3's exemplos.
+         - Errores comunes: 2-3 mistakes to avoid from P4 or P5 facilitator notes.
+         - Indicador de dominio: How the worker knows they learned it — simplified from P1's reactivos.
       
       RULES:
-      1. SAME NUMBER OF ELEMENTS AS UNITS RECEIVED.
-      2. PLAIN LANGUAGE: Write for someone with no prior training. If a term is technical, explain it in parentheses. Sentence length: 15-20 words max.
-      3. P1-P6 GROUNDING: Every field must be traceable to a specific P1-P6 product. Ejemplo real from P5. Errores comunes from P4 or P5 facilitator notes. Indicador from P1.
-      4. field "name" MUST be: "informacion_unidad_" + modulo.
-      5. USE \n FOR LINE BREAKS in suggested_value.
+      1. OUTPUT LENGTH = 3 + number of units.
+      2. PLAIN LANGUAGE: Sentence length 15-20 words max. Explain jargon.
+      3. field "name" MUST be: "informacion_unidad_" + modulo for unit fields.
+      4. USE \n FOR LINE BREAKS in suggested_value.
       
       EXACT OUTPUT FORMAT:
       [
+        {
+          "name": "perfil_ingreso",
+          "label": "Perfil de Ingreso del Participante",
+          "suggested_value": "Este curso está dirigido a: ...\nSe requiere experiencia previa en: ...\nNivel educativo mínimo: ...",
+          "type": "textarea"
+        },
+        {
+          "name": "perfil_egreso",
+          "label": "Perfil de Egreso y Competencias",
+          "suggested_value": "Al terminar el curso, el participante podrá:\n- [Acción observable 1]\n- [Acción observable 2]\nEC0366 — CONOCER",
+          "type": "textarea"
+        },
+        {
+          "name": "requisitos_certificacion",
+          "label": "Requisitos de Certificación EC0366",
+          "suggested_value": "Calificación mínima: 85%\nEvidencias: ...\nEvaluador: Centro de Evaluación autorizado CONOCER\nDocumentos a presentar: ...",
+          "type": "textarea"
+        },
         {
           "name": "informacion_unidad_1",
           "label": "Información: [Unit name]",

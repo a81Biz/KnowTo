@@ -73,12 +73,20 @@ function formatearPlan(p: PlanLogistico): string {
   return md;
 }
 
+function traducirFechaEntrega(raw: string): string {
+  return raw
+    .replace(/Same\s+day/gi, 'El mismo día')
+    .replace(/Next\s+day/gi, 'Al día siguiente')
+    .replace(/End\s+of\s+session/gi, 'Al finalizar la sesión')
+    .replace(/One\s+week/gi, 'Una semana');
+}
+
 function formatearEntrega(e: Entregables): string {
   let md = '#### Entregables y Evaluación\n\n';
   md += `**Producto:** ${e.producto}\n`;
   md += `**Instrumento de Evaluación:** ${e.instrumento}\n`;
   md += `**Criterio de Aceptación:** ${e.criterio_aceptacion}\n`;
-  if (e.fecha_entrega) md += `**Fecha Sugerida:** ${e.fecha_entrega}\n`;
+  if (e.fecha_entrega) md += `**Fecha Sugerida:** ${traducirFechaEntrega(e.fecha_entrega)}\n`;
   return md;
 }
 
@@ -137,7 +145,7 @@ export async function handleDocumentP6Assembler(context: ProductContext): Promis
   const { jobId, projectId, services, event } = context;
   console.log(`[p6-assembler] ── Ensamblando calendario de la sesión (job: ${jobId}) ──`);
 
-  const moduloActual = event?.body?.userInputs?._modulo_actual || 1;
+  const moduloActual = Number(event?.body?.userInputs?._modulo_actual || 1);
   const nombreSesion = event?.body?.userInputs?._nombre_sesion || `Sesión ${moduloActual}`;
 
   const partes: ParteCalendario = {
@@ -163,6 +171,17 @@ export async function handleDocumentP6Assembler(context: ProductContext): Promis
     console.log(`[p6-assembler] Sección ${seccion}: juez=${seleccion}`);
   }
 
+  // Override instrumento with exact P1 type to avoid LLM paraphrase inconsistency (6.3)
+  try {
+    const instrumentosP1: Array<{unidad: number, tipo: string}> =
+      event?.body?.userInputs?.productos_previos?.P1?.instrumentos || [];
+    const instrP1 = instrumentosP1.find((i: any) => Number(i.unidad) === moduloActual);
+    if (partes.entregables && instrP1?.tipo) {
+      partes.entregables.instrumento = instrP1.tipo;
+      console.log(`[p6-assembler] Instrumento de P1 inyectado: "${instrP1.tipo}" para unidad ${moduloActual}`);
+    }
+  } catch {}
+
   if (partes.plan) {
     partes.plan.actividades = normalizarActividades(partes.plan.actividades);
     partes.plan.recursos = normalizarStringArray(partes.plan.recursos);
@@ -187,16 +206,28 @@ export async function handleDocumentP6Assembler(context: ProductContext): Promis
     if (data?.datos_producto?.partes) partesAcumuladas = data.datos_producto.partes;
   } catch {}
 
+  // Extract raw plan fecha so P8 can read session dates from P6 partes
+  const fechaSesionRaw: string = (partes.plan as any)?.fecha || '';
+
   partesAcumuladas[`modulo_${moduloActual}`] = {
     nombre: nombreSesion,
     horas: horasMd,
     plan: planMd,
     entrega: entregaMd,
     horario_raw: partes.horario,
+    fecha_sesion: fechaSesionRaw,
   };
+
+  // Inject lugar_imparticion from P8 if available (6-E: location per calendar)
+  const lugarImparticion: string =
+    event?.body?.userInputs?.productos_previos?.P8?.ficha_formacion?.lugar ||
+    event?.body?.userInputs?.lugar_imparticion || '';
 
   const modulosOrdenados = Object.keys(partesAcumuladas).sort();
   let documentoFinal = '# Calendario General del Curso\n\n';
+  if (lugarImparticion) {
+    documentoFinal += `**Lugar de impartición:** ${lugarImparticion}\n\n`;
+  }
 
   // Tabla resumen poblada desde horario_raw acumulado
   documentoFinal += '## Resumen de Distribución Horaria\n\n';
@@ -206,15 +237,34 @@ export async function handleDocumentP6Assembler(context: ProductContext): Promis
     const m = partesAcumuladas[key];
     const h = m.horario_raw as typeof partes.horario;
     if (h) {
+      const sessionHours = Number(h.total_horas) || 0;
       documentoFinal += `| ${m.nombre} | ${h.horas_teoricas ?? '—'} h | ${h.horas_practicas ?? '—'} h | ${h.total_horas ?? '—'} h |\n`;
       totalT += Number(h.horas_teoricas) || 0;
       totalP += Number(h.horas_practicas) || 0;
-      totalG += Number(h.total_horas) || 0;
+      totalG += sessionHours;
+      // Check max session length (6.2)
+      if (sessionHours > 10) {
+        console.warn(`[p6-assembler] ⚠️ AVISO PEDAGÓGICO: "${m.nombre}" tiene ${sessionHours}h — excede el máximo recomendado de 10h por jornada`);
+      }
     } else {
       documentoFinal += `| ${m.nombre} | — | — | — |\n`;
     }
   }
   documentoFinal += `| **Total del Curso** | **${totalT.toFixed(1)} h** | **${totalP.toFixed(1)} h** | **${totalG.toFixed(1)} h** |\n\n`;
+
+  // F3 alignment check (6.4)
+  try {
+    const durF3Raw = event?.body?.userInputs?.productos_previos?.F3?.calculo_duracion?.duracion_total_horas;
+    if (durF3Raw && totalG > 0) {
+      const durF3 = Number(durF3Raw);
+      const diff = Math.abs(totalG - durF3) / durF3;
+      if (diff > 0.1) {
+        console.warn(`[p6-assembler] ⚠️ Desviación de horas: calendario acumula ${totalG.toFixed(1)}h vs F3 declara ${durF3}h (${(diff * 100).toFixed(1)}% de diferencia)`);
+        documentoFinal += `> ⚠️ **Nota de alineación:** Las horas acumuladas en este calendario (${totalG.toFixed(1)} h) difieren en más del 10% de las horas declaradas en el programa F3 (${durF3} h). Revisar con el diseñador instruccional antes de presentar a CONOCER.\n\n`;
+      }
+    }
+  } catch {}
+
   documentoFinal += '---\n\n';
 
   for (const key of modulosOrdenados) {

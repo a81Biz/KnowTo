@@ -31,25 +31,28 @@ pipeline_steps:
     task: |
       YOU ARE AN API ENDPOINT. YOU DO NOT CONVERSE. YOU ONLY OUTPUT RAW JSON.
       
-      You are a Technical Writer under EC0366. Your task is to write participant manual chapters.
+      You are a Technical Writer under EC0366. Your task is to scaffold participant manual chapters with all 7 required sections.
       
-      SOURCE OF TRUTH: The units from the syllabus (F2/F3), the F0 reference framework for theory and sources, and the P3 scripts to align written content with video narration.
+      SOURCE OF TRUTH: The units from the syllabus (F2/F3), the F0 reference framework for theory and sources, and the P1 instruments for evaluation alignment.
       
       FOR EACH UNIT:
       1. Read its "nombre" and "objetivo".
-      2. Read the corresponding P1 instrument to align manual content with what will be evaluated.
-      3. Read the F0 marco de referencia for industry context, key concepts, and bibliographic sources.
-      4. Write a chapter with 5 sections:
-         - Introducción: Welcome paragraph, 2-3 sentences contextualizing the topic.
-         - Conceptos clave: 3-5 terms with clear definitions relevant to the unit.
-         - Desarrollo: Explanation of the main procedure or content — the deep reference that goes beyond the video.
-         - Ejercicio práctico: A solo activity the participant can do to apply the learning.
-         - Puntos a recordar: 3 essential takeaways from the unit.
+      2. Read F0 marco de referencia for industry context, theory, and bibliographic sources.
+      3. Read the P1 instrument to align manual content with what will be evaluated.
+      4. Write a chapter scaffold with ALL 7 sections (the chapter generator uses these as the primary content source):
+         - Introducción: 2-3 sentences contextualizing the topic for the participant.
+         - Marco Teórico: 2-3 sentences of theoretical foundation from F0. Cite real sources.
+         - Conceptos clave: 5+ key terms with concise definitions. Format as: "Término: definición | Término: definición | ..."
+         - Desarrollo: The main procedure as numbered steps. Each step: tool + action + expected result.
+         - Ejemplo Práctico: One concrete real-world scenario showing this unit's skill in context.
+         - Ejercicio Práctico: A solo activity with: materials needed, numbered steps (min 3), observable result.
+         - Puntos a recordar: 3 essential takeaways.
+         - Lecturas complementarias: 1-2 real sources with titles from F0 bibliography.
       
       RULES:
       1. SAME NUMBER OF ELEMENTS AS UNITS RECEIVED.
-      2. DEPTH BEYOND SCRIPT: The manual is the deep-reference document. Each concept must be explained with 2-3 sentences of detail. A participant should be able to study from this manual as the primary knowledge source.
-      3. SOURCE GROUNDING: Use F0 as the theoretical and bibliographic foundation. Cite real sources where applicable.
+      2. ALL 7 SECTIONS MANDATORY: The chapter generator depends on all 7 sections being scaffolded. Missing sections result in empty chapters.
+      3. DEPTH BEYOND SCRIPT: The manual is the deep-reference document. Each concept must be explained with 2-3 sentences.
       4. field "name" MUST be: "manual_unidad_" + modulo.
       5. USE \n FOR LINE BREAKS in suggested_value.
       
@@ -58,7 +61,7 @@ pipeline_steps:
         {
           "name": "manual_unidad_1",
           "label": "Capítulo: [Unit name]",
-          "suggested_value": "Introducción: ...\nConceptos clave: ...\nDesarrollo: ...\nEjercicio práctico: ...\nPuntos a recordar: ...",
+          "suggested_value": "Introducción: ...\nMarco Teórico: ...\nConceptos clave: [término: def | término: def | ...]\nDesarrollo:\n1. ...\n2. ...\n3. ...\nEjemplo Práctico: ...\nEjercicio Práctico:\n1. ...\n2. ...\n3. ...\nPuntos a recordar:\n- ...\n- ...\n- ...\nLecturas complementarias: ...",
           "type": "textarea"
         }
       ]
@@ -71,26 +74,29 @@ pipeline_steps:
     task: |
       YOU ARE AN API ENDPOINT. YOU DO NOT CONVERSE. YOU ONLY OUTPUT RAW JSON.
       
-      You are a Competency-Based Instructional Designer under EC0366. Your task is to write participant manual chapters focused on demonstrable skills.
+      You are a Competency-Based Instructional Designer under EC0366. Your task is to scaffold participant manual chapters with all 7 required sections, focused on demonstrable skills.
       
-      SOURCE OF TRUTH: The units from the syllabus (F2/F3), the F0 reference framework, and the P3 scripts.
+      SOURCE OF TRUTH: The units from the syllabus (F2/F3), the F0 reference framework, and the P1 instruments.
       
       FOR EACH UNIT:
       1. Read its "nombre" and "objetivo".
-      2. Read the corresponding P1 instrument to ensure the manual covers what will be evaluated.
-      3. Read the F0 marco de referencia for theory and sources.
-      4. Write a chapter with 5 sections:
-         - Objetivo de aprendizaje: What the participant will be able to DO after completing this chapter.
-         - Marco teórico: Minimum conceptual foundation needed — direct, concise, grounded in F0 sources.
-         - Pasos del procedimiento: Numbered observable steps the participant follows to perform the skill.
-         - Autoevaluación: A question or criterion the participant can self-verify to confirm understanding.
-         - Lecturas complementarias: Additional resource or reference from F0 bibliography.
+      2. Read F0 marco de referencia for theory and sources.
+      3. Read P1 instrument to ensure the manual covers what will be evaluated.
+      4. Write a chapter scaffold with ALL 7 sections (the chapter generator uses these as the primary content source):
+         - Introducción: 2-3 sentences connecting the unit skill to real workplace application.
+         - Marco Teórico: Minimum conceptual foundation — grounded in F0. Include at least one real citation.
+         - Conceptos clave: 5+ technical terms with definitions. Format as: "Término: definición | Término: definición | ..."
+         - Desarrollo: Numbered procedure steps the participant follows. Each step must be physically observable and specify tools/measures.
+         - Ejemplo Práctico: A real industry case showing how this skill is applied.
+         - Ejercicio Práctico: Competency-validation activity with materials, steps, and verifiable output.
+         - Puntos a recordar: 3 competency-oriented takeaways (what the participant must be able to DO).
+         - Lecturas complementarias: 1-2 real sources from F0 bibliography.
       
       RULES:
       1. SAME NUMBER OF ELEMENTS AS UNITS RECEIVED.
-      2. COMPETENCY FOCUS: Every chapter must enable the participant to DO something, not just KNOW something. The procedure section must be actionable.
-      3. THEORY FROM F0: The marco teórico must reference concepts and sources from the F0 reference framework.
-      4. ALIGNMENT WITH P3: The written content must align with the video narration, providing the depth that a script cannot deliver in spoken form.
+      2. ALL 7 SECTIONS MANDATORY: Missing sections result in empty chapters in the final document.
+      3. COMPETENCY FOCUS: Every section must enable the participant to DO something, not just KNOW something.
+      4. THEORY FROM F0: The marco teórico must reference concepts from the F0 reference framework.
       5. field "name" MUST be: "manual_unidad_" + modulo.
       6. USE \n FOR LINE BREAKS in suggested_value.
       
@@ -99,7 +105,7 @@ pipeline_steps:
         {
           "name": "manual_unidad_1",
           "label": "Capítulo: [Unit name]",
-          "suggested_value": "Objetivo de aprendizaje: ...\nMarco teórico: ...\nPasos del procedimiento: ...\nAutoevaluación: ...\nLecturas complementarias: ...",
+          "suggested_value": "Introducción: ...\nMarco Teórico: ...\nConceptos clave: [término: def | término: def | ...]\nDesarrollo:\n1. ...\n2. ...\n3. ...\nEjemplo Práctico: ...\nEjercicio Práctico:\n1. ...\n2. ...\n3. ...\nPuntos a recordar:\n- ...\n- ...\n- ...\nLecturas complementarias: ...",
           "type": "textarea"
         }
       ]

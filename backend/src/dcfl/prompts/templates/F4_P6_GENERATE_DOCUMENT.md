@@ -15,8 +15,21 @@ pipeline_steps:
       
       Extract from userInputs the data for ONE single session/unit.
       
-      FIELDS: "sesion_unidad_N" (where N is _modulo_actual), "_modulo_actual", "_nombre_sesion"
+      FIELDS:
+      - "sesion_unidad_N" (where N is _modulo_actual) — the main session content
+      - "sesion_diagnostica" — the diagnostic session content (if present)
+      - "fecha_inicio_curso" — the course start date (REQUIRED for date anchoring)
+      - "hora_inicio_sesion" — the daily session start time (e.g., "09:00", "14:00"). REQUIRED for schedule anchoring.
+      - "_modulo_actual", "_nombre_sesion"
       Also check "fase3.calculo_duracion" and "productos_previos.P1" for context.
+      
+      DATE ANCHORING RULE: "fecha_inicio_curso" is the absolute starting date of the course.
+      If present, compute the absolute date for THIS module's session by adding (modulo - 1) * estimated_days_per_session to fecha_inicio_curso.
+      Assume sessions run Monday-Friday, skipping weekends. Return the computed date as "fecha_sesion" (YYYY-MM-DD).
+      If "fecha_inicio_curso" is absent or unparseable, set "fecha_sesion" to null.
+      
+      HORA ANCHORING RULE: "hora_inicio_sesion" is the real daily start time entered by the user.
+      Copy it verbatim into the output as "hora_inicio". If absent or empty, set "hora_inicio" to "09:00".
       
       OUTPUT ONLY VALID JSON:
       {
@@ -24,6 +37,10 @@ pipeline_steps:
         "nombre": "string",
         "contenido_form": "verbatim text from form",
         "duracion_f3": "string from context",
+        "fecha_inicio_curso": "YYYY-MM-DD or null",
+        "fecha_sesion": "YYYY-MM-DD or null",
+        "hora_inicio": "HH:MM — from hora_inicio_sesion field or 09:00 default",
+        "sesion_diagnostica": "verbatim text from sesion_diagnostica field or null",
         "instrumentos_p1": [
           {"unidad": 1, "tipo": "Guía de Observación"}
         ]
@@ -69,7 +86,7 @@ pipeline_steps:
       SELECTION: mathematical consistency (T+P=Total), alignment to F3.
       VETO CRITERIA — Output "RECHAZADO" ONLY IF BOTH of the following are true for BOTH A and B:
       1. Both have horas_teoricas + horas_practicas ≠ total_horas (mathematical inconsistency).
-      2. Both have total_horas ≤ 0 or total_horas > 16 (impossible session length).
+      2. Both have total_horas ≤ 0 or total_horas > 10 (impossible session length — max 10h per EC0366 jornada).
       If RECHAZADO, "razon" MUST describe the specific shared deficiency.
       OUTPUT: {"seleccion": "A"|"B"|"RECHAZADO", "razon": "one-line"}
 
@@ -83,6 +100,17 @@ pipeline_steps:
     task: |
       ROLE: Logistics Manager. TASK: List activities and items.
       
+      DATE ANCHORING: Use "fecha_sesion" from the extractor as the real calendar date for this session.
+      If "fecha_sesion" is not null, include it as "fecha" in the plan output.
+      If null, omit "fecha" from the output.
+      
+      HORA ANCHORING: Use "hora_inicio" from the extractor as the real start time for the first activity.
+      Schedule subsequent activities by adding cumulative durations to hora_inicio. Do NOT hardcode "09:00".
+      EXAMPLE: if hora_inicio is "14:00" → first activity starts at 14:00, next at 14:15, etc.
+      
+      EVALUACIÓN DIAGNÓSTICA: If this is module 1 AND "sesion_diagnostica" is not null, include it as the first activity block:
+      {"hora": "{hora_inicio}", "actividad": "Evaluación Diagnóstica — [sesion_diagnostica objective]", "duracion": "60 min", "tipo": "Diagnóstica"}
+      
       CRITICAL — STRING ARRAYS: "recursos" MUST be an array of plain STRINGS.
       CORRECT:   "recursos": ["Proyector", "Pizarrón", "Marcadores"]
       PROHIBITED: "recursos": [{"item": "Proyector"}, {"nombre": "Pizarrón"}]
@@ -90,9 +118,11 @@ pipeline_steps:
       OUTPUT ONLY THIS JSON:
       {
         "plan": {
+          "fecha": "YYYY-MM-DD or omit if null",
           "actividades": [
-            {"hora": "09:00", "actividad": "Apertura y encuadre", "duracion": "15 min", "tipo": "Teórica"},
-            {"hora": "09:15", "actividad": "Explicación técnica", "duracion": "45 min", "tipo": "Teórica"}
+            {"hora": "{hora_inicio}", "actividad": "Evaluación Diagnóstica — encuadre y conocimientos previos", "duracion": "60 min", "tipo": "Diagnóstica"},
+            {"hora": "{hora_inicio + 60min}", "actividad": "Apertura y encuadre", "duracion": "15 min", "tipo": "Teórica"},
+            {"hora": "{hora_inicio + 75min}", "actividad": "Explicación técnica", "duracion": "45 min", "tipo": "Teórica"}
           ],
           "recursos": ["Item 1", "Item 2"]
         }
@@ -104,9 +134,12 @@ pipeline_steps:
     include_template: false
     task: |
       SAME AS AGENT A. ADD for each activity: "responsable" (Facilitador/Participante).
+      DATE ANCHORING: Include "fecha" from extractor's "fecha_sesion" if not null.
+      HORA ANCHORING: Use "hora_inicio" from the extractor as the real start time. Do NOT hardcode "09:00".
+      EVALUACIÓN DIAGNÓSTICA: If module 1 AND sesion_diagnostica not null, prepend it as first activity.
       CRITICAL — STRING ARRAYS: "recursos" MUST be an array of plain STRINGS (not objects).
       OUTPUT ONLY THIS JSON:
-      {"plan": {"actividades": [{"hora": "...", "actividad": "...", "duracion": "...", "tipo": "...", "responsable": "..."}], "recursos": ["Item 1", "Item 2"]}}
+      {"plan": {"fecha": "YYYY-MM-DD or omit", "actividades": [{"hora": "{hora_inicio}", "actividad": "...", "duracion": "...", "tipo": "...", "responsable": "..."}], "recursos": ["Item 1", "Item 2"]}}
 
   - agent: juez_plan
     model: "qwen2.5:14b"

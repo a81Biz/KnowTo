@@ -27,13 +27,23 @@ pipeline_steps:
         3. Use that chapter's "secciones_json" as p4_secciones
         4. If productos_previos.P4 is absent or no matching chapter found: output empty object {}
       
+      EXTRACT inventario_p4 as follows:
+        - inventario_p4 = productos_previos.P4.inventario_materiales (flat string array — pass as-is; use [] if absent)
+        - This is the authorized list of physical items for the course. Used to validate equipamiento.
+      
+      EC0366 SCOPE NOTE (IMPORTANT):
+      P3 is classified as a SUPPLEMENTARY INSTRUCTIONAL TOOL (guión instruccional para soporte multimedia).
+      It is NOT a required EC0366 deliverable — EC0366 mandates didactic materials (manuals, instruments, guides, calendar) but does NOT require video production.
+      P3 enables optional e-learning or video versions of the course content. When presenting this document to CONOCER, classify it as "Material de apoyo multimedia" not as a primary evaluation deliverable.
+      Clearly separate: (A) PRODUCTION elements (filming equipment, crew, post-production) from (B) INSTRUCTIONAL DESIGN elements (learning objectives, key concepts, pedagogical structure).
+      
       VIDEO DURATION CAP (CRITICAL RULE):
       The "duracion" field represents the VIDEO length — NOT the class/module duration.
       Videos for e-learning must NEVER exceed 15 minutes (industry standard: 5-12 min optimal).
-      If guion_unidad_N mentions a duration > 15 min (e.g., "60 min", "2 horas", "1 hora"), that refers to the CLASS duration. Use 10 min for the video instead.
-      FORMULA: if extracted_duration > 15 → use "10 min". If ≤ 15 → use as-is.
+      If guion_unidad_N mentions a duration > 15 min (e.g., "60 min", "2 horas", "1 hora"), that refers to the CLASS duration.
+      FORMULA for long content: if extracted_duration > 30 min → recommend a SERIES of 3 videos of ~8 min each (use "8 min per video — Series of 3"). If 15 < duration ≤ 30 → use "10 min". If ≤ 15 → use as-is.
       If no duration found: Default = "8 min".
-      EXAMPLES: "5 min" → "5 min" | "12 min" → "12 min" | "60 min" → "10 min" | "2 horas" → "10 min" | not found → "8 min".
+      EXAMPLES: "5 min" → "5 min" | "12 min" → "12 min" | "30 min" → "10 min" | "60 min" → "8 min por video — Serie de 3" | "2 horas" → "8 min por video — Serie de 4" | not found → "8 min".
       
       OUTPUT ONLY VALID JSON:
       {
@@ -41,7 +51,8 @@ pipeline_steps:
         "nombre": "{_nombre_video}",
         "ficha_tecnica_form": "{guion_unidad_N verbatim}",
         "duracion": "extracted or default '8 min'",
-        "p4_secciones": {extracted secciones_json or {}}
+        "p4_secciones": {extracted secciones_json or {}},
+        "inventario_p4": {inventario_p4 as-is}
       }
 
   # ═══════════════════════════════════════════════════════════════════════
@@ -59,6 +70,11 @@ pipeline_steps:
       
       Derive objetivo_aprendizaje from p4_secciones.introduccion + p4_secciones.puntos_recordar.
       
+      EQUIPAMIENTO — TWO SEPARATE CATEGORIES:
+      1. PRODUCCIÓN: Standard filming equipment always allowed — cámara, trípode, micrófono, iluminación, pantalla verde, etc. These do NOT come from inventario_p4.
+      2. MATERIALES EN CÁMARA: Physical course items that appear on screen (shown to participants during the video). These MUST come from {inventario_p4} or {ficha_tecnica_form} — FORBIDDEN to invent course materials absent from both sources.
+      Format: "equipamiento" = "PRODUCCIÓN: [list]. MATERIALES EN CÁMARA: [list from inventario_p4/form]."
+      
       OUTPUT ONLY THIS JSON:
       {
         "ficha_tecnica": {
@@ -66,7 +82,7 @@ pipeline_steps:
           "objetivo_aprendizaje": "Acción observable. STRICT RULE: PROHIBIDO USAR la raíz de las palabras: aprender, comprender, entender, saber, conocer.",
           "duracion": "{duracion}",
           "recursos": ["Format: Array de STRINGS SIMPLES. Ej: 'Animación 2D', 'Close-up'. PROHIBIDO devolver objetos JSON."],
-          "equipamiento": "Menciona solo objetos físicos reales (ej. Pinturas, Pinceles, Agua).",
+          "equipamiento": "PRODUCCIÓN: [filming equipment]. MATERIALES EN CÁMARA: [items from inventario_p4 only].",
           "perfil_talento": "Narrador/actor sugerido..."
         }
       }
@@ -76,7 +92,9 @@ pipeline_steps:
     inputs_from: [extractor_p3]
     include_template: false
     task: |
-      SAME AS AGENT A. DIFFERENT: vary the "perfil_talento" and "equipamiento" suggestions.
+      SAME AS AGENT A. APPLY SAME EQUIPAMIENTO TWO-CATEGORY RULE:
+      PRODUCCIÓN = standard filming equipment (always valid). MATERIALES EN CÁMARA = only from {inventario_p4} or {ficha_tecnica_form}.
+      DIFFERENT: vary the "perfil_talento" suggestion and prioritize different items from {inventario_p4} for MATERIALES EN CÁMARA.
       OUTPUT ONLY THIS JSON:
       {
         "ficha_tecnica": {
@@ -84,7 +102,7 @@ pipeline_steps:
           "objetivo_aprendizaje": "Acción observable. STRICT RULE: PROHIBIDO USAR la raíz de las palabras: aprender, comprender, entender, saber, conocer.",
           "duracion": "{duracion}",
           "recursos": ["Format: Array de STRINGS SIMPLES. Ej: 'Animación 2D', 'Close-up'. PROHIBIDO devolver objetos JSON."],
-          "equipamiento": "Menciona solo objetos físicos reales (ej. Pinturas, Pinceles, Agua).",
+          "equipamiento": "PRODUCCIÓN: [filming equipment]. MATERIALES EN CÁMARA: [items from inventario_p4 only].",
           "perfil_talento": "Narrador/actor sugerido..."
         }
       }
@@ -387,6 +405,10 @@ pipeline_steps:
     task: |
       YOU ARE AN API ENDPOINT. YOU DO NOT CONVERSE. YOU ONLY OUTPUT RAW JSON.
       ROLE: Production Director. TASK: Generate STORYBOARD as array of 4 scene objects.
+      
+      STORYBOARD SCOPE NOTE: This storyboard is REFERENTIAL — it describes visual scenes in text form for planning purposes only.
+      A professional graphic designer or animator must convert it into actual visual boards before production.
+      Its purpose is to guide the production team conceptually, not to replace professional pre-production visuals.
       
       LANGUAGE: ALL field VALUES MUST be written in SPANISH. JSON keys stay in English.
       

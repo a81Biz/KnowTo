@@ -107,6 +107,11 @@ pipeline_steps:
       2. NO REPETITION BETWEEN UNITS: Each unit's reactivos MUST be unique. A reactivo about one skill must not appear in another unit. Before writing, read ALL unit names and ensure distinct, non-overlapping reactivos.
       3. SINGLE INSTRUMENT per unit. Never combine.
       4. PERFECT MATH: Global weights sum exactly 100%.
+      5. WORKPLACE CONTEXT (EC0366 MANDATORY): Each reactivo MUST be anchored to a real workplace situation.
+         The reactivo must describe what the candidate does IN THEIR ACTUAL JOB, not in an abstract evaluation room.
+         WRONG: "El candidato realiza el procedimiento de la unidad"
+         RIGHT: "En su área de trabajo habitual, el candidato selecciona [herramienta específica] e inicia el proceso de [acción concreta del puesto] siguiendo la secuencia establecida en la norma"
+         Every reactivo must include at least one of: job context ("en su puesto de trabajo", "durante la jornada", "ante un cliente/material/equipo real"), specific tool from the course, or measurable output from the unit objective.
       
       OUTPUT ONLY MARKDOWN — start directly with the # heading. No JSON. No code block. No preamble:
       
@@ -174,6 +179,10 @@ pipeline_steps:
       4. PERFECT MATH: All weights sum exactly 100%.
       5. MINIMUM 3 REACTIVOS per unit.
       6. CUESTIONARIO CLAVE: If instrument is Cuestionario, add ### CLAVE DE RESPUESTAS with EXACTLY one row per reactivo — no more, no less.
+      7. WORKPLACE CONTEXT (EC0366 MANDATORY): Each reactivo MUST anchor to a real workplace scenario — the candidate's actual job context, not an abstract evaluation setting.
+         WRONG: "El candidato realiza el ejercicio de la unidad"
+         RIGHT: "En su área de trabajo y con el material real del proceso, el candidato ejecuta [acción específica] hasta obtener [resultado medible del puesto]"
+         At least one context marker per reactivo: ("en su área de trabajo", "ante el material real", "durante el desempeño habitual", "frente al equipo/cliente/herramienta del puesto").
       
       OUTPUT ONLY MARKDOWN — start directly with the # heading. No JSON. No code block. No preamble:
       
@@ -213,6 +222,7 @@ pipeline_steps:
       5. Unique Reactivos: No reactivo text is substantially similar across different units.
       6. Minimum Reactivos: Each unit must have at least 3 reactivos. Documents with only 2 reactivos per unit are penalized.
       7. CLAVE Completeness: For any Cuestionario unit, the ### CLAVE DE RESPUESTAS section must have EXACTLY as many rows as the reactivos table. A CLAVE with fewer rows than reactivos is a critical deficiency.
+      8. WORKPLACE CONTEXT: Count how many reactivos in each unit include at least one of these context markers: "en su área de trabajo", "en su puesto de trabajo", "durante la jornada", "ante el material real", "durante el desempeño habitual", "frente al equipo", "ante un cliente". Prefer the document where a higher percentage of reactivos include a workplace marker. Penalize documents where most reactivos describe abstract evaluation-room scenarios without job context.
       
       Choose the one that meets ALL criteria. If both fail on the same criteria, choose the one with fewer deficiencies.
       

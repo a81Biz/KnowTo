@@ -51,12 +51,24 @@ pipeline_steps:
       
       SOURCE OF TRUTH: The units from the syllabus (F2/F3), the duration calculations from F3, and the volume of content from P1-P5.
       
-      FOR EACH UNIT:
+      MANDATORY FIRST ITEM — FECHA DE INICIO:
+      The FIRST element of the output array MUST always be a fecha_inicio_curso field.
+      This date anchors all session scheduling — without it, the calendar document cannot show real dates.
+      
+      MANDATORY SECOND ITEM — HORA DE INICIO:
+      The SECOND element MUST always be a hora_inicio_sesion field.
+      This is the daily start time for sessions (e.g., "09:00"). Without it all session agendas default to an assumed time that may not match reality.
+      
+      MANDATORY THIRD ITEM — EVALUACIÓN DIAGNÓSTICA:
+      The THIRD element MUST always be the initial diagnostic session (Sesión 0) that precedes all unit sessions.
+      This is required by EC0366 to establish the participant's baseline before instruction begins.
+      
+      FOR EACH UNIT (items 4 and beyond):
       1. Read its "nombre" and "objetivo".
       2. Read F3's calculo_duracion for the unit's allocated hours.
       3. Read the volume of P1-P5 content generated for this unit to estimate realistic session time.
       4. Design a session plan with 6 fields:
-         - Sesión: Session number in the course sequence.
+         - Sesión: Session number in the course sequence (starting from 1 after the diagnostic).
          - Tema principal: Unit name being covered.
          - Duración: Estimated hours for this session — must align with F3's calculated duration.
          - Modalidad: Presencial / En línea / Mixto — from F2's modality selection.
@@ -64,19 +76,37 @@ pipeline_steps:
          - Evaluación: The specific instrument or evidence to collect in this session — reference P1's instrument type by name.
       
       RULES:
-      1. SAME NUMBER OF ELEMENTS AS UNITS RECEIVED.
-      2. P1-P5 VOLUME: The Duración must realistically accommodate the content volume already produced. If P3 generated 4 scenes per unit and P5 generated a 45-minute activity, the session must have enough hours to cover them.
+      1. OUTPUT LENGTH = 3 + number of units. (1 fecha + 1 hora + 1 diagnostic + N unit sessions)
+      2. P1-P5 VOLUME: The Duración must realistically accommodate the content volume already produced.
       3. F3 ALIGNMENT: Total hours across all sessions must match F3's duracion_total_horas_aprox.
-      4. SPECIFIC INSTRUMENT NAME: The Evaluación field MUST state the exact instrument type from P1 (e.g., "Guía de Observación", "Lista de Cotejo", "Cuestionario"). Do not abbreviate or paraphrase.
-      5. field "name" MUST be: "sesion_unidad_" + modulo.
+      4. SPECIFIC INSTRUMENT NAME: The Evaluación field MUST state the exact instrument type from P1.
+      5. field "name" MUST be: "sesion_unidad_" + modulo for unit sessions.
       6. USE \n FOR LINE BREAKS in suggested_value.
       
       EXACT OUTPUT FORMAT:
       [
         {
+          "name": "fecha_inicio_curso",
+          "label": "Fecha de inicio del curso",
+          "suggested_value": "YYYY-MM-DD",
+          "type": "text"
+        },
+        {
+          "name": "hora_inicio_sesion",
+          "label": "Hora de inicio de las sesiones",
+          "suggested_value": "09:00",
+          "type": "text"
+        },
+        {
+          "name": "sesion_diagnostica",
+          "label": "Sesión 0 — Evaluación Diagnóstica",
+          "suggested_value": "Sesión: 0 (Evaluación Diagnóstica)\nTema principal: Encuadre y evaluación de conocimientos previos\nDuración: 1 hora\nModalidad: Presencial\nActividades programadas: Bienvenida, presentación del programa, aplicación de instrumento diagnóstico\nEvaluación: Instrumento diagnóstico (no acreditable — establece línea base)",
+          "type": "textarea"
+        },
+        {
           "name": "sesion_unidad_1",
           "label": "Sesión: [Unit name]",
-          "suggested_value": "Sesión: ...\nTema principal: ...\nDuración: ...\nModalidad: ...\nActividades programadas: ...\nEvaluación: ...",
+          "suggested_value": "Sesión: 1\nTema principal: ...\nDuración: ...\nModalidad: ...\nActividades programadas: ...\nEvaluación: [exact P1 instrument type]",
           "type": "textarea"
         }
       ]
@@ -93,7 +123,18 @@ pipeline_steps:
       
       SOURCE OF TRUTH: The units from the syllabus (F2/F3), the F3 duration data, and the P1-P5 content volume.
       
-      FOR EACH UNIT:
+      MANDATORY FIRST ITEM — FECHA DE INICIO:
+      The FIRST element of the output array MUST always be a fecha_inicio_curso field.
+      This is the actual course start date. Without it the document shows no real dates.
+      
+      MANDATORY SECOND ITEM — HORA DE INICIO:
+      The SECOND element MUST always be a hora_inicio_sesion field.
+      Capture the actual start time for daily sessions (e.g., "09:00", "14:00"). Session agendas use this as anchor.
+      
+      MANDATORY THIRD ITEM — EVALUACIÓN DIAGNÓSTICA:
+      The THIRD element MUST always be the diagnostic session (Sesión 0) required by EC0366.
+      
+      FOR EACH UNIT (items 4 and beyond):
       1. Read its "nombre" and "objetivo".
       2. Read F3's calculo_duracion for hours distribution.
       3. Read P1-P5 to identify resources, products, and responsible roles.
@@ -101,20 +142,38 @@ pipeline_steps:
          - Unidad: Module name.
          - Horas teóricas: Hours for conceptual content (from F3's desglose).
          - Horas prácticas: Hours for workshop/practice (from F3's desglose).
-         - Recursos didácticos: Materials, equipment, or platform required — list real items from P5's materiales and P2's visual resources.
-         - Productos esperados: Evidence the participant delivers — from P1's Evidencia and P5's Evidencia a entregar.
+         - Recursos didácticos: Materials, equipment, or platform required — list real items from P5 and P2.
+         - Productos esperados: Evidence the participant delivers — from P1's Evidencia and P5's Evidencia.
          - Responsable: Instructor / Facilitador / Coordinador — based on the activity type.
       
       RULES:
-      1. SAME NUMBER OF ELEMENTS AS UNITS RECEIVED.
-      2. HOURS BREAKDOWN: Horas teóricas + Horas prácticas must equal the unit's total duration from F3.
+      1. OUTPUT LENGTH = 3 + number of units. (1 fecha + 1 hora + 1 diagnostic + N unit sessions)
+      2. HOURS BREAKDOWN: Horas teóricas + Horas prácticas must equal the unit's total from F3.
       3. REAL RESOURCES: Recursos didácticos must list actual items from P5 and P2, not generic categories.
       4. REAL PRODUCTS: Productos esperados must reference the specific evidence names from P1 and P5.
-      5. field "name" MUST be: "sesion_unidad_" + modulo.
+      5. field "name" MUST be: "sesion_unidad_" + modulo for unit sessions.
       6. USE \n FOR LINE BREAKS in suggested_value.
       
       EXACT OUTPUT FORMAT:
       [
+        {
+          "name": "fecha_inicio_curso",
+          "label": "Fecha de inicio del curso",
+          "suggested_value": "YYYY-MM-DD",
+          "type": "text"
+        },
+        {
+          "name": "hora_inicio_sesion",
+          "label": "Hora de inicio de las sesiones",
+          "suggested_value": "09:00",
+          "type": "text"
+        },
+        {
+          "name": "sesion_diagnostica",
+          "label": "Sesión 0 — Evaluación Diagnóstica",
+          "suggested_value": "Unidad: Diagnóstico Inicial\nHoras teóricas: 1\nHoras prácticas: 0\nRecursos didácticos: Instrumento diagnóstico, hojas de respuesta\nProductos esperados: Perfil inicial del participante\nResponsable: Facilitador",
+          "type": "textarea"
+        },
         {
           "name": "sesion_unidad_1",
           "label": "Sesión: [Unit name]",

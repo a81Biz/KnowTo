@@ -1,12 +1,23 @@
 import { ProductContext } from './product.types';
 import { parseJsonSafely } from '../../../helpers/json-cleaner';
 
+function extractReactivosSection(md: string): string {
+  // Extract only rows from reactivo tables (| N | ... |) to scope PROHIBITED_WORDS check
+  // Avoids false positives from Instrucciones Generales or Datos Generales sections
+  const tableRows = (md.match(/\|\s*\d+\s*\|[^\n]+/g) || []).join('\n');
+  return tableRows;
+}
+
 function validateDocumentoP1(md: string): { valid: boolean; errors: string[] } {
   const errors: string[] = [];
 
-  // Rule 1: prohibited subjective words
-  if (/\b(adecuado|correctamente|correcto|bien|efectivo|notable|mejorado)\b/i.test(md)) {
-    errors.push('Contiene palabras subjetivas prohibidas (adecuado/correcto/bien/efectivo)');
+  // Rule 1: prohibited subjective words — scoped to reactivo table rows only (avoids false positives)
+  const reactivosText = extractReactivosSection(md);
+  if (/\b(adecuado|adecuada|correctamente|correcto|correcta|bien|efectivo|efectiva|notable|mejorado|mejorada|entendimiento|comprensión|comprension|conciencia)\b/i.test(reactivosText)) {
+    errors.push('Reactivos contienen palabras subjetivas prohibidas (adecuado/correcto/bien/efectivo/entendimiento/comprensión)');
+  }
+  if (/de\s+(manera|forma)\s+(adecuada|correcta|efectiva|notable|apropiada)/i.test(reactivosText)) {
+    errors.push('Reactivos contienen locuciones adverbiales subjetivas (de manera adecuada / de forma correcta / etc.)');
   }
 
   // Rule 2: global unit ponderaciones must sum to 100%
@@ -19,12 +30,90 @@ function validateDocumentoP1(md: string): { valid: boolean; errors: string[] } {
     }
   }
 
+  // Rule 2b: ponderaciones written as text instead of digits
+  if (/(?:Ponderaci[oó]n|Peso)\s*(?:Global|Final)?[:\s]+(cien|noventa|ochenta|setenta|sesenta|cincuenta|cuarenta|treinta|veinte|quince|diez|cinco)\s*(?:por\s+ciento)?/gi.test(md)) {
+    errors.push('Ponderación escrita como texto (ej: "treinta por ciento") en lugar de número — verificar valor numérico manualmente');
+  }
+
   // Rule 3: no combined instruments in a single unit
   if (/(?:Cuestionario|Lista de Cotejo|Gu[ií]a de Observaci[oó]n).{1,10}(?:y|\/|\+).{1,10}(?:Cuestionario|Lista de Cotejo|Gu[ií]a de Observaci[oó]n)/i.test(md)) {
     errors.push('Combina dos tipos de instrumento en la misma unidad');
   }
 
+  // Rule 4: CLAVE DE RESPUESTAS row count must match reactivos count
+  errors.push(...verifyClaveRowCounts(md));
+
   return { valid: errors.length === 0, errors };
+}
+
+function verifyClaveRowCounts(md: string): string[] {
+  const errors: string[] = [];
+  const parts = md.split(/###\s*CLAVE DE RESPUESTAS/i);
+
+  for (let i = 1; i < parts.length; i++) {
+    const beforeClave = parts[i - 1];
+    const claveSection = parts[i];
+
+    // Count numbered rows in CLAVE (stop at next ## heading)
+    const claveEnd = claveSection.search(/\n##[^#]/);
+    const claveText = claveEnd >= 0 ? claveSection.substring(0, claveEnd) : claveSection;
+    const claveRows = (claveText.match(/\|\s*\d+\s*\|/g) || []).length;
+
+    // Count numbered rows in the last table of the preceding text
+    const lastSepIdx = beforeClave.lastIndexOf('|---|');
+    const afterLastSep = lastSepIdx >= 0 ? beforeClave.substring(lastSepIdx) : beforeClave;
+    const reactiveRows = (afterLastSep.match(/\|\s*\d+\s*\|/g) || []).length;
+
+    const unitMatch = beforeClave.match(/##\s+Unidad[^\n]*/g);
+    const unitName = unitMatch ? unitMatch[unitMatch.length - 1].trim() : 'unidad desconocida';
+
+    if (reactiveRows > 0 && claveRows !== reactiveRows) {
+      errors.push(`CLAVE DE RESPUESTAS tiene ${claveRows} filas pero hay ${reactiveRows} reactivos en "${unitName}"`);
+    }
+  }
+
+  return errors;
+}
+
+function addInvariantInstitutionalFields(md: string): string {
+  // Inject EC0366 mandatory institutional fields into Datos Generales section (P1-B)
+  // These fields are required by CONOCER and must appear regardless of LLM output
+  const datosGeneralesMarker = /## [12]\.\s*Datos Generales/i;
+  if (!datosGeneralesMarker.test(md)) return md;
+
+  // Only inject if not already present
+  if (/Estándar de Competencia/.test(md) && /Centro de Evaluación/.test(md)) return md;
+
+  const institutionalBlock = `- **Estándar de Competencia:** EC0366-SITTSA\n- **Centro de Evaluación CONOCER:** ____________________\n- **Fecha de evaluación planificada:** ____________________\n`;
+
+  return md.replace(
+    /(## [12]\.\s*Datos Generales\n)([\s\S]*?)(\n## )/i,
+    (match, heading, content, next) => {
+      if (/Estándar de Competencia/.test(content)) return match;
+      return heading + institutionalBlock + content + next;
+    }
+  );
+}
+
+function addInvariantSignatureSection(md: string): string {
+  // Remove any existing signature/validation section to avoid duplication
+  const cleaned = md.replace(/\n---\n[\s\S]*##\s*Firmas[\s\S]*/i, '').trim();
+
+  return cleaned + `
+
+---
+
+## Firmas de Validación
+
+| Rol | Nombre Completo | Firma | Fecha |
+|---|---|---|---|
+| Diseñador Instruccional | | | |
+| Experto en la Materia (SME) | | | |
+| Evaluador Asignado | | | |
+| Candidato (Toma de Conocimiento) | | | |
+
+*Instrumento validado conforme al estándar EC0366 del CONOCER/SEP antes de su aplicación.*
+`;
 }
 
 function extractDocumentoMd(raw: string, fallback: string): string {
@@ -85,6 +174,8 @@ export async function handleDocumentP1Assembler(context: ProductContext): Promis
 
   const rawWinner = (await services.pipelineService.getAgentOutput(jobId, winnerAgent)) || '';
   let documentoMd = extractDocumentoMd(rawWinner, fallback);
+  documentoMd = addInvariantInstitutionalFields(documentoMd);
+  documentoMd = addInvariantSignatureSection(documentoMd);
 
   const validation = validateDocumentoP1(documentoMd);
   let validacionEstado: string;
@@ -93,7 +184,7 @@ export async function handleDocumentP1Assembler(context: ProductContext): Promis
   if (!validation.valid) {
     console.warn(`[doc-p1-assembler] Validación fallida en ${winnerAgent}:`, validation.errors);
     const rawLoser = (await services.pipelineService.getAgentOutput(jobId, loserAgent)) || '';
-    const loserMd = extractDocumentoMd(rawLoser, fallback);
+    const loserMd = addInvariantSignatureSection(addInvariantInstitutionalFields(extractDocumentoMd(rawLoser, fallback)));
     const loserValidation = validateDocumentoP1(loserMd);
     if (loserValidation.valid) {
       console.log(`[doc-p1-assembler] Fallback al perdedor ${loserAgent} — pasa validación`);

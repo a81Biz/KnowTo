@@ -3,6 +3,35 @@ import { parseJsonSafely } from '../../../helpers/json-cleaner';
 
 const PROHIBITED_WORDS = /\b(adecuado|correctamente|correcto|bien|efectivo|notable|mejorado)\b/i;
 
+// Misma lógica que en p7-document.assembler.ts — convierte el JSONB de F2 a texto compacto
+const PERFIL_LABEL_P4: Record<string, string> = {
+  conocimientos_previos: 'Conocimientos previos',
+  habilidades_digitales: 'Habilidades digitales',
+  escolaridad_minima: 'Escolaridad mínima',
+  disponibilidad_sugerida: 'Disponibilidad sugerida',
+};
+
+function formatearPerfilIngresoCompacto(raw: any): string {
+  if (!raw) return '';
+  if (typeof raw === 'object' && !Array.isArray(raw)) {
+    return Object.entries(raw)
+      .map(([key, val]: [string, any]) => {
+        const label = PERFIL_LABEL_P4[key] || key.replace(/_/g, ' ');
+        const req = typeof val === 'object' ? (val.requisito || val.requirement || '') : String(val);
+        return req ? `${label}: ${req}` : '';
+      })
+      .filter(Boolean)
+      .join(' | ');
+  }
+  if (Array.isArray(raw)) {
+    return (raw as Array<any>)
+      .map(item => item.requisito || item.requirement || '')
+      .filter(Boolean)
+      .join(' | ');
+  }
+  return String(raw);
+}
+
 interface UnidadData {
   modulo: number;
   nombre: string;
@@ -62,6 +91,18 @@ export async function handleDocumentP4Assembler(context: ProductContext): Promis
     return '# Manual del Participante\n\n*Error: No se encontraron datos para generar el manual.*';
   }
 
+  // Query F2 audience profile — used to calibrate assumed knowledge in every chapter
+  let audienceProfile = '';
+  try {
+    const f2 = await services.supabase.getF2Analisis(projectId);
+    if (f2?.perfil_ingreso) {
+      audienceProfile = formatearPerfilIngresoCompacto(f2.perfil_ingreso);
+      console.log(`[p4-assembler] Perfil de ingreso F2 cargado para calibración de capítulos`);
+    }
+  } catch (err) {
+    console.warn('[p4-assembler] No se pudo leer perfil F2, capítulos sin calibración de audiencia');
+  }
+
   console.log(`[p4-assembler] Procesando ${secciones.length} capítulos (${unidadesForm.length} nombres del Form Schema)...`);
   console.log(`[p4-assembler] Secciones detectadas: ${JSON.stringify(secciones.map((s: any) => s.campo))}`);
   console.log(`[p4-assembler] Unidades Form Schema: ${JSON.stringify(unidadesForm.map((u: any) => u.nombre))}`);
@@ -71,6 +112,8 @@ export async function handleDocumentP4Assembler(context: ProductContext): Promis
   const capitulosData: Array<{ md: string; secciones: Record<string, any> }> = [];
   const allTerms: Array<{ termino: string; definicion: string }> = [];
   const allReferences: string[] = [];
+
+  let domainLockViolations = 0;
 
   console.log(`[p4-assembler] Iniciando loop de ${secciones.length} iteraciones`);
   for (let i = 0; i < secciones.length; i++) {
@@ -89,6 +132,7 @@ export async function handleDocumentP4Assembler(context: ProductContext): Promis
 
     // Buscar en Tavily información específica para esta unidad
     let researchData = investigacionUnidad;
+    let tavilyFallo = false;
     try {
       const searchResults = await services.osint.searchUnitTopic(
         nombreUnidad,
@@ -96,9 +140,16 @@ export async function handleDocumentP4Assembler(context: ProductContext): Promis
       );
       if (searchResults) {
         researchData = { ...investigacionUnidad, ...searchResults };
+        // 4.5: Audit trail — log Tavily sources per chapter for No Fake Theory traceability
+        const sources: any[] = searchResults.referencias || searchResults.results || [];
+        console.log(`[p4-assembler] Tavily unidad ${unidadNum} (${nombreUnidad}): ${sources.length} fuentes — ${sources.slice(0, 3).map((r: any) => r.url || r.title || String(r)).join(' | ')}`);
+        if (sources.length === 0) tavilyFallo = true;
+      } else {
+        tavilyFallo = true;
       }
     } catch (err) {
       console.warn(`[p4-assembler] Tavily search falló para unidad ${unidadNum}, usando datos del extractor`);
+      tavilyFallo = true;
     }
 
     // Notificar progreso
@@ -110,7 +161,7 @@ export async function handleDocumentP4Assembler(context: ProductContext): Promis
     } catch {}
 
     // Construir prompt para esta unidad
-    const promptUnidad = buildChapterPrompt(unidadNum, nombreUnidad, formContent, researchData, projectName || '');
+    const promptUnidad = buildChapterPrompt(unidadNum, nombreUnidad, formContent, researchData, projectName || '', audienceProfile);
 
     // Ejecutar A/B + Juez
     console.log(`[p4-assembler] Ejecutando agente A para capítulo ${unidadNum}...`);
@@ -128,6 +179,7 @@ export async function handleDocumentP4Assembler(context: ProductContext): Promis
     const decision = juezMatch ? parseJsonSafely(juezMatch[0], { seleccion: 'A' }) : { seleccion: 'A' };
     if (decision.seleccion === 'RECHAZADO') {
       console.warn(`[p4-assembler] Capítulo ${unidadNum}: RECHAZADO por DOMAIN LOCK (ambos agentes introdujeron materiales fuera del formulario). Razón: ${decision.razon}. Usando agente A como fallback.`);
+      domainLockViolations++;
     }
     const seleccion = decision.seleccion === 'B' ? 'B' : 'A';
 
@@ -152,26 +204,31 @@ export async function handleDocumentP4Assembler(context: ProductContext): Promis
       }
     }
 
-    // Extraer términos para el glosario (trailing | opcional para cubrir última fila de tabla)
-    const termMatches = chapterMd.matchAll(/\|\s*([^|\n]+?)\s*\|\s*([^|\n]+?)\s*(?:\||$)/gm);
-    for (const match of termMatches) {
-      const termino = match[1].trim();
-      const definicion = match[2].trim();
-      // Filtrar filas rotas
-      if (!termino || !definicion) continue;
-      if (termino === 'Término' || termino === '---') continue;
-      if (definicion.startsWith('---')) continue;
-      if (termino.length < 2 || definicion.length < 5) continue;
-      // Si el término es igual a la definición, es una fila rota
-      if (termino === definicion) continue;
-      // Si el término tiene más de 60 caracteres, es una definición, no un término
-      if (termino.length > 60) continue;
-      // Si el término empieza con minúscula, verbo, artículo o preposición, es una definición
-      // filtro de minúsculas eliminado: términos técnicos compuestos son válidos en minúscula
-      if (/^(el |la |los |las |un |una |proceso |método |técnica |diferencia |importancia )/i.test(termino)) continue;
-      // Si el término contiene markdown (negrita sin cerrar), limpiarlo
-      const terminoLimpio = termino.replace(/\*\*/g, '').trim();
-      allTerms.push({ termino: terminoLimpio, definicion });
+    // P4-D: If Tavily failed, prepend a visible banner so the reader knows theory is unverified
+    if (tavilyFallo) {
+      chapterMd = chapterMd.replace(
+        /### Marco Teórico/,
+        '> ⚠️ **Marco Teórico generado sin fuentes externas verificadas** — Tavily no devolvió resultados para esta unidad. Validar con SME antes de publicar.\n\n### Marco Teórico'
+      );
+    }
+
+    // P4-E: Count ### sections and warn if < 6
+    const sectionCount = (chapterMd.match(/^###\s/gm) || []).length;
+    if (sectionCount < 6) {
+      console.warn(`[p4-assembler] ⚠️ Capítulo ${unidadNum} "${nombreUnidad}": solo ${sectionCount} sección(es) (mínimo 6). Secciones faltantes pueden indicar contenido incompleto.`);
+    }
+
+    const seccionesJson = parseSecciones(chapterMd);
+
+    // Extraer términos del glosario SOLO desde la sección ### Conceptos Clave
+    // (evita falsos positivos de tablas de Desarrollo, Ejemplo, etc.)
+    for (const clave of seccionesJson.conceptos_clave || []) {
+      if (clave.termino && clave.definicion) {
+        allTerms.push({
+          termino: clave.termino.replace(/\*\*/g, '').trim(),
+          definicion: clave.definicion
+        });
+      }
     }
 
     // Extraer referencias para la bibliografía
@@ -183,7 +240,6 @@ export async function handleDocumentP4Assembler(context: ProductContext): Promis
       }
     }
 
-    const seccionesJson = parseSecciones(chapterMd);
     capitulos.push(chapterMd);
     capitulosData.push({ md: chapterMd, secciones: seccionesJson });
     console.log(`[p4-assembler] Capítulo ${unidadNum} completado (${chapterMd.length} chars)`);
@@ -220,6 +276,11 @@ export async function handleDocumentP4Assembler(context: ProductContext): Promis
   const domainsSeen = new Set<string>();
   const uniqueRefs: string[] = [];
   for (const url of allReferences) {
+    // 4.2: Flag URLs that look hallucinated before including them
+    if (esSospechosa(url)) {
+      console.warn(`[p4-assembler] URL potencialmente inventada omitida de bibliografía: ${url}`);
+      continue;
+    }
     try {
       const domain = new URL(url).hostname.replace('www.', '');
       if (!domainsSeen.has(domain)) {
@@ -258,6 +319,7 @@ export async function handleDocumentP4Assembler(context: ProductContext): Promis
     // Deduplicar por título también
     const uniqueRefLinks = [...new Set(refLinks)];
     bibliografiaMd += uniqueRefLinks.join('\n') + '\n';
+    bibliografiaMd += '\n> **Nota de verificación:** Las referencias en línea fueron sugeridas por IA (Tavily). Verificar que cada URL resuelve correctamente antes de entregar el manual a candidatos.\n';
   } else {
     bibliografiaMd += '- No se encontraron referencias en línea para los temas de este manual.\n';
   }
@@ -269,10 +331,18 @@ export async function handleDocumentP4Assembler(context: ProductContext): Promis
       .replace(/^#\s+(Capítulo\s)/gm, '## $1')
       .replace(/^###(\S)/gm, '### $1')
   );
+  const validacionSectionMd = `\n\n---\n\n## Validación y Vigencia del Manual\n\n` +
+    `| Rol | Nombre | Firma | Fecha |\n|---|---|---|---|\n` +
+    `| Diseñador Instruccional | | | |\n` +
+    `| Experto en la Materia (SME) | | | |\n\n` +
+    `*Este manual requiere validación por el Experto en la Materia (SME) y firma del Diseñador Instruccional ` +
+    `antes de su entrega oficial a candidatos. Vigencia: 1 año o hasta actualización del Estándar EC0366.*\n`;
+
   const documentoMd = '# Manual del Participante\n\n' +
     capitulosNormalizados.join('\n\n') +
     glosarioMd +
-    bibliografiaMd;
+    bibliografiaMd +
+    validacionSectionMd;
 
   console.log(`[p4-assembler] Documento final: ${documentoMd.length} chars, ${capitulos.length} capítulos`);
 
@@ -280,13 +350,47 @@ export async function handleDocumentP4Assembler(context: ProductContext): Promis
   let validacionEstado = 'aprobado';
   let validacionErrores: object = { passed: true };
 
+  const erroresValidacion: string[] = [];
   if (PROHIBITED_WORDS.test(documentoMd)) {
+    erroresValidacion.push('Palabras subjetivas prohibidas detectadas en el documento final');
+  }
+  // 4.4: Programmatic fallback for domain lock violations
+  if (domainLockViolations > 0) {
+    erroresValidacion.push(`${domainLockViolations} capítulo(s) con DOMAIN LOCK violation — materiales no autorizados detectados por el juez (agente A usado como fallback)`);
+  }
+  if (erroresValidacion.length > 0) {
     validacionEstado = 'aprobado_con_errores';
-    validacionErrores = { passed: false, errors: ['Palabras subjetivas prohibidas detectadas en el documento final'] };
+    validacionErrores = { passed: false, errors: erroresValidacion };
   }
 
+  // P4-B: Separate inventario_conceptos (theoretical terms from conceptos_clave)
+  // from inventario_materiales (physical items from Desarrollo and Ejercicio Práctico sections).
+  // Only physical materials should gate Domain Lock for P2/P3/P5.
+  const inventarioConceptos = [...new Set(
+    capitulosData.flatMap(c =>
+      (c.secciones.conceptos_clave || []).map((t: any) => t.termino).filter(Boolean)
+    )
+  )];
+
+  // Extract physical materials from Desarrollo (numbered steps) and Ejercicio Práctico
+  // by matching lines that describe physical objects (tools, materials, quantities)
+  const MATERIAL_PATTERN = /(?:\d+\.\s*|[-*]\s*)(?:usar?|utilizar?|colocar?|aplicar?|mezclar?|tomar?|retirar?|limpiar?|preparar?)?[^.\n]*(?:pincel|pintura|herramienta|material|tela|madera|metal|papel|piel|cuero|resina|soldad|cable|tubo|tornill|perno|equipo|máquina|dispositivo|modelo|pieza|miniatura)[^.\n]*/gi;
+  const inventarioMateriales = [...new Set(
+    capitulosData.flatMap(c => {
+      const textoDesarrollo = typeof c.secciones.desarrollo === 'string' ? c.secciones.desarrollo : (c.secciones.desarrollo || []).join(' ');
+      const textoEjercicio = typeof c.secciones.ejercicio_practico === 'string' ? c.secciones.ejercicio_practico : '';
+      const matches: string[] = [];
+      for (const match of (textoDesarrollo + ' ' + textoEjercicio).matchAll(MATERIAL_PATTERN)) {
+        const item = match[0].trim().slice(0, 80);
+        if (item.length > 5) matches.push(item);
+      }
+      // Fallback: if pattern finds nothing, include conceptos as before to avoid empty Domain Lock
+      return matches.length > 0 ? matches : (c.secciones.conceptos_clave || []).map((t: any) => t.termino).filter(Boolean);
+    })
+  )];
+
   // 7. Guardar en BD
-await services.supabase.saveF4Producto({
+  await services.supabase.saveF4Producto({
     projectId,
     producto: 'P4',
     documentoFinal: documentoMd,
@@ -303,6 +407,8 @@ await services.supabase.saveF4Producto({
         secciones_json: cap.secciones,
         palabras: cap.md.split(/\s+/).length
       })),
+      inventario_materiales: inventarioMateriales,
+      inventario_conceptos: inventarioConceptos,
       palabras_totales: documentoMd.split(/\s+/).length
     },
   });
@@ -377,8 +483,23 @@ function buildChapterPrompt(
   nombre: string,
   formContent: string,
   researchData: any,
-  proyecto: string
+  proyecto: string,
+  audienceProfile: string = ''
 ): string {
+  const audienceSection = audienceProfile
+    ? `
+🎯 AUDIENCE PROFILE — CONTENT CALIBRATION RULE (from F2 analysis — authoritative):
+${audienceProfile}
+
+CALIBRATION MANDATE: This manual is the PRIMARY STUDY DOCUMENT for participants with the above profile.
+- Write at the level of a participant who meets EXACTLY the stated "Conocimientos previos" — not below, not above.
+- FORBIDDEN: assuming the reader knows concepts NOT listed in the profile.
+- FORBIDDEN: over-explaining concepts that are explicitly listed as "known" in the profile.
+- EXAMPLE: if profile says "Conocimientos previos: basic brush application" → you may reference brush application without defining it, but must explain advanced color mixing from scratch.
+- Every technical term introduced for the FIRST TIME in this chapter MUST appear in ### Conceptos Clave.
+`
+    : '';
+
   return `
 YOU ARE AN API ENDPOINT. YOU DO NOT CONVERSE. YOU ONLY OUTPUT RAW JSON.
 
@@ -395,7 +516,7 @@ RESEARCH DATA (from web search — secondary source only):
 - Trends: ${JSON.stringify((researchData as any).tendencias || [])}
 - References: ${JSON.stringify((researchData as any).referencias || [])}
 - Industry context: ${(researchData as any).contexto_industria || 'Not available'}
-
+${audienceSection}
 ⚠️ DOMAIN LOCK — MANDATORY. READ BEFORE WRITING ANYTHING:
 You are writing for the course "${proyecto}" — unit "${nombre}".
 STEP 1 — BUILD YOUR INVENTORY: Scan the FORM CONTENT above. List every tool, material, instrument, and technique explicitly named there. That list is your AUTHORIZED INVENTORY.
@@ -463,6 +584,16 @@ CRITICAL:
 OUTPUT ONLY THIS JSON:
 {"documento_md": "[complete chapter markdown using \\n for line breaks]"}
 `;
+}
+
+// 4.2: Detect URLs that look hallucinated (template brackets, placeholder domains, etc.)
+function esSospechosa(url: string): boolean {
+  const PATRONES = [
+    /\[.*?\]/, /\{.*?\}/, /example\.com/i, /placeholder/i,
+    /tu-url/i, /your-url/i, /sitio-web/i, /lorem/i, /undefined/i,
+    /enlace-aqui/i, /url-aqui/i, /insert-url/i,
+  ];
+  return PATRONES.some(p => p.test(url));
 }
 
 function buildJudgePrompt(rawA: string, rawB: string, unitName: string, formContent: string): string {
