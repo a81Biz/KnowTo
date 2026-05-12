@@ -65,26 +65,14 @@ export async function handleDocumentP4Assembler(context: ProductContext): Promis
     console.warn('[p4-assembler] No se pudo leer schema de BD, usando nombres por defecto');
   }
 
-  // 2. Leer contenido del formulario directamente de BD
+  // 2. Leer contenido del formulario desde userInputs (mismo patrón que todos los assemblers)
+  const userInputs = (event?.body?.userInputs as any) || {};
   let secciones: any[] = [];
   let investigacion: any[] = [];
-  try {
-    const { data: formData } = await services.supabase.client!
-      .from('producto_form_schemas')
-      .select('valores_usuario')
-      .eq('project_id', projectId)
-      .eq('producto', 'P4')
-      .single();
-    
-    const valores = formData?.valores_usuario || {};
-    // Convertir { manual_unidad_1: "...", manual_unidad_2: "...", ... } en array de secciones
-    secciones = Object.entries(valores)
-      .filter(([key]) => key.startsWith('manual_unidad_'))
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([campo, contenido]) => ({ campo, contenido: contenido as string }));
-  } catch (err) {
-    console.warn('[p4-assembler] No se pudo leer valores_usuario de BD');
-  }
+  secciones = Object.entries(userInputs)
+    .filter(([key]) => key.startsWith('manual_unidad_'))
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([campo, contenido]) => ({ campo, contenido: String(contenido || '') }));
 
   if (secciones.length === 0) {
     console.warn('[p4-assembler] No se encontraron secciones en el extractor. Abortando.');

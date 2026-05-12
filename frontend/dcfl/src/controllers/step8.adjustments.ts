@@ -5,9 +5,7 @@
 // Flujo: 1) generar formulario via /generate-form → 2) usuario llena → 3) /generate
 
 import { BaseStep } from '../shared/step.base';
-import { postData } from '@core/http.client';
-import { ENDPOINTS, buildEndpoint } from '../shared/endpoints';
-import { showLoading, hideLoading, showError } from '@core/ui';
+import { showError } from '@core/ui';
 import { wizardStore } from '../stores/wizard.store';
 import type { DynamicFormField, DynamicFormSchema } from '../types/wizard.types';
 
@@ -48,40 +46,88 @@ class Step8AdjustmentsController extends BaseStep {
     this._dom.form = this._container.querySelector('#form-step8') ?? undefined;
   }
 
-  private async _loadDynamicForm(): Promise<void> {
-    const state = wizardStore.getState();
-    if (!state.projectId) { showError('No hay proyecto activo.'); return; }
-
-    if (this._adjDom.btnGenerateForm) {
-      this._adjDom.btnGenerateForm.disabled = true;
-      this._adjDom.btnGenerateForm.textContent = '⏳ Analizando verificación...';
+  // Extrae los módulos del curso leyendo los documentos ya generados en el wizard store.
+  // Busca en F2 (idx 2), F3 (idx 4) y F2.5 (idx 3). Sin LLM.
+  private _extractModules(): Array<{ num: number; nombre: string }> {
+    const steps = wizardStore.getState().steps;
+    for (const idx of [2, 4, 3, 5]) {
+      const doc = steps[idx]?.documentContent ?? '';
+      if (!doc) continue;
+      const map = new Map<number, string>();
+      const re = /\b(?:Módulo|Unidad)\s+(\d+)\s*[:\-–]\s*([^\n|*#]{3,80})/gi;
+      let m: RegExpExecArray | null;
+      while ((m = re.exec(doc)) !== null) {
+        const n = parseInt(m[1]);
+        const name = m[2].replace(/\*+/g, '').trim();
+        if (!map.has(n) && name.length > 2) map.set(n, name);
+      }
+      if (map.size > 1) {
+        return Array.from(map.entries()).map(([num, nombre]) => ({ num, nombre })).sort((a, b) => a.num - b.num);
+      }
     }
-    showLoading('Generando formulario personalizado...');
+    return [{ num: 1, nombre: 'Módulo único del curso' }];
+  }
 
-    try {
-      const context = wizardStore.buildContext(STEP_NUMBER) as {
-        projectName: string; clientName: string; industry?: string; email?: string; previousData?: Record<string, unknown>;
-      };
+  private _buildSchema(modules: Array<{ num: number; nombre: string }>): DynamicFormSchema {
+    const TYPE_OPTIONS = [
+      { value: 'ninguno',        label: 'Sin ajuste necesario en este módulo' },
+      { value: 'tecnico',        label: 'Técnico (plataforma, link, video, audio)' },
+      { value: 'pedagogico',     label: 'Pedagógico (instrucciones, dificultad, claridad)' },
+      { value: 'administrativo', label: 'Administrativo (fechas, nombres, datos)' },
+    ];
 
-      const res = await postData<{ formSchema: DynamicFormSchema }>(
-        buildEndpoint(ENDPOINTS.wizard.generateForm),
-        { projectId: state.projectId, promptId: 'F6_FORM', context }
+    const fields: DynamicFormField[] = [
+      {
+        id: 'courseVersion', label: 'Versión del curso después de ajustes',
+        type: 'text', placeholder: 'Ej: 1.1', required: true,
+        helpText: 'Incrementa el número de versión respecto a la versión anterior.',
+      },
+      {
+        id: 'observationSummary', label: 'Resumen general de observaciones recibidas',
+        type: 'textarea', placeholder: 'Observaciones del evaluador o participantes de prueba.',
+        required: true, helpText: 'Incluye observaciones técnicas y pedagógicas.',
+      },
+    ];
+
+    for (const { num, nombre } of modules) {
+      const p = `mod_${num}`;
+      fields.push(
+        { id: `${p}_description`, label: `${nombre} — Problema o ajuste detectado`,
+          type: 'textarea', placeholder: "Describe el problema o escribe 'Sin observaciones'.",
+          required: true, helpText: 'Actividad específica, síntoma observable, impacto.' },
+        { id: `${p}_solution`, label: `${nombre} — Solución implementada`,
+          type: 'textarea', placeholder: 'Describe el cambio realizado (archivo, texto, config).',
+          required: true, helpText: 'Indica el recurso modificado y el cambio exacto.' },
+        { id: `${p}_type`, label: `${nombre} — Tipo de ajuste`,
+          type: 'select', required: true, options: TYPE_OPTIONS },
+        { id: `${p}_verification`, label: `${nombre} — ¿Cómo verificaste que quedó resuelto?`,
+          type: 'text', placeholder: "Ej: Probé el módulo completo. Si no hubo ajuste: 'No aplica'.",
+          required: true, helpText: 'Verificación objetiva y comprobable.' },
       );
-
-      if (res.data?.formSchema) {
-        this._renderDynamicForm(res.data.formSchema);
-        if (this._adjDom.formGenerationPanel) this._adjDom.formGenerationPanel.classList.add('hidden');
-        if (this._adjDom.dynamicFormPanel) this._adjDom.dynamicFormPanel.classList.remove('hidden');
-      }
-    } catch (err) {
-      showError(err instanceof Error ? err.message : 'Error al generar el formulario');
-      if (this._adjDom.btnGenerateForm) {
-        this._adjDom.btnGenerateForm.disabled = false;
-        this._adjDom.btnGenerateForm.textContent = '🔍 Analizar verificación y generar formulario';
-      }
-    } finally {
-      hideLoading();
     }
+
+    fields.push(
+      { id: 'additionalAdjustments', label: 'Otros ajustes (no asociados a un módulo específico)',
+        type: 'textarea', placeholder: 'Cambios globales u otros no contemplados arriba.',
+        required: false, helpText: 'Opcional.' },
+      { id: 'completionDate', label: 'Fecha de finalización de ajustes',
+        type: 'text', placeholder: 'DD/MM/AAAA', required: true,
+        helpText: 'Fecha en que implementaste todos los ajustes.' },
+    );
+
+    return {
+      formTitle: 'Ajustes Post-Evaluación',
+      description: `Documenta los ajustes módulo por módulo (${modules.length} módulo${modules.length !== 1 ? 's' : ''}). Si un módulo no requirió ajustes, selecciona "Sin ajuste necesario" y escribe "No aplica" en verificación.`,
+      fields,
+    };
+  }
+
+  private _loadDynamicForm(): void {
+    const modules = this._extractModules();
+    const schema = this._buildSchema(modules);
+    this._renderDynamicForm(schema);
+    if (this._adjDom.formGenerationPanel) this._adjDom.formGenerationPanel.classList.add('hidden');
+    if (this._adjDom.dynamicFormPanel) this._adjDom.dynamicFormPanel.classList.remove('hidden');
   }
 
   private _renderDynamicForm(schema: DynamicFormSchema): void {
@@ -151,7 +197,7 @@ class Step8AdjustmentsController extends BaseStep {
 
   private _bindSubDomEvents(): void {
     this._adjDom.btnGenerateForm?.addEventListener('click', () => {
-      void this._loadDynamicForm();
+      this._loadDynamicForm();
     });
   }
 
