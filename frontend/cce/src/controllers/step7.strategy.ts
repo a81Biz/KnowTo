@@ -154,9 +154,7 @@ class Step7StrategyController extends BaseStep {
     if (!state.projectId) { showError('No hay proyecto activo.'); return; }
 
     let stepId = state.steps[5]?.stepId;
-    if (!stepId) {
-      stepId = await this._ensureStepId(state.projectId, formData) ?? undefined;
-    }
+    stepId = await this._ensureStepId(state.projectId, formData) ?? stepId;
     if (!stepId) { showError('No se pudo registrar el paso.'); return; }
 
     if (this._subDom.btnSubmitSpecs) {

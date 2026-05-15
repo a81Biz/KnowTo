@@ -205,7 +205,7 @@ export class BaseStep {
 
   protected async _ensureStepId(projectId: string, formData: Record<string, unknown>): Promise<string | null> {
     const step = wizardStore.getState().steps[this._config.stepNumber];
-    if (step?.stepId) return step.stepId;
+    let stepId = step?.stepId;
 
     try {
       const res = await postData<{ stepId: string }>(
@@ -213,11 +213,11 @@ export class BaseStep {
         { projectId, stepNumber: this._config.stepNumber, inputData: formData }
       );
       if (res.data?.stepId) {
-        wizardStore.setStepId(this._config.stepNumber, res.data.stepId);
-        return res.data.stepId;
+        stepId = res.data.stepId;
+        wizardStore.setStepId(this._config.stepNumber, stepId);
       }
     } catch { /* continuar */ }
-    return null;
+    return stepId ?? null;
   }
 
   protected async _generateDocument(extraData?: Record<string, unknown>, options: { regenerate?: boolean } = {}): Promise<void> {

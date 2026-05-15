@@ -842,6 +842,39 @@ export abstract class BaseSupabaseService {
    * Obtiene un prompt de la tabla unificada `site_prompts` (migración 008).
    * Fallback: devuelve null si la tabla no existe aún (compatibilidad durante migración).
    */
+  // ── Project Soul ───────────────────────────────────────────────────────────
+
+  /**
+   * Guarda el "Project Soul" — la identidad canónica inmutable del proyecto.
+   * Se genera tras completar F1 y se inyecta en cada prompt subsecuente.
+   */
+  async saveProjectSoul(projectId: string, soul: string): Promise<void> {
+    if (!this.client) return;
+
+    const { error } = await this.client
+      .from('projects')
+      .update({ project_soul: soul, updated_at: new Date().toISOString() })
+      .eq('id', projectId);
+
+    if (error) throw new Error(`saveProjectSoul failed: ${error.message}`);
+  }
+
+  /**
+   * Recupera el "Project Soul" de un proyecto.
+   */
+  async getProjectSoul(projectId: string): Promise<string | null> {
+    if (!this.client) return null;
+
+    const { data, error } = await this.client
+      .from('projects')
+      .select('project_soul')
+      .eq('id', projectId)
+      .single();
+
+    if (error) return null;
+    return (data as { project_soul: string | null })?.project_soul ?? null;
+  }
+
   async getPromptFromSiteTable(siteId: string, promptId: string): Promise<Record<string, unknown> | null> {
     if (!this.client) return null;
 

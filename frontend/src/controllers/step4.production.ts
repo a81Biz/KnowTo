@@ -627,18 +627,16 @@ class Step5ProductionController extends BaseStep {
     const userInputs = schemaData?.valores_usuario || this._sharedFormData;
 
     let stepId = state.steps[STEP_NUMBER]?.stepId;
-    if (!stepId) {
-      try {
-        const res = await postData<{ stepId: string }>(
-          buildEndpoint(ENDPOINTS.wizard.saveStep),
-          { projectId: state.projectId, stepNumber: STEP_NUMBER, inputData: userInputs }
-        );
-        if (res.data?.stepId) {
-          stepId = res.data.stepId;
-          wizardStore.setStepId(STEP_NUMBER, stepId);
-        }
-      } catch { /* continuar */ }
-    }
+    try {
+      const res = await postData<{ stepId: string }>(
+        buildEndpoint(ENDPOINTS.wizard.saveStep),
+        { projectId: state.projectId, stepNumber: STEP_NUMBER, inputData: userInputs }
+      );
+      if (res.data?.stepId) {
+        stepId = res.data.stepId;
+        wizardStore.setStepId(STEP_NUMBER, stepId);
+      }
+    } catch { /* continuar */ }
     if (!stepId) { showError('No se pudo registrar el paso.'); return; }
 
     // --- LÓGICA MODULAR PARA P2 Y P3 ---

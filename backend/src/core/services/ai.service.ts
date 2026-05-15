@@ -39,10 +39,17 @@ export class AIService {
 
   async generate(options: GenerateOptions): Promise<string> {
     const entry = this.registry.get(options.promptId);
+
+    // Extraer el Project Soul del contexto para inyectarlo como prefijo del System Prompt.
+    // Esto garantiza la coherencia semántica (anti-amnesia) en todas las fases posteriores a F1.
+    const projectSoul = typeof options.context._projectSoul === 'string'
+      ? options.context._projectSoul
+      : '';
+
     if (!entry.metadata.pipeline_steps || entry.metadata.pipeline_steps.length === 0) {
-      return this._runLegacy(entry.content, options);
+      return this._runLegacy(entry.content, options, projectSoul);
     }
-    return this._runPipeline(entry.content, entry.metadata.pipeline_steps, options);
+    return this._runPipeline(entry.content, entry.metadata.pipeline_steps, options, projectSoul);
   }
 
   async runAgent(promptText: string, modelType: string, systemPromptOverride: string): Promise<string> {
@@ -72,7 +79,7 @@ export class AIService {
     }
   }
 
-  private async _runLegacy(template: string, options: GenerateOptions): Promise<string> {
+  private async _runLegacy(template: string, options: GenerateOptions, projectSoul: string = ''): Promise<string> {
     const today = new Date().toLocaleDateString('es-MX', { day: '2-digit', month: 'long', year: 'numeric' });
     const params: Record<string, string> = {
       context: JSON.stringify(options.context, null, 2),
@@ -84,7 +91,10 @@ export class AIService {
     }
     const rendered = this.registry.render(template, params);
     try {
-      const raw = await this.provider.generate(rendered);
+      const sysPrompt = projectSoul
+        ? `${projectSoul}\n\n---\n\n${this.systemPrompt}`
+        : undefined; // undefined = use default
+      const raw = await this.provider.generate(rendered, undefined, sysPrompt);
       return this._clean(raw);
     } catch (error) {
       const msg = error instanceof Error ? error.message : 'AI generation failed';
@@ -95,8 +105,13 @@ export class AIService {
   private async _runPipeline(
     template: string,
     steps: NonNullable<ReturnType<IPromptRegistry['get']>['metadata']['pipeline_steps']>,
-    options: GenerateOptions
+    options: GenerateOptions,
+    projectSoul: string = ''
   ): Promise<string> {
+    // Construir system prompt enriquecido con el Project Soul
+    const effectiveSystemPrompt = projectSoul
+      ? `${projectSoul}\n\n---\n\n${this.systemPrompt}`
+      : this.systemPrompt;
     const today = new Date().toLocaleDateString('es-MX', { day: '2-digit', month: 'long', year: 'numeric' });
     const params: Record<string, string> = {
       context: JSON.stringify(options.context, null, 2),
@@ -231,7 +246,7 @@ export class AIService {
       if (step.tools && step.tools.length > 0) {
         raw = await this._runAgentWithTools(step, rendered, step.tools);
       } else {
-        raw = await this.provider.generate(rendered, step.model);
+        raw = await this.provider.generate(rendered, step.model, effectiveSystemPrompt);
       }
 
       console.log(`[PIPELINE] Respuesta de ${step.agent} recibida (${raw.length} chars)`);
@@ -275,7 +290,7 @@ export class AIService {
                 (inputStep.include_template !== false ? `\nPLANTILLA / REGLAS:\n${template}` : '');
               const retryRendered = this.registry.render(retryPrompt, params);
               console.log(`[PIPELINE] RETRY agente ${inputAgentName} (${retryRendered.length}chars)`);
-              const retryRaw = await this.provider.generate(retryRendered, inputStep.model);
+              const retryRaw = await this.provider.generate(retryRendered, inputStep.model, effectiveSystemPrompt);
               let retryCleaned = this._clean(retryRaw);
               if (inputAgentName.includes('_A') || inputAgentName.includes('_B')) {
                 retryCleaned = this._extractJsonFromText(retryCleaned);
@@ -297,7 +312,7 @@ export class AIService {
               (step.include_template !== false ? `\nPLANTILLA / REGLAS:\n${template}` : '');
             const judgeRetryRendered = this.registry.render(judgeRetryPrompt, params);
             console.log(`[PIPELINE] RETRY juez ${step.agent} (intento ${retries}/${MAX_RETRIES})`);
-            const judgeRetryRaw = await this.provider.generate(judgeRetryRendered, step.model);
+            const judgeRetryRaw = await this.provider.generate(judgeRetryRendered, step.model, effectiveSystemPrompt);
             out[step.agent] = this._clean(judgeRetryRaw);
             decision = this._parseJudgeDecision(out[step.agent]);
           }
@@ -468,7 +483,56 @@ export class AIService {
   }
 
   private _clean(raw: string): string {
-    return raw.replace(/```(?:markdown|json|text)?\s*([\s\S]*?)```/i, '$1').trim();
+    let cleaned = raw.replace(/```\w*\s*([\s\S]*?)```/i, '$1').trim();
+
+    // ── Output Sanitizer ───────────────────────────────────────────────────
+    // Detecta patrones prohibidos que indican Prompt Bleeding o fugas internas.
+
+    // 1. Eliminar nombres de variables internas filtradas
+    cleaned = cleaned.replace(/\bp\d+_secciones\.\w+/g, '');
+    cleaned = cleaned.replace(/\bundefined\b/gi, '');
+
+    // 2. Decodificar URIs mal formadas (ej. %CC%81 → caracteres reales)
+    cleaned = cleaned.replace(/%[0-9A-Fa-f]{2}/g, (match) => {
+      try { return decodeURIComponent(match); }
+      catch { return match; }
+    });
+
+    // 3. Detectar fragmentos significativos en inglés (Prompt Bleeding)
+    //    Solo loguear — no mutilar el output, ya que puede haber términos técnicos legítimos.
+    const englishPatterns = /\b(acceptance criteria|learning outcomes|the following|as follows|please note|in conclusion|deliverables|assessment|stakeholder)\b/gi;
+    const englishMatches = cleaned.match(englishPatterns);
+    if (englishMatches && englishMatches.length >= 3) {
+      console.warn(`[ai-service] ⚠️ Posible Prompt Bleeding detectado: ${englishMatches.length} fragmentos en inglés encontrados: ${englishMatches.slice(0, 5).join(', ')}`);
+    }
+
+    return cleaned;
+  }
+
+  /**
+   * Sanitiza un output final de documento (usado por los assemblers).
+   * Limpia artefactos de IA, variables internas, y URIs codificadas.
+   */
+  public static sanitizeOutput(text: string): string {
+    if (!text) return '';
+
+    let cleaned = text;
+
+    // Eliminar variables internas filtradas
+    cleaned = cleaned.replace(/\bp\d+_secciones\b[.\w]*/g, '');
+    cleaned = cleaned.replace(/\{\{[^}]+\}\}/g, ''); // Handlebars sin resolver
+    cleaned = cleaned.replace(/\bundefined\b/gi, '');
+
+    // Decodificar URIs
+    cleaned = cleaned.replace(/%[0-9A-Fa-f]{2}(?:%[0-9A-Fa-f]{2})*/g, (match) => {
+      try { return decodeURIComponent(match); }
+      catch { return match; }
+    });
+
+    // Limpiar líneas completamente vacías consecutivas (máx 2)
+    cleaned = cleaned.replace(/\n{4,}/g, '\n\n\n');
+
+    return cleaned;
   }
 
   /**

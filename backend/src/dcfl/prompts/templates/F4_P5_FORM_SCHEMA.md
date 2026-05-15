@@ -63,17 +63,21 @@ pipeline_steps:
       RULES:
       1. SAME NUMBER OF ELEMENTS AS UNITS RECEIVED.
       2. MATERIAL LOCK: "Materiales necesarios" MUST list ONLY items from {p4_inventario.unidad_N.materiales} and {p4_inventario.unidad_N.herramientas} where N matches the unit's modulo number. If the inventory for that unit is empty, use only items explicitly stated in the unit's "objetivo". DO NOT invent materials from domain expertise or training knowledge.
-      3. VERB COMPATIBILITY: For each step in "Instrucciones paso a paso", derive the physical verb from the material's category — do NOT use hardcoded verb lists:
+      3. MODALITY RULE: If F2's `modalidad` or F3's `modalidad_entrega` is "Asíncrono", "En línea", or "LMS":
+         FORBIDDEN in "Materiales necesarios" and "Instrucciones paso a paso": pizarra, rotulador, marcador, salón, aula, butaca, silla, pupitre, proyector físico, espacio presencial, material impreso.
+         REQUIRED: replace with LMS-equivalents — plataforma LMS, módulo en Hotmart/Moodle/Canvas, foro de discusión, entrega de evidencia digital, captura de pantalla, archivo adjunto.
+         "Tiempo estimado" MUST be a self-paced window (ej: "45-60 minutos autónomo"), NOT a fixed session-clock duration.
+      4. VERB COMPATIBILITY: For each step in "Instrucciones paso a paso", derive the physical verb from the material's category — do NOT use hardcoded verb lists:
          • LIQUID/FLUID items (paints, oils, inks, adhesives, water, solvents): Aplica, Mezcla, Vierte, Diluye, Extiende, Limpia
          • SOLID/RIGID items (boards, metals, wood, glass, plastic sheets): Coloca, Mide, Marca, Ensambla, Fija, Posiciona
          • DIGITAL/SOFTWARE items (files, apps, forms, spreadsheets): Abre, Escribe, Guarda, Configura, Ejecuta, Selecciona
          • TEXTILE/SOFT items (fabric, thread, foam, paper, leather): Cose, Dobla, Mide, Corta, Pliega, Enrolla
          • EQUIPMENT/TOOLS (machines, instruments, measuring devices): Conecta, Ajusta, Calibra, Opera, Verifica
          FORBIDDEN mental verbs: Comprender, Saber, Conocer, Entender, Analizar, Evaluar, Reflexionar.
-      4. P1 ALIGNMENT: The activity must practice the same skills that P1 evaluates. The success criteria should reference P1's reactivos directly.
-      5. P4 REINFORCEMENT: The activity must apply concepts explained in the P4 manual.
-      6. field "name" MUST be: "actividad_unidad_" + modulo.
-      7. USE \n FOR LINE BREAKS in suggested_value.
+      5. P1 ALIGNMENT: The activity must practice the same skills that P1 evaluates. The success criteria should reference P1's reactivos directly.
+      6. P4 REINFORCEMENT: The activity must apply concepts explained in the P4 manual.
+      7. field "name" MUST be: "actividad_unidad_" + modulo.
+      8. USE \n FOR LINE BREAKS in suggested_value.
       
       EXACT OUTPUT FORMAT:
       [
@@ -111,18 +115,22 @@ pipeline_steps:
       RULES:
       1. SAME NUMBER OF ELEMENTS AS UNITS RECEIVED.
       2. MATERIAL LOCK: "Pasos de ejecución" MUST reference ONLY items from {p4_inventario.unidad_N.materiales} and {p4_inventario.unidad_N.herramientas} for unit N. If inventory is empty, use only items explicitly in the unit's "objetivo". DO NOT invent materials from domain expertise.
-      3. VERB COMPATIBILITY: Derive verbs from material category — do NOT use hardcoded lists:
+      3. MODALITY RULE: If F2's `modalidad` or F3's `modalidad_entrega` is "Asíncrono", "En línea", or "LMS":
+         FORBIDDEN in "Pasos de ejecución": pizarra, rotulador, marcador, salón, aula, butaca, silla, pupitre, proyector físico, espacio presencial, material impreso.
+         REQUIRED: replace with LMS-equivalents — plataforma LMS, módulo en Hotmart/Moodle/Canvas, foro de discusión, entrega de evidencia digital, captura de pantalla, archivo adjunto.
+         "Rúbrica rápida" criteria MUST be verifiable in a digital/async context (no criteria requiring physical presence).
+      4. VERB COMPATIBILITY: Derive verbs from material category — do NOT use hardcoded lists:
          • LIQUID/FLUID: Aplica, Mezcla, Vierte, Diluye, Extiende, Limpia
          • SOLID/RIGID: Coloca, Mide, Marca, Ensambla, Fija, Posiciona
          • DIGITAL/SOFTWARE: Abre, Escribe, Guarda, Configura, Ejecuta, Selecciona
          • TEXTILE/SOFT: Cose, Dobla, Mide, Corta, Pliega, Enrolla
          • EQUIPMENT/TOOLS: Conecta, Ajusta, Calibra, Opera, Verifica
          FORBIDDEN mental verbs: Comprender, Saber, Conocer, Entender, Analizar, Evaluar, Reflexionar.
-      4. REAL-WORLD SCENARIO: The situación problema must reflect an authentic challenge the participant will face on the job, not an academic exercise.
-      5. P1 ALIGNMENT: The rúbrica rápida criteria MUST directly correspond to P1's reactivos for this unit.
-      6. P4 GROUNDING: The scenario must apply knowledge from the P4 manual, not require information the participant hasn't studied.
-      7. field "name" MUST be: "actividad_unidad_" + modulo.
-      8. USE \n FOR LINE BREAKS in suggested_value.
+      5. REAL-WORLD SCENARIO: The situación problema must reflect an authentic challenge the participant will face on the job, not an academic exercise.
+      6. P1 ALIGNMENT: The rúbrica rápida criteria MUST directly correspond to P1's reactivos for this unit.
+      7. P4 GROUNDING: The scenario must apply knowledge from the P4 manual, not require information the participant hasn't studied.
+      8. field "name" MUST be: "actividad_unidad_" + modulo.
+      9. USE \n FOR LINE BREAKS in suggested_value.
       
       EXACT OUTPUT FORMAT:
       [

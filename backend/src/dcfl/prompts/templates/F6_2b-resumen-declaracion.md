@@ -23,39 +23,35 @@ Extrae del contexto: nombre del curso (F1), industria/sector (F0), duración tot
 # RESUMEN EJECUTIVO Y DECLARACIÓN FINAL — EC0366
 **Proyecto:** {{projectName}}
 **Candidato:** {{clientName}}
-**Folio de expediente:** [mismo folio generado en F6_2a — si disponible en contexto, usar el mismo]
+**Folio de expediente:** {resumen_datos.folio_sugerido}
 **Fecha de cierre:** {{fechaActual}}
 
 ---
 
-## 3. RESUMEN EJECUTIVO DEL PROCESO
+## 1. RESUMEN EJECUTIVO DEL PROCESO
 
 | Dato | Valor |
 |:---|:---|
-| Nombre del curso desarrollado | [título del curso del contexto] |
-| Industria / Sector | [del contexto F0] |
-| Duración total del curso | [X horas — del contexto F3] |
-| Modalidad | [del contexto F2] |
-| Plataforma LMS utilizada | [del contexto F3] |
-| Estándar de empaquetamiento | [SCORM versión — del contexto F3] |
-| Número de módulos | [N — del contexto F2] |
-| Número de actividades totales | [N — del contexto F4] |
-| Número de evaluaciones | [N diagnóstica + formativas + sumativa] |
-| Número de videos producidos | [N — del contexto F2_5/F4] |
-| Total de productos EC0366 generados | 16 documentos |
-| Fecha de inicio del proceso | [fecha de F0 si disponible, o "ver documento F0"] |
-| Fecha de cierre del expediente | [fecha actual] |
-| Duración total del proceso | [N días desde F0 hasta hoy, si se puede calcular] |
+| Nombre del curso desarrollado | {resumen_datos.titulo} |
+| Industria / Sector | {resumen_datos.industria} |
+| Duración total del curso | {resumen_datos.duracion} |
+| Modalidad | {resumen_datos.modalidad} |
+| Plataforma LMS utilizada | {resumen_datos.plataforma} |
+| Estándar de empaquetamiento | {resumen_datos.scorm} |
+| Número de módulos | {resumen_datos.modulos} |
+| Número de videos producidos | {resumen_datos.videos} |
+| Fecha de inicio del diseño instruccional | {resumen_datos.fecha_inicio_proceso} |
+| Fecha de cierre del expediente | {{fechaActual}} |
 
 ### Logros del proceso
-[2–3 oraciones destacando los logros: qué tipo de curso se desarrolló, para qué sector, qué problema de capacitación resuelve.]
+[Basándote en el contexto, genera un párrafo conciso sobre el logro principal de este curso y cómo resolverá la necesidad del cliente.]
 
 ### Observaciones y recomendaciones para el organismo certificador
 [Si hubo ajustes post-evaluación documentados en F6, mencionar brevemente que el curso pasó por un proceso de revisión y ajuste. Si no hubo ajustes significativos, indicarlo.]
 
 ---
 
-## 4. DECLARACIÓN FINAL
+## 2. DECLARACIÓN FINAL
 
 El candidato [clientName] declara bajo protesta de decir verdad que:
 
@@ -74,6 +70,6 @@ El candidato [clientName] declara bajo protesta de decir verdad que:
 > *Este expediente fue generado con apoyo de la plataforma KnowTo como herramienta de diseño instruccional. El contenido, decisiones pedagógicas y evidencias son responsabilidad del candidato.*
 
 ## INSTRUCCIONES DE CALIDAD
-- El resumen ejecutivo debe ser coherente con el contexto acumulado de todo el proceso.
-- No inventes datos que no estén en el contexto. Si un dato no está disponible, escribe "[ver documento correspondiente]".
+- CRÍTICO: Debes reemplazar TODOS los placeholders {AÑO}, {4_DIGITOS_AL_AZAR}, {título...}, {del contexto...} con DATOS REALES extraídos del contexto acumulado.
+- Si un dato realmente no está en el contexto, escribe "No especificado". NUNCA imprimas las llaves o corchetes en tu respuesta final.
 - Responde SOLO en español. Genera únicamente este documento, sin preámbulos.

@@ -11,7 +11,7 @@
 -- para que las migraciones incrementales posteriores de GoTrue encuentren
 -- las columnas que esperan (confirmed_at, instance_id, etc.).
 -- ---------------------------------------------------------------------------
-DO $$ BEGIN
+DO $migration$ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_namespace WHERE nspname = 'auth') THEN
     CREATE SCHEMA auth;
   END IF;
@@ -81,7 +81,7 @@ DO $$ BEGIN
       $$;
     $func$;
   END IF;
-END $$;
+END $migration$;
 
 
 

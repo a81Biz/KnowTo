@@ -192,10 +192,20 @@ class Step1NeedsController extends BaseStep {
     // lo más limpio para cumplir el "Cambio 2" es realizar la llamada aquí mismo.
 
     const formData = { ...this._collectFormData(), ...extraData };
-    const stepId = wizardStore.getState().steps[1].stepId;
+    let stepId = wizardStore.getState().steps[1].stepId;
 
     if (!stepId) {
       return super._generateDocumentAsync(extraData); // Fallback si no hay stepId
+    }
+
+    try {
+      const { postData } = await import('@core/http.client');
+      await postData(
+        buildEndpoint(ENDPOINTS.wizard.saveStep),
+        { projectId, stepNumber: 1, inputData: formData }
+      );
+    } catch (err) {
+      console.warn('[Step1Needs] No se pudo guardar el step data', err);
     }
 
     this._setLoading(true);

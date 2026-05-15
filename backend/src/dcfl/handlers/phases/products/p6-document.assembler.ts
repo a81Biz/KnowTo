@@ -229,7 +229,8 @@ export async function handleDocumentP6Assembler(context: ProductContext): Promis
     documentoFinal += `**Lugar de impartición:** ${lugarImparticion}\n\n`;
   }
 
-  // Tabla resumen poblada desde horario_raw acumulado
+  // Tabla resumen poblada desde horario_raw acumulado — LÓGICA DETERMINISTA
+  // La IA solo propone duraciones en minutos; las sumas y totales se calculan aquí.
   documentoFinal += '## Resumen de Distribución Horaria\n\n';
   documentoFinal += '| Sesión | Horas Teóricas | Horas Prácticas | Total |\n|---|---|---|---|\n';
   let totalT = 0, totalP = 0, totalG = 0;
@@ -237,11 +238,32 @@ export async function handleDocumentP6Assembler(context: ProductContext): Promis
     const m = partesAcumuladas[key];
     const h = m.horario_raw as typeof partes.horario;
     if (h) {
-      const sessionHours = Number(h.total_horas) || 0;
-      documentoFinal += `| ${m.nombre} | ${h.horas_teoricas ?? '—'} h | ${h.horas_practicas ?? '—'} h | ${h.total_horas ?? '—'} h |\n`;
-      totalT += Number(h.horas_teoricas) || 0;
-      totalP += Number(h.horas_practicas) || 0;
+      // Recalcular aritméticamente — nunca confiar en total_horas de la IA
+      const ht = Number(h.horas_teoricas) || 0;
+      const hp = Number(h.horas_practicas) || 0;
+      const sessionHours = ht + hp;
+
+      // Sobreescribir el total calculado por la IA con la suma real
+      if (Math.abs(sessionHours - (Number(h.total_horas) || 0)) > 0.01) {
+        console.warn(`[p6-assembler] ⚠️ Corrección aritmética: "${m.nombre}" — IA declaró ${h.total_horas}h pero ${ht}+${hp}=${sessionHours}h`);
+      }
+
+      documentoFinal += `| ${m.nombre} | ${ht.toFixed(1)} h | ${hp.toFixed(1)} h | ${sessionHours.toFixed(1)} h |\n`;
+      totalT += ht;
+      totalP += hp;
       totalG += sessionHours;
+
+      // Validar distribución de minutos si existe
+      if (h.distribucion_minutos) {
+        const distTotal = (Number(h.distribucion_minutos.apertura) || 0)
+          + (Number(h.distribucion_minutos.desarrollo) || 0)
+          + (Number(h.distribucion_minutos.cierre) || 0);
+        const sessionMinutos = sessionHours * 60;
+        if (distTotal > 0 && Math.abs(distTotal - sessionMinutos) > 5) {
+          console.warn(`[p6-assembler] ⚠️ Distribución inconsistente en "${m.nombre}": apertura+desarrollo+cierre=${distTotal}min vs sesión=${sessionMinutos}min`);
+        }
+      }
+
       // Check max session length (6.2)
       if (sessionHours > 10) {
         console.warn(`[p6-assembler] ⚠️ AVISO PEDAGÓGICO: "${m.nombre}" tiene ${sessionHours}h — excede el máximo recomendado de 10h por jornada`);

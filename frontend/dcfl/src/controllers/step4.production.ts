@@ -40,8 +40,10 @@ class Step5ProductionController extends BaseStep {
   private _approvedProducts: Map<number, { content: string; documentId: string }> = new Map();
   private _sharedFormData: Record<string, unknown> = {};
   private _validationWarnings: Set<number> = new Set();
-  private _currentSchema: any = null;
+  /** Caché por código de producto (P1-P8). Evita re-fetch al cambiar de tab. */
+  private _schemaCache = new Map<string, any>();
   private _schemaSubscription: JobSubscription | null = null;
+  private _projectSoul: string | null = null;
 
   private _subDom: {
     productIndicators?: HTMLElement;
@@ -79,18 +81,21 @@ class Step5ProductionController extends BaseStep {
    * El backend ejecuta el pipeline F4_GENERATE_FORM_SCHEMA con dos agentes y un juez
    */
   private async _loadFormSchema(producto: string): Promise<any> {
+    // Devolver caché si ya está listo (evita round-trip al cambiar de tab)
+    if (this._schemaCache.has(producto)) {
+      return this._schemaCache.get(producto);
+    }
+
     const projectId = wizardStore.getState().projectId;
     if (!projectId) return null;
 
     const url = buildEndpoint(`/api/form-schema/${projectId}/${producto}`);
-    console.log('[F4] Fetching form schema from:', url);
 
     try {
       const result = await getData<any>(url) as any;
-      console.log('[F4] Response data:', result);
 
       if (result.status === 'ready') {
-        this._currentSchema = result;
+        this._schemaCache.set(producto, result);
         return result;
       }
 
@@ -103,8 +108,9 @@ class Step5ProductionController extends BaseStep {
             async () => {
               try {
                 const ready = await getData<any>(url) as any;
-                this._currentSchema = ready.status === 'ready' ? ready : null;
-                resolve(this._currentSchema);
+                const schema = ready.status === 'ready' ? ready : null;
+                if (schema) this._schemaCache.set(producto, schema);
+                resolve(schema);
               } catch {
                 resolve(null);
               }
@@ -192,7 +198,27 @@ class Step5ProductionController extends BaseStep {
     }
 
     // Construir HTML dinámicamente desde el esquema
-    let html = `
+    let html = '';
+
+    // Banner del Project Soul (solo lectura, colapsable)
+    const soul = this._projectSoul ?? wizardStore.getState().projectSoul;
+    if (soul) {
+      const preview = soul.length > 180 ? soul.slice(0, 180) + '…' : soul;
+      const full = soul.length > 180 ? soul : '';
+      html += `
+        <details class="mb-4 border border-amber-300 rounded-lg bg-amber-50 open:bg-amber-50">
+          <summary class="cursor-pointer px-4 py-2 text-xs font-bold text-amber-800 uppercase tracking-widest select-none flex items-center gap-2">
+            <span>Anclaje del proyecto (solo lectura)</span>
+            <span class="ml-auto text-amber-500 text-base">▼</span>
+          </summary>
+          <div class="px-4 pb-3 pt-1 text-xs text-amber-900 leading-relaxed whitespace-pre-line">
+            ${this._escapeHtml(full || preview)}
+          </div>
+        </details>
+      `;
+    }
+
+    html += `
       <div class="bg-blue-50 p-4 rounded-lg mb-4 border border-blue-200">
         <p class="text-sm text-blue-800">${this._escapeHtml(schema.description || 'Confirma los datos para generar el producto:')}</p>
       </div>
@@ -288,7 +314,9 @@ class Step5ProductionController extends BaseStep {
 
     try {
       await postData(buildEndpoint(`/api/form-schema/${projectId}/${productoNum}`), { valores_usuario: values });
-      console.log(`[F4] Valores guardados para ${productoNum}`);
+      // Actualizar la caché para que el siguiente render use los valores recién guardados
+      const cached = this._schemaCache.get(productoNum);
+      if (cached) cached.valores_usuario = { ...cached.valores_usuario, ...values };
     } catch (err) {
       console.error('[F4] Error saving form values:', err);
     }
@@ -377,6 +405,23 @@ class Step5ProductionController extends BaseStep {
         }
       });
     });
+  }
+
+  private async _loadProjectSoul(projectId: string): Promise<void> {
+    // Prefer cached value in store to avoid an extra round-trip on every re-mount
+    const cached = wizardStore.getState().projectSoul;
+    if (cached) { this._projectSoul = cached; return; }
+
+    try {
+      const res = await getData<any>(buildEndpoint(ENDPOINTS.wizard.getProject(projectId)));
+      const soul = res.data?.project?.project_soul as string | null | undefined;
+      if (soul) {
+        this._projectSoul = soul;
+        wizardStore.setProjectSoul(soul);
+      }
+    } catch {
+      // No bloquea la carga del formulario si falla
+    }
   }
 
   private async _cargarProductosPrevios(): Promise<Record<string, any>> {
@@ -526,18 +571,16 @@ class Step5ProductionController extends BaseStep {
     const userInputs = { ...(schemaData?.valores_usuario || this._sharedFormData), _producto: productoNum };
 
     let stepId = state.steps[STEP_NUMBER]?.stepId;
-    if (!stepId) {
-      try {
-        const res = await postData<{ stepId: string }>(
-          buildEndpoint(ENDPOINTS.wizard.saveStep),
-          { projectId: state.projectId, stepNumber: STEP_NUMBER, inputData: userInputs }
-        );
-        if (res.data?.stepId) {
-          stepId = res.data.stepId;
-          wizardStore.setStepId(STEP_NUMBER, stepId);
-        }
-      } catch { /* continuar */ }
-    }
+    try {
+      const res = await postData<{ stepId: string }>(
+        buildEndpoint(ENDPOINTS.wizard.saveStep),
+        { projectId: state.projectId, stepNumber: STEP_NUMBER, inputData: userInputs }
+      );
+      if (res.data?.stepId) {
+        stepId = res.data.stepId;
+        wizardStore.setStepId(STEP_NUMBER, stepId);
+      }
+    } catch { /* continuar */ }
     if (!stepId) { showError('No se pudo registrar el paso.'); return; }
 
     this._setLoading(true);
@@ -1138,6 +1181,7 @@ class Step5ProductionController extends BaseStep {
     const projectId = wizardStore.getState().projectId;
     if (projectId) {
       await this._loadProductsFromBD(projectId);
+      await this._loadProjectSoul(projectId);
     }
 
     this._config.promptId = PRODUCTS[this._currentProductIndex].promptId;

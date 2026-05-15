@@ -42,13 +42,80 @@ const CLAVE_PARTE: Record<Seccion, keyof ParteCronograma> = {
   riesgos: 'riesgos_calidad',
 };
 
+// ── Motor de Fechas Gantt (Determinista) ───────────────────────────────────
+
+/**
+ * Parsea una fecha en formato DD/MM/YYYY o ISO y devuelve un Date válido.
+ * Retorna null si no puede parsear.
+ */
+function parseDateFlexible(raw: string): Date | null {
+  if (!raw || typeof raw !== 'string') return null;
+  const trimmed = raw.trim();
+
+  // DD/MM/YYYY
+  const dmy = trimmed.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+  if (dmy) {
+    const d = new Date(Number(dmy[3]), Number(dmy[2]) - 1, Number(dmy[1]));
+    if (!isNaN(d.getTime())) return d;
+  }
+
+  // ISO
+  const iso = new Date(trimmed);
+  if (!isNaN(iso.getTime())) return iso;
+
+  return null;
+}
+
+/**
+ * Formatea un Date a DD/MM/YYYY en locale es-MX.
+ */
+function formatDate(d: Date): string {
+  const dd = String(d.getDate()).padStart(2, '0');
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const yyyy = d.getFullYear();
+  return `${dd}/${mm}/${yyyy}`;
+}
+
+/**
+ * Suma días laborables (lun-vie) a una fecha base.
+ */
+function addBusinessDays(base: Date, days: number): Date {
+  const result = new Date(base);
+  let added = 0;
+  while (added < days) {
+    result.setDate(result.getDate() + 1);
+    const dow = result.getDay();
+    if (dow !== 0 && dow !== 6) added++;
+  }
+  return result;
+}
+
 // ── Formateadores ──────────────────────────────────────────────────────────
 
-function formatearHitos(hitos: Hito[]): string {
+/**
+ * Formatea los hitos a Markdown. Si se proporciona una fecha base de producción,
+ * las fechas de los hitos se calculan determinísticamente (Gantt), ignorando
+ * cualquier fecha propuesta por el LLM.
+ */
+function formatearHitos(hitos: Hito[], fechaBaseProduccion?: Date | null): string {
   let md = '#### Plan de Producción del Módulo\n\n';
   md += '| Tarea | Inicio | Entrega | Responsable | Dependencia |\n|---|---|---|---|---|\n';
-  for (const h of hitos) {
-    md += `| ${h.tarea} | ${h.inicio} | ${h.entrega} | ${h.responsable} | ${h.dependencia || 'N/A'} |\n`;
+
+  if (fechaBaseProduccion) {
+    // Motor Gantt: calcular fechas secuenciales ignorando las del LLM
+    let cursor = new Date(fechaBaseProduccion);
+    for (const h of hitos) {
+      const inicio = formatDate(cursor);
+      // Estimar duración: 3 días laborables por hito (heurística EC0366)
+      const entrega = formatDate(addBusinessDays(cursor, 3));
+      md += `| ${h.tarea} | ${inicio} | ${entrega} | ${h.responsable} | ${h.dependencia || 'N/A'} |\n`;
+      cursor = addBusinessDays(cursor, 4); // siguiente hito empieza 1 día después
+    }
+  } else {
+    // Sin fecha base: usar las fechas relativas del LLM (legacy)
+    for (const h of hitos) {
+      md += `| ${h.tarea} | ${h.inicio} | ${h.entrega} | ${h.responsable} | ${h.dependencia || 'N/A'} |\n`;
+    }
   }
   return md;
 }
@@ -182,8 +249,17 @@ export async function handleDocumentP8Assembler(context: ProductContext): Promis
     });
   }
 
-  // Formatear a markdown
-  const hitosMd = partes.hitos?.length ? formatearHitos(partes.hitos) : '';
+  // Formatear a markdown — Motor Gantt determinista
+  // Derivar fecha base de producción: userInputs > fichaFormacion > null (legacy)
+  const fechaProduccionRaw: string =
+    event?.body?.userInputs?.fecha_inicio_produccion ||
+    fichaFormacion?.fecha_inicio || '';
+  const fechaBaseProduccion = parseDateFlexible(fechaProduccionRaw);
+  if (fechaBaseProduccion) {
+    console.log(`[p8-assembler] Motor Gantt activado con fecha base: ${formatDate(fechaBaseProduccion)}`);
+  }
+
+  const hitosMd = partes.hitos?.length ? formatearHitos(partes.hitos, fechaBaseProduccion) : '';
   const riesgosMd = partes.riesgos_calidad ? formatearRiesgos(partes.riesgos_calidad) : '';
 
   // Acumular en BD

@@ -12,6 +12,8 @@ import { PromptId } from '../types/wizard.types';
 import { enrichContextWithOSINT } from '../helpers/osint.helper';
 import { dispatchAgentEvent } from '../helpers/pipeline-router.helper';
 import { AgentName } from '../constants/agents.constants';
+import { AIService } from '../../core/services/ai.service';
+const globalJobLocks: Record<string, Promise<void>> = {};
 
 export async function handleGenerate(c: Context) {
   const body = (c.req as any).valid('json');
@@ -106,9 +108,15 @@ export async function handleGenerateAsync(c: Context) {
     userId,
   });
 
-  runPipelineAsync(jobId, body as any, c.env).catch((err) =>
-    console.error(`[generate-async] unhandled error for job ${jobId}:`, err)
-  );
+  const lockKey = `${body.projectId}-${body.promptId}`;
+  if (!globalJobLocks[lockKey]) {
+    globalJobLocks[lockKey] = Promise.resolve();
+  }
+  globalJobLocks[lockKey] = globalJobLocks[lockKey].then(async () => {
+    await runPipelineAsync(jobId, body as any, c.env);
+  }).catch((err) => {
+    console.error(`[generate-async] unhandled error for job ${jobId}:`, err);
+  });
 
   return c.json({ success: true, data: { jobId, status: 'pending' as const }, timestamp: new Date().toISOString() }, 202);
 }
@@ -150,6 +158,19 @@ export async function runPipelineAsync(
   try {
     // PASO 1: Cargar contexto histórico (Inyección de datos de fases previas)
     let enrichedContext = { ...body.context };
+
+    // ── INYECCIÓN DEL PROJECT SOUL ──────────────────────────────────────────
+    // Recuperar la identidad canónica del proyecto y añadirla al contexto.
+    // El AIService la usará como prefijo del System Prompt en todas las fases.
+    try {
+      const projectSoul = await supabase.getProjectSoul(body.projectId);
+      if (projectSoul) {
+        enrichedContext._projectSoul = projectSoul;
+        console.log(`[pipeline] Project Soul inyectado (${projectSoul.length} chars)`);
+      }
+    } catch (err) {
+      console.warn('[pipeline] No se pudo recuperar Project Soul:', err);
+    }
     
     // === INYECCIÓN DE CONTEXTO PARA FASE 1 (DNC - EC0249) ===
     if (body.phaseId === 'F1') {
@@ -206,13 +227,62 @@ export async function runPipelineAsync(
       }
     }
 
+    // === INYECCIÓN DE CONTEXTO PARA FASE 6 Y F7 (CIERRE / RESUMEN EJECUTIVO / PROCESO) ===
+    if (body.promptId && (body.promptId.startsWith('F6') || body.promptId === 'F7')) {
+      try {
+        if (!enrichedContext.previousData) enrichedContext.previousData = {};
+        
+        const f0 = await supabase.getFase0Estructurado(body.projectId);
+        const f1 = await supabase.getF1Informe(body.projectId);
+        const f2 = await supabase.getF2Analisis(body.projectId);
+        const f3 = await supabase.getF3Especificaciones(body.projectId);
+        const f2_5 = await supabase.getF2_5Recomendaciones(body.projectId);
+
+        enrichedContext.previousData.f0_estructurado = f0;
+        enrichedContext.previousData.f1_estructurado = f1;
+        enrichedContext.previousData.f2_estructurado = f2;
+        enrichedContext.previousData.f3_estructurado = f3;
+        enrichedContext.previousData.f2_5_estructurado = f2_5;
+        
+        // Fetch ALL products for F6 inventory
+        const prevProducts = await supabase.getF4Productos(body.projectId);
+        const productosTerminados = prevProducts.map(p => p.producto);
+        enrichedContext.productosTerminados = productosTerminados;
+
+        // Fetch other completed documents
+        const prevDocs = await supabase.client!.from('documents').select('phase_id').eq('project_id', body.projectId);
+        enrichedContext.documentosAdicionalesTerminados = (prevDocs.data || []).map(d => d.phase_id);
+        
+        // Pre-calculate explicit summary values so the LLM doesn't have to guess
+        enrichedContext.resumen_datos = {
+          titulo: f0?.nombre_curso || f1?.nombre_curso || 'No especificado',
+          industria: f0?.industria || 'No especificado',
+          duracion: f3?.calculo_duracion || 'No especificado',
+          modalidad: f2?.modalidad || 'No especificado',
+          plataforma: f3?.plataforma || 'No especificado',
+          scorm: f3?.formato || 'No especificado',
+          modulos: f2?.estructura_tematica?.length || 'No especificado',
+          videos: f2_5?.total_videos || 'No especificado',
+          fecha_inicio_proceso: f0?.created_at ? new Date(f0.created_at).toLocaleDateString('es-MX') : 'No especificado',
+          folio_sugerido: `EC0366-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`
+        };
+        
+        console.log(`[context-injection] F6_2b: Injected comprehensive project data from DB.`);
+      } catch (err) {
+        console.error(`[context-injection] F6_2b failed:`, err);
+      }
+    }
+
     const needsPrevProducts = [
       'F4_P2_FORM_SCHEMA',
       'F4_P3_FORM_SCHEMA',
       'F4_P7_FORM_SCHEMA',
       'F4_P8_FORM_SCHEMA',
       'F4_P7_GENERATE_DOCUMENT',
-      'F4_P8_GENERATE_DOCUMENT'
+      'F4_P8_GENERATE_DOCUMENT',
+      'F6_2a',
+      'F6_2b',
+      'F7'
     ].includes(body.promptId);
 
     if (needsPrevProducts) {
@@ -220,7 +290,7 @@ export async function runPipelineAsync(
         const prevProducts = await supabase.getF4Productos(body.projectId);
         const productos_previos: Record<string, any> = {};
         for (const p of prevProducts) {
-          if (['P1', 'P2', 'P3', 'P4', 'P5', 'P6'].includes(p.producto) && p.datos_producto) {
+          if (['P1', 'P2', 'P3', 'P4', 'P5', 'P6', 'P7', 'P8'].includes(p.producto) && p.datos_producto) {
             productos_previos[p.producto] = p.datos_producto;
           }
         }
@@ -269,6 +339,10 @@ export async function runPipelineAsync(
     // Calling saveDocument here would mark wizard_step 5 as 'completed' after just
     // the first product — the step should only complete when all 8 products are done.
     const isF4Product = body.promptId.startsWith('F4_P');
+    
+    // Sanitizar el contenido final antes de persistirlo (anti Prompt Bleeding)
+    const sanitizedContent = AIService.sanitizeOutput(content);
+    
     let documentId: string | undefined;
     if (body.stepId && !isF4Product) {
       const saved = await supabase.saveDocument({
@@ -276,12 +350,12 @@ export async function runPipelineAsync(
         stepId: body.stepId,
         phaseId: body.phaseId,
         title: `${body.phaseId} - ${enrichedContext.projectName}`,
-        content,
+        content: sanitizedContent,
       });
       documentId = saved.documentId;
     }
 
-    await jobsSvc.completeJob(jobId, { documentId, content });
+    await jobsSvc.completeJob(jobId, { documentId, content: sanitizedContent });
     console.log(`[pipeline] SUCCESS job=${jobId}`);
 
   } catch (err) {

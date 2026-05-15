@@ -278,20 +278,18 @@ export class BaseStep {
 
     const step = state.steps[this._config.stepNumber];
 
-    // Registrar step si no tiene ID
+    // Registrar o actualizar inputData del step
     let stepId = step?.stepId;
-    if (!stepId) {
-      try {
-        const res = await postData<{ stepId: string }>(
-          buildEndpoint(ENDPOINTS.wizard.saveStep),
-          { projectId: state.projectId, stepNumber: this._config.stepNumber, inputData: formData }
-        );
-        if (res.data?.stepId) {
-          stepId = res.data.stepId;
-          wizardStore.setStepId(this._config.stepNumber, stepId);
-        }
-      } catch { /* continuar, se reintentará */ }
-    }
+    try {
+      const res = await postData<{ stepId: string }>(
+        buildEndpoint(ENDPOINTS.wizard.saveStep),
+        { projectId: state.projectId, stepNumber: this._config.stepNumber, inputData: formData }
+      );
+      if (res.data?.stepId) {
+        stepId = res.data.stepId;
+        wizardStore.setStepId(this._config.stepNumber, stepId);
+      }
+    } catch { /* continuar, se reintentará */ }
 
     if (!stepId) {
       showError('No se pudo registrar el paso. Intenta de nuevo.');
@@ -423,23 +421,21 @@ export class BaseStep {
       return;
     }
 
-    // Registrar step si no tiene ID
+    // Registrar o actualizar inputData del step
     let stepId = state.steps[this._config.stepNumber]?.stepId;
-    if (!stepId) {
-      logger.info(`[step${this._config.stepNumber}] Registrando step...`);
-      try {
-        const res = await postData<{ stepId: string }>(
-          buildEndpoint(ENDPOINTS.wizard.saveStep),
-          { projectId: state.projectId, stepNumber: this._config.stepNumber, inputData: formData }
-        );
-        if (res.data?.stepId) {
-          stepId = res.data.stepId;
-          wizardStore.setStepId(this._config.stepNumber, stepId);
-          logger.info(`[step${this._config.stepNumber}] Step registrado`, { stepId });
-        }
-      } catch (err) {
-        logger.warn(`[step${this._config.stepNumber}] No se pudo registrar el step`, err);
+    logger.info(`[step${this._config.stepNumber}] Guardando inputData del step...`);
+    try {
+      const res = await postData<{ stepId: string }>(
+        buildEndpoint(ENDPOINTS.wizard.saveStep),
+        { projectId: state.projectId, stepNumber: this._config.stepNumber, inputData: formData }
+      );
+      if (res.data?.stepId) {
+        stepId = res.data.stepId;
+        wizardStore.setStepId(this._config.stepNumber, stepId);
+        logger.info(`[step${this._config.stepNumber}] Step guardado`, { stepId });
       }
+    } catch (err) {
+      logger.warn(`[step${this._config.stepNumber}] No se pudo guardar el step`, err);
     }
 
     if (!stepId) {
@@ -623,8 +619,11 @@ export class BaseStep {
     this._injectManualOverride();
 
     const step = wizardStore.getState().steps[this._config.stepNumber];
+    // Fire-and-forget: no bloquea la carga del formulario. Si el usuario genera
+    // antes de que termine, _generateDocumentAsync también llama _ensureExtractedContext
+    // con un guard que evita la doble extracción.
     if (step?.status !== 'completed') {
-      await this._ensureExtractedContext();
+      void this._ensureExtractedContext();
     }
 
     if (step?.documentContent) {

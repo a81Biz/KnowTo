@@ -24,7 +24,7 @@ export const GenerateDocumentBody = z
   .object({
     projectId: z.string().uuid(),
     stepId: z.string().uuid(),
-    phaseId: z.enum(['F0', 'F1', 'F2', 'F2.5', 'F3', 'F4', 'F5.1', 'F5.2', 'F6.1', 'F6.2a', 'F6.2b', 'CLOSE']),
+    phaseId: z.enum(['F0', 'F1', 'F2', 'F2.5', 'F3', 'F4', 'F5.1', 'F5.2', 'F6.1', 'F6.2a', 'F6.2b', 'F7', 'CLOSE']),
     promptId: z.enum([
       'F0', 'F1', 'F2', 'F2_5', 'F3',
       'F4_P1', 'F4_P2', 'F4_P3', 'F4_P4', 'F4_P5', 'F4_P6', 'F4_P7', 'F4_P8',
@@ -32,7 +32,7 @@ export const GenerateDocumentBody = z
       'F4_P2_GENERATE_DOCUMENT', 'F4_P3_GENERATE_DOCUMENT', 'F4_P4_GENERATE_DOCUMENT',
       'F4_P5_GENERATE_DOCUMENT', 'F4_P6_GENERATE_DOCUMENT', 'F4_P7_GENERATE_DOCUMENT', 'F4_P8_GENERATE_DOCUMENT',
       'F5', 'F5_2',
-      'F6', 'F6_FORM', 'F6_2a', 'F6_2b',
+      'F6', 'F6_FORM', 'F6_2a', 'F6_2b', 'F7',
     ]),
     context: z.object({
       projectName: z.string(),
@@ -81,7 +81,7 @@ export const GenerateAsyncBody = z
   .object({
     projectId:  z.string().uuid(),
     stepId:     z.string().uuid(),
-    phaseId:    z.enum(['F0', 'F1', 'F2', 'F2.5', 'F3', 'F4', 'F5.1', 'F5.2', 'F6.1', 'F6.2a', 'F6.2b', 'CLOSE']),
+    phaseId:    z.enum(['F0', 'F1', 'F2', 'F2.5', 'F3', 'F4', 'F5.1', 'F5.2', 'F6.1', 'F6.2a', 'F6.2b', 'F7', 'CLOSE']),
     promptId:   z.enum([
       'F0', 'F1', 'F2', 'F2_5', 'F3',
       'F4_P1', 'F4_P2', 'F4_P3', 'F4_P4', 'F4_P5', 'F4_P6', 'F4_P7', 'F4_P8',
@@ -89,7 +89,7 @@ export const GenerateAsyncBody = z
       'F4_P2_GENERATE_DOCUMENT', 'F4_P3_GENERATE_DOCUMENT', 'F4_P3_ORCHESTRATOR', 'F4_P4_GENERATE_DOCUMENT',
       'F4_P5_GENERATE_DOCUMENT', 'F4_P6_GENERATE_DOCUMENT', 'F4_P7_GENERATE_DOCUMENT', 'F4_P8_GENERATE_DOCUMENT',
       'F5', 'F5_2',
-      'F6', 'F6_FORM', 'F6_2a', 'F6_2b',
+      'F6', 'F6_FORM', 'F6_2a', 'F6_2b', 'F7',
     ]),
     context:    z.object({
       projectName: z.string(),

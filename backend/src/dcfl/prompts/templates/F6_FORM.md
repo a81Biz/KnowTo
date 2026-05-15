@@ -104,7 +104,7 @@ Después de todos los grupos por módulo, añade los campos de cierre:
 }
 ```
 
-## EJEMPLO para un curso de 3 módulos ("Introducción", "Desarrollo", "Evaluación")
+## EJEMPLO para un curso de 3 módulos ("Introducción", "Desarrollo", "Desarrollo Temático")
 
 ```json
 {
@@ -201,7 +201,7 @@ Después de todos los grupos por módulo, añade los campos de cierre:
     },
     {
       "id": "mod_3_description",
-      "label": "Evaluación — Problema o ajuste detectado",
+      "label": "Desarrollo Temático — Problema o ajuste detectado",
       "type": "textarea",
       "placeholder": "Describe el problema detectado o escribe 'Sin observaciones'.",
       "required": true,
@@ -209,7 +209,7 @@ Después de todos los grupos por módulo, añade los campos de cierre:
     },
     {
       "id": "mod_3_solution",
-      "label": "Evaluación — Solución implementada",
+      "label": "Desarrollo Temático — Solución implementada",
       "type": "textarea",
       "placeholder": "Describe qué cambio realizaste.",
       "required": true,
@@ -217,7 +217,7 @@ Después de todos los grupos por módulo, añade los campos de cierre:
     },
     {
       "id": "mod_3_type",
-      "label": "Evaluación — Tipo de ajuste",
+      "label": "Desarrollo Temático — Tipo de ajuste",
       "type": "select",
       "required": true,
       "options": [
@@ -229,7 +229,7 @@ Después de todos los grupos por módulo, añade los campos de cierre:
     },
     {
       "id": "mod_3_verification",
-      "label": "Evaluación — ¿Cómo verificaste que quedó resuelto?",
+      "label": "Desarrollo Temático — ¿Cómo verificaste que quedó resuelto?",
       "type": "text",
       "placeholder": "Ej: Probé el módulo completo.",
       "required": true,

@@ -276,9 +276,7 @@ class Step4FieldworkController extends BaseStep {
     if (!state.projectId) return;
 
     let stepId = state.steps[2]?.stepId;
-    if (!stepId) {
-      stepId = await this._ensureStepId(state.projectId, {}) ?? undefined;
-    }
+    stepId = await this._ensureStepId(state.projectId, {}) ?? stepId;
     if (!stepId) return;
 
     showLoading('Generando síntesis diagnóstica...');

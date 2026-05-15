@@ -311,5 +311,61 @@ export async function handleF1Assembler(params: {
 
   await supabase.saveF1Informe(legacyData);
 
+  // ── Identity Synthesizer: generar y persistir el "Project Soul" ──────────
+  // Este párrafo canónico actúa como ancla semántica inmutable para todas las
+  // fases subsecuentes, evitando la amnesia técnica y la deriva de dominio.
+  try {
+    const soul = buildProjectSoul({
+      projectName,
+      declaracion: analisis.declaracion_problema,
+      objetivo: estrategia.objetivo_general_smart,
+      perfil: perfilPersistente,
+      brechas: analisis.brechas,
+      restricciones: estrategia.restricciones,
+    });
+    await supabase.saveProjectSoul(projectId, soul);
+    console.log(`[f1.handler] Project Soul guardado (${soul.length} chars) para proyecto ${projectId}`);
+  } catch (err) {
+    console.warn('[f1.handler] No se pudo guardar el Project Soul:', err);
+  }
+
   return finalDoc;
+}
+
+/**
+ * Construye el "Project Soul" — identidad canónica del proyecto.
+ * Se inyecta como System Prompt prioritario en todas las fases posteriores a F1.
+ */
+function buildProjectSoul(params: {
+  projectName: string;
+  declaracion: string;
+  objetivo: string;
+  perfil: Record<string, string>;
+  brechas: NormalizedBrecha[];
+  restricciones: string[];
+}): string {
+  const brechasCapacitables = params.brechas
+    .filter(b => b.capacitable === 'sí')
+    .map(b => b.comportamiento)
+    .slice(0, 3)
+    .join('; ');
+
+  const restriccionesTxt = params.restricciones.slice(0, 3).join('; ');
+
+  return [
+    `IDENTIDAD DEL PROYECTO (INMUTABLE):`,
+    `Nombre del proyecto: "${params.projectName}".`,
+    `Problema: ${params.declaracion}`,
+    `Objetivo general: ${params.objetivo}`,
+    `Perfil del participante: ${params.perfil.perfil_profesional || 'No especificado'}, nivel educativo ${params.perfil.nivel_educativo_minimo || 'no especificado'}.`,
+    brechasCapacitables ? `Brechas capacitables priorizadas: ${brechasCapacitables}.` : '',
+    restriccionesTxt ? `Restricciones: ${restriccionesTxt}.` : '',
+    ``,
+    `RESTRICCIONES NEGATIVAS OBLIGATORIAS:`,
+    `- No cambies el nombre del proyecto ni el estándar de certificación.`,
+    `- No inventes datos de mercado, cifras financieras ni URLs sin fuentes verificables.`,
+    `- No menciones tecnologías, herramientas o plataformas que no hayan sido especificadas por el usuario.`,
+    `- No sustituyas el stack tecnológico o el dominio del curso por otros no relacionados.`,
+    `- Toda la salida debe estar en español mexicano. No generes contenido en inglés.`,
+  ].filter(Boolean).join('\n');
 }

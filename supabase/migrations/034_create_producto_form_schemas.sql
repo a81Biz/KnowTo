@@ -48,7 +48,7 @@ BEGIN
       auth.role() = 'authenticated'
       AND project_id IN (SELECT id FROM projects WHERE user_id = auth.uid())
     );
-EXCEPTION WHEN undefined_function OR undefined_schema THEN
+EXCEPTION WHEN undefined_function OR invalid_schema_name THEN
   RAISE WARNING 'producto_form_schemas: auth.role() not available during init, skipping SELECT policy';
 END $$;
 
@@ -59,7 +59,7 @@ BEGIN
       auth.role() = 'authenticated'
       AND project_id IN (SELECT id FROM projects WHERE user_id = auth.uid())
     );
-EXCEPTION WHEN undefined_function OR undefined_schema THEN
+EXCEPTION WHEN undefined_function OR invalid_schema_name THEN
   RAISE WARNING 'producto_form_schemas: auth.role() not available during init, skipping INSERT policy';
 END $$;
 
@@ -70,7 +70,7 @@ BEGIN
       auth.role() = 'authenticated'
       AND project_id IN (SELECT id FROM projects WHERE user_id = auth.uid())
     );
-EXCEPTION WHEN undefined_function OR undefined_schema THEN
+EXCEPTION WHEN undefined_function OR invalid_schema_name THEN
   RAISE WARNING 'producto_form_schemas: auth.role() not available during init, skipping UPDATE policy';
 END $$;
 
@@ -81,7 +81,7 @@ BEGIN
       auth.role() = 'authenticated'
       AND project_id IN (SELECT id FROM projects WHERE user_id = auth.uid())
     );
-EXCEPTION WHEN undefined_function OR undefined_schema THEN
+EXCEPTION WHEN undefined_function OR invalid_schema_name THEN
   RAISE WARNING 'producto_form_schemas: auth.role() not available during init, skipping DELETE policy';
 END $$;
 
@@ -91,7 +91,7 @@ DO $$
 BEGIN
   CREATE POLICY "Service role full access" ON producto_form_schemas
     FOR ALL USING (auth.role() = 'service_role');
-EXCEPTION WHEN undefined_function OR undefined_schema THEN
+EXCEPTION WHEN undefined_function OR invalid_schema_name THEN
   RAISE WARNING 'producto_form_schemas: auth.role() not available during init, skipping service_role policy';
 END $$;
 

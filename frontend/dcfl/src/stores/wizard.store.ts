@@ -20,7 +20,7 @@ const STEP_DEFINITIONS: Omit<WizardStep, 'status' | 'inputData'>[] = [
   { stepNumber: 8,  phaseId: 'F6.1',  promptId: 'F6',    label: 'Ajustes',                icon: 'tune' },
   { stepNumber: 9,  phaseId: 'F6.2a', promptId: 'F6_2a', label: 'Inventario y Firmas',    icon: 'inventory' },
   { stepNumber: 10, phaseId: 'F6.2b', promptId: 'F6_2b', label: 'Resumen y Declaración',  icon: 'summarize' },
-  { stepNumber: 11, phaseId: 'CLOSE', promptId: 'F6_2b', label: 'Finalización',            icon: 'celebration' },
+  { stepNumber: 11, phaseId: 'F7', promptId: 'F7', label: 'Resumen Cualitativo',            icon: 'celebration' },
 ];
 
 const initialState: WizardState = {
@@ -42,6 +42,7 @@ const initialState: WizardState = {
   closingData: null,
   steps: STEP_DEFINITIONS.map((d) => ({ ...d, status: 'pending' as StepStatus, inputData: {} })),
   extractedContexts: {},
+  projectSoul: null,
 };
 
 class WizardStoreClass {
@@ -152,6 +153,12 @@ class WizardStoreClass {
     this.nextStep();
   }
 
+  setProjectSoul(soul: string): void {
+    this.state.projectSoul = soul;
+    this.saveToLocalStorage();
+    this.notify();
+  }
+
   setExtractedContext(stepNumber: number, entry: ExtractedContextEntry): void {
     this.state = {
       ...this.state,
@@ -170,6 +177,7 @@ class WizardStoreClass {
       ...initialState,
       steps: STEP_DEFINITIONS.map((d) => ({ ...d, status: 'pending' as StepStatus, inputData: {} })),
       extractedContexts: {},
+      projectSoul: null,
     };
     localStorage.removeItem(STORAGE_KEY);
     this.notify();

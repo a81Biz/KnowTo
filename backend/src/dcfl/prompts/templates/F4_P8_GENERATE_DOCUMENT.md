@@ -64,6 +64,8 @@ pipeline_steps:
       ROLE: Project Manager. TASK: Define milestones with real calendar dates.
       
       DATE ANCHORING: Use "fecha_inicio_modulo" from extractor as the first real production date for this module.
+      CRITICAL RULE 1: Never invent past dates. Assume the current year is 2026. Do NOT use dates from 2023 or 2024.
+      CRITICAL RULE 2: ABSOLUTELY NO TEMPLATE ENGINE CODE. DO NOT output tags like {{calcular_fecha_entrega}}. YOU must do the math mentally and output ONLY the final text (e.g., "15/05/2026" or "Día 3").
       If "fecha_inicio_modulo" is not null, compute each task's "inicio" and "entrega" as real DD/MM/YYYY dates.
       If null, use relative notation (Día 1, Día 5, etc.).
       
@@ -85,6 +87,8 @@ pipeline_steps:
     task: |
       SAME AS AGENT A. ADD: "dependencia" (e.g. "P3 aprobado").
       DATE ANCHORING: Use "fecha_inicio_modulo" for real DD/MM/YYYY dates. Add "Inicio de la formación" milestone if fecha_inicio_formacion present.
+      CRITICAL RULE 1: Never invent past dates. Assume the current year is 2026.
+      CRITICAL RULE 2: ABSOLUTELY NO TEMPLATE ENGINE CODE. DO NOT output tags like {{calcular_fecha_entrega}}. YOU must do the math mentally and output ONLY the final calculated string.
       OUTPUT ONLY THIS JSON:
       {"hitos": [{"tarea": "...", "inicio": "DD/MM/YYYY", "entrega": "DD/MM/YYYY", "responsable": "...", "dependencia": "..."}]}
 

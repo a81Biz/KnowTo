@@ -36,6 +36,7 @@ import F6     from './templates/F6-ajustes.md';
 import F6_FORM from './templates/F6_FORM.md';
 import F6_2a  from './templates/F6_2a-inventario-firmas.md';
 import F6_2b  from './templates/F6_2b-resumen-declaracion.md';
+import F7     from './templates/F7-resumen-proceso.md';
 import EXTRACTOR from './templates/EXTRACTOR.md';
 
 
@@ -68,6 +69,7 @@ export const DCFL_PROMPT_MAP: Record<PromptId, string> = {
   F6_FORM,
   F6_2a,
   F6_2b,
+  F7,
   EXTRACTOR,
 };
 

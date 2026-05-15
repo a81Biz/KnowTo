@@ -1,6 +1,6 @@
 // src/dcfl/types/wizard.types.ts
 
-export type PhaseId = 'F0' | 'F1' | 'F2' | 'F2.5' | 'F3' | 'F4' | 'F5.1' | 'F5.2' | 'F6.1' | 'F6.2a' | 'F6.2b' | 'CLOSE';
+export type PhaseId = 'F0' | 'F1' | 'F2' | 'F2.5' | 'F3' | 'F4' | 'F5.1' | 'F5.2' | 'F6.1' | 'F6.2a' | 'F6.2b' | 'F7' | 'CLOSE';
 export type PromptId =
   | 'F0' | 'F1' | 'F2' | 'F2_5' | 'F3'
   | 'F4_P1_GENERATE_DOCUMENT'
@@ -9,7 +9,7 @@ export type PromptId =
   | 'F4_P1_FORM_SCHEMA' | 'F4_P2_FORM_SCHEMA' | 'F4_P3_FORM_SCHEMA' | 'F4_P4_FORM_SCHEMA'
   | 'F4_P5_FORM_SCHEMA' | 'F4_P6_FORM_SCHEMA' | 'F4_P7_FORM_SCHEMA' | 'F4_P8_FORM_SCHEMA'
   | 'F5' | 'F5_2'
-  | 'F6' | 'F6_FORM' | 'F6_2a' | 'F6_2b'
+  | 'F6' | 'F6_FORM' | 'F6_2a' | 'F6_2b' | 'F7'
   | 'EXTRACTOR'
   ;
 

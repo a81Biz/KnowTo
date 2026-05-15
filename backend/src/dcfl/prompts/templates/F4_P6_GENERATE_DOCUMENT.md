@@ -58,6 +58,10 @@ pipeline_steps:
       
       INPUT: {nombre}, {contenido_form}, {duracion_f3}
       
+      CRITICAL RULE: The ENTIRE course duration is {duracion_f3}.
+      Calculate the "total_horas" for THIS SINGLE SESSION by dividing the total course duration proportionally, or using the specific hours listed in {contenido_form}.
+      DO NOT INVENT higher numbers. If the course is 3.8 hours and there are 3 modules, this session should be around 1.2 hours.
+      
       OUTPUT ONLY THIS JSON:
       {
         "horario": {
@@ -108,21 +112,22 @@ pipeline_steps:
       Schedule subsequent activities by adding cumulative durations to hora_inicio. Do NOT hardcode "09:00".
       EXAMPLE: if hora_inicio is "14:00" → first activity starts at 14:00, next at 14:15, etc.
       
-      EVALUACIÓN DIAGNÓSTICA: If this is module 1 AND "sesion_diagnostica" is not null, include it as the first activity block:
-      {"hora": "{hora_inicio}", "actividad": "Evaluación Diagnóstica — [sesion_diagnostica objective]", "duracion": "60 min", "tipo": "Diagnóstica"}
+      EVALUACIÓN DIAGNÓSTICA: If this is module 1 AND "sesion_diagnostica" is not null, include it as the first activity block.
       
       CRITICAL — STRING ARRAYS: "recursos" MUST be an array of plain STRINGS.
       CORRECT:   "recursos": ["Proyector", "Pizarrón", "Marcadores"]
       PROHIBITED: "recursos": [{"item": "Proyector"}, {"nombre": "Pizarrón"}]
+      
+      CRITICAL RULE: ABSOLUTELY NO TEMPLATE ENGINE CODE. DO NOT output tags like {hora_inicio + 60min}. YOU MUST calculate the exact string, e.g. "15:00".
       
       OUTPUT ONLY THIS JSON:
       {
         "plan": {
           "fecha": "YYYY-MM-DD or omit if null",
           "actividades": [
-            {"hora": "{hora_inicio}", "actividad": "Evaluación Diagnóstica — encuadre y conocimientos previos", "duracion": "60 min", "tipo": "Diagnóstica"},
-            {"hora": "{hora_inicio + 60min}", "actividad": "Apertura y encuadre", "duracion": "15 min", "tipo": "Teórica"},
-            {"hora": "{hora_inicio + 75min}", "actividad": "Explicación técnica", "duracion": "45 min", "tipo": "Teórica"}
+            {"hora": "14:00", "actividad": "Evaluación Diagnóstica — encuadre y conocimientos previos", "duracion": "60 min", "tipo": "Diagnóstica"},
+            {"hora": "15:00", "actividad": "Apertura y encuadre", "duracion": "15 min", "tipo": "Teórica"},
+            {"hora": "15:15", "actividad": "Explicación técnica", "duracion": "45 min", "tipo": "Teórica"}
           ],
           "recursos": ["Item 1", "Item 2"]
         }
@@ -138,8 +143,9 @@ pipeline_steps:
       HORA ANCHORING: Use "hora_inicio" from the extractor as the real start time. Do NOT hardcode "09:00".
       EVALUACIÓN DIAGNÓSTICA: If module 1 AND sesion_diagnostica not null, prepend it as first activity.
       CRITICAL — STRING ARRAYS: "recursos" MUST be an array of plain STRINGS (not objects).
+      CRITICAL RULE: ABSOLUTELY NO TEMPLATE ENGINE CODE. DO NOT output tags like {hora_inicio}. YOU MUST calculate the exact string.
       OUTPUT ONLY THIS JSON:
-      {"plan": {"fecha": "YYYY-MM-DD or omit", "actividades": [{"hora": "{hora_inicio}", "actividad": "...", "duracion": "...", "tipo": "...", "responsable": "..."}], "recursos": ["Item 1", "Item 2"]}}
+      {"plan": {"fecha": "YYYY-MM-DD or omit", "actividades": [{"hora": "14:00", "actividad": "...", "duracion": "...", "tipo": "...", "responsable": "..."}], "recursos": ["Item 1", "Item 2"]}}
 
   - agent: juez_plan
     model: "qwen2.5:14b"

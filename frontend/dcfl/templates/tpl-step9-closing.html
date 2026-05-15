@@ -13,15 +13,26 @@
       </div>
       <button id="btn-submit" type="submit"
         class="btn-primary w-full bg-blue-900 text-white py-4 px-8 rounded-xl font-bold text-lg hover:bg-blue-800 transition-all disabled:opacity-50">
-        🎉 Generar Resumen Ejecutivo
+        🎉 Generar Resumen Cualitativo del Proceso
       </button>
     </form>
     <div id="preview-panel" class="hidden">
       <div id="document-preview" class="document-preview bg-gray-50 border border-gray-200 rounded-xl p-6 max-h-96 overflow-y-auto text-sm"></div>
-      <div class="mt-3 flex gap-2">
+      <div class="mt-3 flex gap-2 flex-wrap">
         <button id="btn-copy-doc" class="px-4 py-2 border border-gray-300 rounded-lg text-sm">📋 Copiar</button>
         <button id="btn-regenerate" class="px-4 py-2 border border-blue-300 text-blue-700 rounded-lg text-sm">🔄 Regenerar</button>
       </div>
+    </div>
+
+    <!-- Sección de descarga del expediente completo -->
+    <div class="mt-6 border border-green-200 rounded-xl bg-green-50 p-5">
+      <h3 class="font-bold text-green-900 text-sm mb-1">Expediente completo EC0366</h3>
+      <p class="text-green-700 text-xs mb-4">Descarga todos los documentos generados en el proceso como un único archivo ZIP. Incluye los 8 productos de la Fase 4.</p>
+      <button id="btn-download-expediente"
+        class="w-full sm:w-auto bg-green-700 hover:bg-green-800 text-white font-bold py-3 px-6 rounded-lg text-sm transition-colors flex items-center justify-center gap-2">
+        <span>⬇</span>
+        <span>Descargar expediente ZIP</span>
+      </button>
     </div>
   </div>
 </template>

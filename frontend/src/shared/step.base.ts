@@ -171,20 +171,18 @@ export class BaseStep {
 
     const step = state.steps[this._config.stepNumber];
 
-    // Registrar step si no tiene ID
+    // Registrar o actualizar inputData del step
     let stepId = step?.stepId;
-    if (!stepId) {
-      try {
-        const res = await postData<{ stepId: string }>(
-          buildEndpoint(ENDPOINTS.wizard.saveStep),
-          { projectId: state.projectId, stepNumber: this._config.stepNumber, inputData: formData }
-        );
-        if (res.data?.stepId) {
-          stepId = res.data.stepId;
-          wizardStore.setStepId(this._config.stepNumber, stepId);
-        }
-      } catch { /* continuar, se reintentará */ }
-    }
+    try {
+      const res = await postData<{ stepId: string }>(
+        buildEndpoint(ENDPOINTS.wizard.saveStep),
+        { projectId: state.projectId, stepNumber: this._config.stepNumber, inputData: formData }
+      );
+      if (res.data?.stepId) {
+        stepId = res.data.stepId;
+        wizardStore.setStepId(this._config.stepNumber, stepId);
+      }
+    } catch { /* continuar, se reintentará */ }
 
     if (!stepId) {
       showError('No se pudo registrar el paso. Intenta de nuevo.');

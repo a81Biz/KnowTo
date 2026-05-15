@@ -32,25 +32,25 @@ Usa el contexto acumulado para determinar qué documentos están completados y l
 
 | # | Documento | Fase | Elemento EC | Estado | Páginas aprox. | Firma requerida |
 |:---|:---|:---|:---|:---|:---|:---|
-| 1 | Marco de Referencia del Cliente | F0 | E1219 | [Completado/Pendiente según contexto] | [N] | Candidato |
-| 2 | Informe de Necesidades de Capacitación | F1 | E1219 | [Completado/Pendiente] | [N] | Candidato |
-| 3 | Especificaciones de Análisis | F2 | E1219 | [Completado/Pendiente] | [N] | Candidato |
-| 4 | Recomendaciones Pedagógicas | F2.5 | E1219 | [Completado/Pendiente] | [N] | Candidato |
-| 5 | Especificaciones Técnicas | F3 | E1219 | [Completado/Pendiente] | [N] | Candidato |
-| 6 | Cronograma de Desarrollo | F4-P0 | E1219 | [Completado/Pendiente] | [N] | Candidato + Revisor |
-| 7 | Documento de Información General | F4-P1 | E1219 | [Completado/Pendiente] | [N] | Candidato |
-| 8 | Guías de Actividades por Módulo | F4-P2 | E1220 | [Completado/Pendiente] | [N] | Candidato |
-| 9 | Calendario General de Actividades | F4-P3 | E1220 | [Completado/Pendiente] | [N] | Candidato |
-| 10 | Documentos de Texto (contenido) | F4-P4 | E1220 | [Completado/Pendiente] | [N] | Candidato |
-| 11 | Presentación Electrónica | F4-P5 | E1220 | [Completado/Pendiente] | [N] | Candidato |
-| 12 | Guiones de Material Multimedia | F4-P6 | E1220 | [Completado/Pendiente] | [N] | Candidato |
-| 13 | Instrumentos de Evaluación | F4-P7 | E1220 | [Completado/Pendiente] | [N] | Candidato + Revisor |
-| 14 | Checklist de Verificación Técnica y Pedagógica | F5 | E1221 | [Completado/Pendiente] | [N] | Candidato + Evaluador |
-| 15 | Anexo de Evidencias | F5.2 | E1221 | [Completado/Pendiente] | [N] | Candidato |
-| 16 | Documento de Ajustes Post-Evaluación | F6 | E1221 | [Completado/Pendiente] | [N] | Candidato |
+| 1 | Marco de Referencia del Cliente | F0 | E1219 | Completado | 2 | Candidato |
+| 2 | Informe de Necesidades de Capacitación | F1 | E1219 | Completado | 4 | Candidato |
+| 3 | Especificaciones de Análisis | F2 | E1219 | Completado | 3 | Candidato |
+| 4 | Recomendaciones Pedagógicas | F2.5 | E1219 | Completado | 2 | Candidato |
+| 5 | Especificaciones Técnicas | F3 | E1219 | Completado | 3 | Candidato |
+| 6 | Cronograma de Desarrollo | F4-P8 | E1219 | {EVALUAR_P8} | {PAGS} | Candidato + Revisor |
+| 7 | Documento de Información General | F4-P1 | E1219 | {EVALUAR_P1} | {PAGS} | Candidato |
+| 8 | Guías de Actividades por Módulo | F4-P5 | E1220 | {EVALUAR_P5} | {PAGS} | Candidato |
+| 9 | Calendario General de Actividades | F4-P6 | E1220 | {EVALUAR_P6} | {PAGS} | Candidato |
+| 10 | Documentos de Texto (contenido) | F4-P4 | E1220 | {EVALUAR_P4} | {PAGS} | Candidato |
+| 11 | Presentación Electrónica | F4-P2 | E1220 | {EVALUAR_P2} | {PAGS} | Candidato |
+| 12 | Guiones de Material Multimedia | F4-P3 | E1220 | {EVALUAR_P3} | {PAGS} | Candidato |
+| 13 | Instrumentos de Evaluación | F4-P7 | E1220 | {EVALUAR_P7} | {PAGS} | Candidato + Revisor |
+| 14 | Checklist de Verificación Técnica y Pedagógica | F5 | E1221 | {EVALUAR_F5} | {PAGS} | Candidato + Evaluador |
+| 15 | Anexo de Evidencias | F5.2 | E1221 | {EVALUAR_F5_2} | {PAGS} | Candidato |
+| 16 | Documento de Ajustes Post-Evaluación | F6 | E1221 | {EVALUAR_F6} | {PAGS} | Candidato |
 
-**Documentos completados:** [N de 16]
-**Documentos pendientes:** [N de 16]
+**Documentos completados:** {CALCULAR_TOTAL_COMPLETADOS} de 16
+**Documentos pendientes:** {CALCULAR_TOTAL_PENDIENTES} de 16
 
 ---
 
@@ -75,6 +75,8 @@ Usa el contexto acumulado para determinar qué documentos están completados y l
 **Fecha:** _________________________
 
 ## INSTRUCCIONES DE CALIDAD
+- CRÍTICO PARA EL INVENTARIO: El array "productosTerminados" en el contexto contiene todos los productos (P1, P2... P8) que realmente están generados. Si un producto está en ese array, pon su estado como "Completado".
+- CRÍTICO PARA F5 y F6: El array "documentosAdicionalesTerminados" contiene los IDs (ej: "F5.1", "F5.2", "F6.1"). Si el documento está allí, pon "Completado".
+- Reemplaza los placeholders {EVALUAR_PX}, {EVALUAR_FX}, {PAGS}, {CALCULAR...} con el texto real calculado. NUNCA imprimas llaves en el resultado.
 - El folio debe generarse con formato EC0366-[AÑO actual]-[4 dígitos].
-- Marca como "Completado" solo los documentos que aparezcan en el contexto acumulado.
 - Responde SOLO en español. Genera únicamente este documento, sin preámbulos.

@@ -89,15 +89,25 @@ export async function handleFormSchemaAssembler(context: ProductContext): Promis
   console.log(`[DIALECTIC-TEAM] Campos del agente ${seleccion}: ${propuestasDinamicas.length} items`);
   
   if (propuestasDinamicas.length > 0) {
+    const hoy = new Date();
+    hoy.setDate(hoy.getDate() + 7);
+    const sugeridaDate = hoy.toISOString().split('T')[0];
+
     propuestasDinamicas.forEach((bloque: any, idx: number) => {
       const unitId = bloque.unit_id || idx + 1;
       const prefix = FIELD_PREFIX[producto] || 'instrumento_unidad_';
+      let suggestedValue = bloque.suggested_value || "Contenido validado por el Juez...";
+      
+      if (bloque.name === 'fecha_inicio_curso') {
+        suggestedValue = sugeridaDate;
+      }
+
       fields.push({
-        name: `${prefix}${unitId}`,
+        name: bloque.name || `${prefix}${unitId}`,
         label: bloque.label || `Evaluación: Unidad ${unitId}`,
-        type: "textarea",
+        type: bloque.type || "textarea",
         required: true,
-        suggested_value: bloque.suggested_value || "Contenido validado por el Juez...",
+        suggested_value: suggestedValue,
         hint: bloque.hint || `Basado en el objetivo de la unidad ${unitId}.`
       });
     });

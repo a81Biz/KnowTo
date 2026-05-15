@@ -76,6 +76,7 @@ pipeline_steps:
          - Evaluación: The specific instrument or evidence to collect in this session — reference P1's instrument type by name.
       
       RULES:
+      MODALITY RULE: The "Modalidad" field in every session MUST match exactly what F2's `modalidad` or F3's `modalidad_entrega` states. NEVER default to "Presencial" if the context indicates "Asíncrono", "En línea", or "LMS". Read the modality from the context before writing any session.
       1. OUTPUT LENGTH = 3 + number of units. (1 fecha + 1 hora + 1 diagnostic + N unit sessions)
       2. P1-P5 VOLUME: The Duración must realistically accommodate the content volume already produced.
       3. F3 ALIGNMENT: Total hours across all sessions must match F3's duracion_total_horas_aprox.
@@ -100,7 +101,7 @@ pipeline_steps:
         {
           "name": "sesion_diagnostica",
           "label": "Sesión 0 — Evaluación Diagnóstica",
-          "suggested_value": "Sesión: 0 (Evaluación Diagnóstica)\nTema principal: Encuadre y evaluación de conocimientos previos\nDuración: 1 hora\nModalidad: Presencial\nActividades programadas: Bienvenida, presentación del programa, aplicación de instrumento diagnóstico\nEvaluación: Instrumento diagnóstico (no acreditable — establece línea base)",
+          "suggested_value": "Sesión: 0 (Evaluación Diagnóstica)\nTema principal: Encuadre y evaluación de conocimientos previos\nDuración: 1 hora\nModalidad: [Leer de F2/F3 — Presencial / En línea / Mixto / Asíncrono]\nActividades programadas: Bienvenida, presentación del programa, aplicación de instrumento diagnóstico\nEvaluación: Instrumento diagnóstico (no acreditable — establece línea base)",
           "type": "textarea"
         },
         {
@@ -147,6 +148,7 @@ pipeline_steps:
          - Responsable: Instructor / Facilitador / Coordinador — based on the activity type.
       
       RULES:
+      MODALITY RULE: All resource selections ("Recursos didácticos") MUST reflect the actual delivery mode from F2's `modalidad` or F3's `modalidad_entrega`. If the course is "Asíncrono", "En línea", or "LMS": FORBIDDEN — pizarra, rotulador, salón, aula, proyector físico; REQUIRED — plataforma LMS, módulo digital, foro, captura de pantalla, evidencia digital.
       1. OUTPUT LENGTH = 3 + number of units. (1 fecha + 1 hora + 1 diagnostic + N unit sessions)
       2. HOURS BREAKDOWN: Horas teóricas + Horas prácticas must equal the unit's total from F3.
       3. REAL RESOURCES: Recursos didácticos must list actual items from P5 and P2, not generic categories.
