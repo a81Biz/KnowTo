@@ -38,8 +38,8 @@ services:
     ports:
       - "80:80"          # Único puerto expuesto — todo el tráfico entra aquí
     volumes:
-      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./src/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./src/nginx/conf.d:/etc/nginx/conf.d:ro
     depends_on:
       backend:
         condition: service_healthy
@@ -80,7 +80,7 @@ services:
       - "8787"
       - "9229"
     volumes:
-      - ./backend:/app
+      - ./src/backend:/app
       - backend_node_modules:/app/node_modules
     environment:
       NODE_ENV: development
@@ -115,7 +115,7 @@ services:
     expose:
       - "5173"
     volumes:
-      - ./frontend:/frontend                  # frontend/ completo → /frontend/
+      - ./src/frontend:/frontend                # frontend/ completo → /frontend/
       - frontend_dcfl_node_modules:/frontend/dcfl/node_modules
     environment:
       NODE_ENV: development
@@ -141,7 +141,7 @@ services:
     expose:
       - "5175"
     volumes:
-      - ./frontend:/frontend
+      - ./src/frontend:/frontend
       - frontend_cce_node_modules:/frontend/cce/node_modules
     environment:
       NODE_ENV: development
@@ -166,7 +166,7 @@ services:
     expose:
       - "5174"
     volumes:
-      - ./frontend:/frontend
+      - ./src/frontend:/frontend
       - frontend_root_node_modules:/frontend/root/node_modules
     environment:
       NODE_ENV: development
@@ -195,7 +195,7 @@ services:
       JWT_SECRET: ${JWT_SECRET:-super-secret-jwt-token-with-at-least-32-characters-long}
     volumes:
       - supabase_db_data:/var/lib/postgresql/data
-      - ./supabase/migrations:/docker-entrypoint-initdb.d:ro
+      - ./src/supabase/migrations:/docker-entrypoint-initdb.d:ro
     networks:
       - knowto-network
     restart: unless-stopped
@@ -355,7 +355,7 @@ services:
       KONG_ADMIN_ERROR_LOG: /dev/stderr
       KONG_PLUGINS: request-transformer,cors,key-auth,acl
     volumes:
-      - ./supabase/kong.yml:/var/lib/kong/kong.yml:ro
+      - ./src/supabase/kong.yml:/var/lib/kong/kong.yml:ro
     ports:
       - "54321:8000"   # API Gateway (REST, Auth, Realtime WebSocket)
     networks:

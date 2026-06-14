@@ -12,3 +12,5 @@ functional/
 docs/
 graphify-out/
 output/
+# Runtime state — scratch dirs created by tools
+src/backend/src/brain/

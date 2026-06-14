@@ -1,0 +1,297 @@
+---
+id: F4_P1_GENERATE_DOCUMENT
+name: Compilador de Documento P1 (Instrumentos de Evaluación)
+version: 4.0.0
+tags: [EC0366, documento, evaluacion, markdown, compilacion, agnostico]
+pipeline_steps:
+
+  # ── EXTRACTOR ────────────────────────────────────────────────────────────
+  - agent: extractor_doc_p1
+    model: "qwen2.5:14b"
+    inputs_from: []
+    include_template: false
+    task: |
+      Read from userInputs (evaluation forms) and from productos_previos.P4 (Manual del Participante, if available).
+      P4 is the source of truth for module/unit names and learning objectives — use it to align P1 evaluation criteria.
+
+      SOURCE MAPPING:
+      - The form fields follow the pattern "instrumento_unidad_N" where N is the unit number.
+      - projectName and clientName come from the context root.
+      - productos_previos.P4.inventario_p4 (or document_final text) may contain module names and objectives.
+
+      YOUR TASK: Map each form field to its unit number by extracting N from the key name. Preserve the EXACT text of each field value.
+      If P4 data is available, extract the unit/module names and objectives to populate the "nombre_unidad" field.
+
+      COUNT RULE (CRITICAL): Before outputting, count EVERY key in userInputs that starts with "instrumento_unidad_".
+      Your "evaluaciones" array MUST have EXACTLY that many items — one per field, no more, no less.
+      FORBIDDEN: outputting fewer evaluaciones than there are "instrumento_unidad_*" keys.
+      EXAMPLE: if userInputs has instrumento_unidad_1, instrumento_unidad_2, instrumento_unidad_3 → "evaluaciones" MUST have 3 items.
+
+      OUTPUT ONLY VALID JSON — EXACT STRUCTURE:
+      {
+        "proyecto": "[projectName from context]",
+        "candidato": "[clientName from context]",
+        "total_unidades": [integer: count of instrumento_unidad_* keys],
+        "evaluaciones": [
+          { "unidad": "1", "nombre_unidad": "[unit name from P4 or form, or 'Unidad 1']", "contenido": "[value of instrumento_unidad_1]" },
+          { "unidad": "2", "nombre_unidad": "[unit name from P4 or form, or 'Unidad 2']", "contenido": "[value of instrumento_unidad_2]" },
+          { "unidad": "N", "nombre_unidad": "[unit name from P4 or form, or 'Unidad N']", "contenido": "[value of instrumento_unidad_N]" }
+        ]
+      }
+
+      RULES:
+      - Include ONLY fields whose key starts with "instrumento_unidad_"
+      - Preserve the exact text of each field value — do not paraphrase or summarize
+      - The number of evaluaciones MUST equal total_unidades
+      - NEVER invent unit names that don't come from the form or P4 data
+
+  # ── AGENTE A: NORMATIVE AUDITOR ──────────────────────────────────────────
+  - agent: agente_doc_A
+    model: "qwen2.5:14b"
+    inputs_from: [extractor_doc_p1]
+    include_template: false
+    task: |
+      ANCLA SEMÁNTICA (FUENTE DE VERDAD INMUTABLE):
+      - Nombre oficial del curso: {_frozen.nombre_oficial_curso}
+      - Dominio técnico: {_frozen.dominio_tecnico}
+      - Resultado central: {_frozen.resultado_central}
+      - Audiencia primaria: {_frozen.audiencia_primaria}
+      PROHIBIDO: Contradecir, redefinir o ignorar estas anclas en cualquier sección del documento.
+
+      RESTRICCIONES_OBLIGATORIAS (verifica ANTES de escribir cualquier línea):
+      - IDIOMA: Escribe EXCLUSIVAMENTE en {_frozen.idioma_requerido ?? 'español'}. PROHIBIDO mezclar idiomas.
+      - MODALIDAD: Refleja la modalidad "{_frozen.modalidad_canonica ?? 'presencial'}". Usa vocabulario apropiado.
+      - TABLA_BLOOM_INSTRUMENTO válido por EC0366:
+        | Nivel Bloom            | Instrumento EC0366 válido                          |
+        |------------------------|----------------------------------------------------|
+        | Recordar / Comprender  | Cuestionario (Examen Escrito)                      |
+        | Aplicar / Analizar     | Guía de Observación / Lista de Cotejo              |
+        | Evaluar / Crear        | Rúbrica / Portafolio de Evidencias / Proyecto      |
+        PROHIBIDO asignar instrumento de nivel inferior al nivel Bloom declarado.
+      - PONDERACION_SUM: sum(ponderacion de TODAS las unidades) = 100 exactamente. Ajusta la última si es necesario.
+      - NO_PLACEHOLDERS: PROHIBIDO {{variable}}, [PENDIENTE], [INSERTAR], TBD en cualquier campo.
+
+      YOU ARE A DOCUMENT GENERATOR. OUTPUT ONLY MARKDOWN. DO NOT CONVERSE. DO NOT ADD JSON WRAPPERS OR CODE BLOCKS.
+
+      GLOBAL CONSTRAINTS (mandatory — check context._reglas_globales):
+      - If a certification standard applies, it is in _frozen.estandar_norma in the context. It is NOT the course name or topic.
+      - NEVER invent bibliographic references, norms, authors, or dates not present in the context.
+      - NEVER leave unresolved placeholders: {{variable}}, [PENDIENTE], [INSERTAR], [TODO], TBD.
+
+      You are a Normative Auditor. Generate the final evaluation document.
+      
+      SOURCE: The evaluation data extracted from the user-confirmed form.
+      
+      FILTRO_OBSERVABILIDAD: Queda estrictamente prohibido el uso de verbos no observables (Saber, Conocer, Entender, Comprender) Y de sustantivos de estado mental (entendimiento, comprensión, conocimiento, conciencia, dominio). Si el reactivo menciona estados internos no verificables, el agente DEBE transformarlos en acciones físicas o productos verificables (ej. "Realiza", "Identifica", "Describe", "Muestra", "Demuestra").
+      EJEMPLOS PROHIBIDOS: "muestra entendimiento del proceso", "evidencia conocimiento de la técnica", "comprensión del concepto".
+      EJEMPLOS CORRECTOS: "ejecuta los pasos en el orden especificado", "identifica visualmente la diferencia entre A y B", "produce una pieza con las características X, Y, Z".
+      
+      REACTIVOS_MINIMOS: Genera MÍNIMO 3 reactivos por unidad. Con solo 2 reactivos la evaluación no cubre los criterios de desempeño de forma suficiente. Si la unidad es compleja, genera hasta 5 reactivos.
+      
+      REGLA_CUESTIONARIO: Si el Tipo de Instrumento de una unidad es "Cuestionario", después de la tabla de reactivos DEBES añadir una sección obligatoria:
+      ### CLAVE DE RESPUESTAS
+      | No. Reactivo | Respuesta Correcta | Sustento Técnico |
+      |---|---|---|
+      | 1 | [respuesta] | [fundamento técnico observable] |
+      COUNT_CHECK OBLIGATORIO: Antes de escribir la CLAVE, cuenta las filas `| N | ... |` de la tabla de reactivos anterior. La CLAVE DEBE tener EXACTAMENTE ese mismo número de filas, una por cada reactivo. Si hay 3 reactivos → 3 filas en la CLAVE. Si hay 4 → 4 filas. NUNCA menos.
+      
+      HOW TO BUILD THE DOCUMENT:
+      
+      ### Section 1: Datos Generales
+      Fill with the candidate name and evaluator placeholder.
+      
+      ### Section 2: Instrucciones Generales
+      Write detailed, professional instructions based on the specific course topic. Describe the evaluation environment, materials needed, and general conduct for the evaluator.
+      
+      ### FOR EACH EXTRACTED UNIT:
+      
+      **Tipo de Instrumento**: Deduce logically from the objective and reactivos:
+      - Physical performance → "Guía de Observación"
+      - Final product deliverable → "Lista de Cotejo"
+      - Theory/knowledge assessment → "Cuestionario"
+      NEVER combine types (no "Cuestionario y Lista").
+      
+      **Ponderación Global**: Assign a logical percentage. THE SUM OF ALL UNITS MUST BE EXACTLY 100%. Distribute based on complexity and duration.
+      
+      **Instrucción al Evaluador**: Describe the exact physical moment to start observing and the specific sequential observable actions to verify. FORBIDDEN: generic phrases like "Observe al candidato mientras [generic verb]". MUST specify concrete actions: "Verifique que el participante [specific physical action]".
+      
+      **Reactivos table**: Each reactivo must describe a verifiable physical action or measurable deliverable. MINIMUM 3 reactivos per unit.
+      
+      **Valor Interno rules**:
+      - Each value between 20% and 60% (whole numbers, no decimals)
+      - Sum within a single unit = 100%
+      - More complex actions receive higher weight
+      - No identical weights unless genuinely equivalent
+      
+      ### Section 3: Criterios de Suficiencia
+      Minimum passing score: 85%.
+      
+      ALL_UNITS RULE (CRITICAL): Read "total_unidades" from the extractor output. You MUST generate exactly that many "## Unidad N" sections.
+      FORBIDDEN: generating fewer units than total_unidades. If total_unidades is 3, you MUST produce 3 complete unit sections.
+      
+      CRITICAL RULES (DO NOT PRINT THESE IN THE OUTPUT):
+      1. OBSERVABLE ACTIONS ONLY: FORBIDDEN subjective adjectives — adecuado, correcto, correctamente, bien, efectivo, notable, mejorado.
+         WRONG: "Realiza el procedimiento correctamente"
+         RIGHT: "Realiza el procedimiento completando cada paso en el orden establecido sin omitir verificaciones"
+      2. NO REPETITION BETWEEN UNITS: Each unit's reactivos MUST be unique. A reactivo about one skill must not appear in another unit. Before writing, read ALL unit names and ensure distinct, non-overlapping reactivos.
+      3. SINGLE INSTRUMENT per unit. Never combine.
+      4. PERFECT MATH: Global weights sum exactly 100%.
+      5. WORKPLACE CONTEXT (MANDATORY): Each reactivo MUST be anchored to a real workplace situation.
+         The reactivo must describe what the candidate does IN THEIR ACTUAL JOB, not in an abstract evaluation room.
+         WRONG: "El candidato realiza el procedimiento de la unidad"
+         RIGHT: "En su área de trabajo habitual, el candidato selecciona [herramienta específica] e inicia el proceso de [acción concreta del puesto] siguiendo la secuencia establecida en la norma"
+         Every reactivo must include at least one of: job context ("en su puesto de trabajo", "durante la jornada", "ante un cliente/material/equipo real"), specific tool from the course, or measurable output from the unit objective.
+      
+      OUTPUT ONLY MARKDOWN — start directly with the # heading. No JSON. No code block. No preamble:
+      
+      # Instrumentos de Evaluación
+      ## 1. Datos Generales
+      - **Candidato:** [Name]
+      - **Evaluador:** [Name / Center]
+      
+      ## 2. Instrucciones Generales
+      [Detailed instructions based on course topic]
+      
+      [REPEAT FOR ALL total_unidades UNITS — DO NOT STOP UNTIL ALL UNITS ARE WRITTEN]:
+      ## Unidad [N]: [Unit Name]
+      - **Tipo de Instrumento:** [Guía de Observación / Lista de Cotejo / Cuestionario]
+      - **Ponderación Global:** [%]
+      - **Instrucción al Evaluador:** [Specific observable actions to verify]
+      
+      | No. | Reactivo (Condición de Calidad Observable) | Valor Interno | Cumple (Sí/No) | Observaciones |
+      |---|---|---|---|---|
+      | 1 | [Physical, measurable action] | [%] | | |
+      | 2 | [Physical, measurable action] | [%] | | |
+      
+      ## 3. Criterios de Suficiencia
+      Para declarar la competencia, el candidato debe sumar el 100% de la evaluación global, requiriendo un puntaje mínimo aprobatorio del 85%.
+
+  # ── AGENTE B: PRACTICAL INSTRUCTIONAL DESIGNER ───────────────────────────
+  - agent: agente_doc_B
+    model: "qwen2.5:14b"
+    inputs_from: [extractor_doc_p1]
+    include_template: false
+    task: |
+      ANCLA SEMÁNTICA (FUENTE DE VERDAD INMUTABLE):
+      - Nombre oficial del curso: {_frozen.nombre_oficial_curso}
+      - Dominio técnico: {_frozen.dominio_tecnico}
+      - Resultado central: {_frozen.resultado_central}
+      - Audiencia primaria: {_frozen.audiencia_primaria}
+      PROHIBIDO: Contradecir, redefinir o ignorar estas anclas en cualquier sección del documento.
+
+      RESTRICCIONES_OBLIGATORIAS (verifica ANTES de escribir cualquier línea):
+      - IDIOMA: Escribe EXCLUSIVAMENTE en {_frozen.idioma_requerido ?? 'español'}. PROHIBIDO mezclar idiomas.
+      - MODALIDAD: Refleja la modalidad "{_frozen.modalidad_canonica ?? 'presencial'}". Usa vocabulario apropiado.
+      - TABLA_BLOOM_INSTRUMENTO válido por EC0366:
+        | Nivel Bloom            | Instrumento EC0366 válido                          |
+        |------------------------|----------------------------------------------------|
+        | Recordar / Comprender  | Cuestionario (Examen Escrito)                      |
+        | Aplicar / Analizar     | Guía de Observación / Lista de Cotejo              |
+        | Evaluar / Crear        | Rúbrica / Portafolio de Evidencias / Proyecto      |
+        PROHIBIDO asignar instrumento de nivel inferior al nivel Bloom declarado.
+      - PONDERACION_SUM: sum(ponderacion de TODAS las unidades) = 100 exactamente. Ajusta la última si es necesario.
+      - NO_PLACEHOLDERS: PROHIBIDO {{variable}}, [PENDIENTE], [INSERTAR], TBD en cualquier campo.
+
+      YOU ARE A DOCUMENT GENERATOR. OUTPUT ONLY MARKDOWN. DO NOT CONVERSE. DO NOT ADD JSON WRAPPERS OR CODE BLOCKS.
+
+      GLOBAL CONSTRAINTS (mandatory — check context._reglas_globales):
+      - The certification standard (if any) is in _frozen.estandar_norma. It is NOT the course name or topic.
+      - NEVER invent bibliographic references, norms, authors, or dates not present in the context.
+      - NEVER leave unresolved placeholders: {{variable}}, [PENDIENTE], [INSERTAR], [TODO], TBD.
+
+      You are an Instructional Designer for competency-based instructional design — PRACTICAL AND REAL-WORLD focus. Generate the final evaluation document.
+      
+      SOURCE: The evaluation data extracted from the user-confirmed form.
+      
+      HOW TO BUILD THE DOCUMENT:
+      
+      ### Section 1: Requerimientos Físicos del Entorno
+      Deduce and describe the specific inputs, equipment, software, or spatial conditions needed to evaluate THIS specific course. Mention real tools, materials, or workspace requirements.
+      
+      ### FOR EACH EXTRACTED UNIT:
+      
+      **Instrumento**: Same as Agent A — single type per unit, deduced from the objective.
+      
+      **Peso en la Calificación Final**: Logical percentage. Total sum MUST be 100%.
+      
+      **Directriz de Aplicación**: Technical and physical instruction for the evaluator. What to check, in what order, with what criteria.
+      
+      **Reactivos table**: Technical quality conditions, free of subjectivity.
+      
+      ### Section 2: Reglas de Decisión y Firmas
+      Include approval rules and signature spaces for evaluator and candidate.
+      
+      ALL_UNITS RULE (CRITICAL): Read "total_unidades" from the extractor output. You MUST generate exactly that many "## Unidad N" sections.
+      FORBIDDEN: generating fewer units than total_unidades. If total_unidades is 3, you MUST produce 3 complete unit sections.
+      
+      CRITICAL RULES (DO NOT PRINT THESE IN THE OUTPUT):
+      1. SINGLE INSTRUMENT per unit. Never combine.
+      2. OBSERVABLE ACTIONS ONLY: FORBIDDEN — adecuado, correcto, correctamente, bien, efectivo, notable, mejorado, entendimiento, comprensión, conocimiento, conciencia.
+         WRONG: "Ensambla de forma correcta" / "Demuestra entendimiento del proceso"
+         RIGHT: "Ensambla las piezas haciendo coincidir los bordes sin dejar huecos"
+      3. NO REPETITION BETWEEN UNITS: Each unit's reactivos MUST be unique.
+      4. PERFECT MATH: All weights sum exactly 100%.
+      5. MINIMUM 3 REACTIVOS per unit.
+      6. CUESTIONARIO CLAVE: If instrument is Cuestionario, add ### CLAVE DE RESPUESTAS with EXACTLY one row per reactivo — no more, no less.
+      7. WORKPLACE CONTEXT (MANDATORY): Each reactivo MUST anchor to a real workplace scenario — the candidate's actual job context, not an abstract evaluation setting.
+         WRONG: "El candidato realiza el ejercicio de la unidad"
+         RIGHT: "En su área de trabajo y con el material real del proceso, el candidato ejecuta [acción específica] hasta obtener [resultado medible del puesto]"
+         At least one context marker per reactivo: ("en su área de trabajo", "ante el material real", "durante el desempeño habitual", "frente al equipo/cliente/herramienta del puesto").
+      
+      OUTPUT ONLY MARKDOWN — start directly with the # heading. No JSON. No code block. No preamble:
+      
+      # Instrumentos de Evaluación Práctica
+      ## 1. Requerimientos Físicos del Entorno
+      [Specific inputs, equipment, software, or spatial conditions for this course]
+      
+      [REPEAT FOR ALL total_unidades UNITS — DO NOT STOP UNTIL ALL UNITS ARE WRITTEN]:
+      ## Unidad [N]: [Unit Name]
+      - **Instrumento:** [Guía de Observación / Lista de Cotejo / Cuestionario]
+      - **Peso en la Calificación Final:** [%]
+      - **Directriz de Aplicación:** [Technical instruction for the evaluator]
+      
+      | No. | Reactivo (Condición de Calidad Técnica) | Ponderación | Cumple | Observaciones |
+      |---|---|---|---|---|
+      | 1 | [Specific observable technical criterion] | [%] | | |
+      | 2 | [Specific observable technical criterion] | [%] | | |
+      
+      ## 2. Reglas de Decisión y Firmas
+      [Approval rules and signature spaces for evaluator and candidate]
+
+  # ── JUDGE ────────────────────────────────────────────────────────────────
+  - agent: juez_doc
+    model: "qwen2.5:14b"
+    inputs_from: [agente_doc_A, agente_doc_B]
+    include_template: false
+    task: |
+      YOU ARE A JSON PARSER. DO NOT CONVERSE.
+      
+      Compare the Instrumento de Evaluación document generated by A and B. Both documents are in TRABAJO PREVIO.
+      
+      SELECTION CRITERIA:
+      1. No Prompt Leaking: The critical rules MUST NOT appear in the output text. It must look like a clean, official evaluation document.
+      2. No Subjectivity: The chosen document must NOT contain subjective adjectives — adecuado, correcto, correctamente, bien, efectivo, notable, mejorado — nor mental state nouns — entendimiento, comprensión, conocimiento, conciencia. Reactivos must describe physical, observable actions.
+      3. Perfect Math: Global unit weights (Ponderación Global / Peso en la Calificación Final) must sum exactly 100%.
+      4. Single Instrument: Only one instrument type per unit. No "Cuestionario y Guía" or similar combined instruments.
+      5. Unique Reactivos: No reactivo text is substantially similar across different units.
+      6. Minimum Reactivos: Each unit must have at least 3 reactivos. Documents with only 2 reactivos per unit are penalized.
+      7. CLAVE Completeness: For any Cuestionario unit, the ### CLAVE DE RESPUESTAS section must have EXACTLY as many rows as the reactivos table. A CLAVE with fewer rows than reactivos is a critical deficiency.
+      8. WORKPLACE CONTEXT: Count how many reactivos in each unit include at least one of these context markers: "en su área de trabajo", "en su puesto de trabajo", "durante la jornada", "ante el material real", "durante el desempeño habitual", "frente al equipo", "ante un cliente". Prefer the document where a higher percentage of reactivos include a workplace marker. Penalize documents where most reactivos describe abstract evaluation-room scenarios without job context.
+      
+      Choose the one that meets ALL criteria. If both fail on the same criteria, choose the one with fewer deficiencies.
+      
+      VETO CRITERIA — Output "RECHAZADO" ONLY IF ALL of the following apply to BOTH documents simultaneously:
+      1. Both have forbidden subjective adjectives or mental state nouns in 3 or more reactivos.
+      2. Both have reactivos that describe intentions or knowledge states instead of physical observable actions.
+      If RECHAZADO, "razon" MUST describe the specific shared deficiency so the agents can correct it.
+      
+      OUTPUT ONLY THIS JSON:
+      {"seleccion": "A" | "B" | "RECHAZADO", "razon": "1-line explanation"}
+
+  # ── ASSEMBLER ────────────────────────────────────────────────────────────
+  - agent: ensamblador_doc_p1
+    model: "qwen2.5:14b"
+    inputs_from: [juez_doc]
+    include_template: false
+    task: "CÓDIGO - Assembly in document.assembler.ts"
+---

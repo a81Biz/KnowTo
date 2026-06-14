@@ -14,7 +14,7 @@ Plataforma de microsites de certificación asistidos por IA. Arquitectura multi-
 | Notificaciones async | Supabase Realtime — `postgres_changes` en tabla `pipeline_jobs` (WebSocket, sin polling) |
 | Routing local | Nginx (reverse proxy, único puerto expuesto: 80) |
 | Dev local | Docker Compose — Nginx + Node.js + Supabase stack completo + Ollama |
-| Tests | Vitest (152 tests, 100 % pass) |
+| Tests | Vitest (247 tests, 100 % pass) |
 
 ---
 
@@ -55,19 +55,19 @@ El stack de Supabase tarda ~30 s en estar completamente operativo.
 
 ```bash
 # Terminal 1 — backend
-cd backend
+cd src/backend
 npm install
-npm run dev          # Node.js en :8787, lee backend/.dev.vars
+npm run dev          # Node.js en :8787, lee src/backend/.dev.vars
 # o con debugger:
 npm run dev:debug    # igual + inspector Node.js en :9229
 
 # Terminal 2 — microsite dcfl
-cd frontend/dcfl
+cd src/frontend/dcfl
 npm install
 npm run dev          # Vite en :5173
 
 # Terminal 3 — (opcional) directorio raíz
-cd frontend/root
+cd src/frontend/root
 npm install
 npm run dev          # Vite en :5174
 ```
@@ -174,7 +174,7 @@ knowto/
 │           ├── services/         # SupabaseService (extiende BaseSupabaseService)
 │           ├── prompts/          # flow-map.yaml + templates/ (F0–F6, F0_CLIENT_QUESTIONS_FORM…)
 │           └── types/            # PromptId, ProjectContext…
-├── backend/src/__tests__/        # Vitest — 152 tests
+├── backend/src/__tests__/        # Vitest — 247 tests
 │   ├── middleware/auth.middleware.test.ts
 │   ├── routes/health.e2e.test.ts
 │   ├── routes/wizard.e2e.test.ts           # Flujo completo DCFL
@@ -496,7 +496,7 @@ curl -X POST http://api.localhost/dcfl/wizard/project \
 ```bash
 # Backend — Vitest
 cd backend
-npm test               # 152 tests
+npm test               # 247 tests
 npm run test:coverage  # con reporte de cobertura HTML
 
 # Frontend dcfl — verificación de tipos TypeScript
@@ -585,7 +585,7 @@ En Docker las variables vienen de `docker-compose.yml`.
 | `npm run dev` | Servidor Node.js en :8787, lee `.dev.vars` |
 | `npm run dev:debug` | Igual + inspector Node.js en :9229 (VS Code attach) |
 | `npm run dev:wrangler` | Servidor workerd (solo para verificar compatibilidad CF) |
-| `npm test` | Vitest — 152 tests |
+| `npm test` | Vitest — 247 tests |
 | `npm run test:watch` | Vitest en modo watch |
 | `npm run test:prompts` | Solo la suite de prompts (verbose) |
 | `wrangler deploy --env production` | Deploy a Cloudflare Workers |
@@ -801,7 +801,7 @@ docker compose restart backend
 ```bash
 curl -X POST http://api.localhost/dcfl/test/run-all \
   -H "Content-Type: application/json" \
-  -d '{ "projectId": "<PROJECT_ID>" }'
+  -d '{ "projectId": "625cf334-4fda-470a-924a-661656d2f514" }'
 ```
 
 Retorna `202` inmediatamente. La generación corre en background (2-6 horas con Ollama local).
@@ -827,7 +827,7 @@ docker exec knowto-supabase-db psql -U postgres -d postgres -c "
   ORDER BY created_at DESC LIMIT 30;"
 ```
 
-Ver [docs/TEST-F4-PRODUCTS.md](docs/TEST-F4-PRODUCTS.md) para diagnóstico detallado.
+Ver [docs/implementation/Implementation.md](docs/implementation/Implementation.md) §9 para diagnóstico detallado del test runner.
 
 ---
 

@@ -58,24 +58,28 @@ Genera los documentos técnicos necesarios para que un instructor pueda certific
 | 3 | F2.5 | Recomendaciones de producción multimedia | ✅ |
 | 3 | F3 | Especificaciones Técnicas del Curso | ✅ |
 | 4 | F4 | Sub-wizard de 8 productos de producción | ✅ |
-| 5 | F5 | Verificación y checklist | ⚠️ parcial |
-| 6 | F6 | Ajustes, evidencias e inventario de firmas | ⚠️ parcial |
+| 5 | F5 | Verificación y checklist | ✅ |
+| 6 | F6 | Ajustes, evidencias e inventario de firmas | ✅ |
 | 10 | — | Resumen y entrega | ✅ |
 
 ### Los 8 productos de F4 (sub-wizard de producción)
 
 Cada producto tiene su propio pipeline multi-agente (extractor → agente A → agente B → juez → validador → sintetizador) y se persiste en la tabla `fase4_productos`.
 
-| # | Producto | Documento |
-|:---:|:---|:---|
-| P0 | Cronograma de producción | Tabla de fases con fechas |
-| P1 | Información general del curso | Ficha técnica EC0366 |
-| P2 | Guías de actividades de aprendizaje | Actividades por módulo con ponderaciones |
-| P3 | Calendario de actividades | Distribución semanal |
-| P4 | Documentos de texto del contenido | Contenido temático por módulo |
-| P5 | Presentación electrónica | Estructura de diapositivas por módulo |
-| P6 | Guiones de material multimedia | Guiones de video con timecodes |
-| P7 | Instrumentos de evaluación | Cuestionario diagnóstico + rúbrica + lista de cotejo |
+> **Nota:** `ProductCode` es el identificador interno del código; `Orden UI` es el número que ve el usuario en el sub-wizard. El orden de generación interno es diferente al de presentación (P4 se genera primero por ser fuente de verdad).
+
+| Orden UI | ProductCode | Documento | Prompt Template |
+|:---:|:---:|:---|:---|
+| 1 | P4 | Manual del Participante | `F4_P4_GENERATE_DOCUMENT` |
+| 2 | P1 | Instrumentos de Evaluación | `F4_P1_GENERATE_DOCUMENT` |
+| 3 | P3 | Guiones Multimedia | `F4_P3_GENERATE_DOCUMENT` |
+| 4 | P2 | Presentación Electrónica | `F4_P2_GENERATE_DOCUMENT` |
+| 5 | P5 | Plan de Evaluación del Aprendizaje | `F4_P5_GENERATE_DOCUMENT` |
+| 6 | P7 | Glosario Técnico | `F4_P7_GENERATE_DOCUMENT` |
+| 7 | P6 | Guía Didáctica del Instructor | `F4_P6_GENERATE_DOCUMENT` |
+| 8 | P8 | Portafolio de Evidencias | `F4_P8_GENERATE_DOCUMENT` |
+
+**Orden de generación interno:** `P4 → P1 → P3 → P2 → P5 → P7 → P6 → P8` (P4 es la fuente de verdad; P3 debe existir antes que P2).
 
 ### Pipeline multi-agente (patrón por fase)
 
@@ -95,10 +99,10 @@ Los **validadores** y el **sintetizador_final** son handlers de código puro (si
 
 | Tabla | Qué guarda |
 |:---|:---|
-| `wizard_projects` | Proyecto por cliente (nombre, industria, tema del curso) |
+| `projects` | Proyecto por cliente (nombre, industria, tema del curso) |
 | `wizard_steps` | Inputs del usuario por paso |
 | `pipeline_jobs` | Estado y resultado de cada ejecución del pipeline |
-| `pipeline_job_agents` | Output por agente dentro de cada job (checkpointing) |
+| `pipeline_agent_outputs` | Output por agente dentro de cada job (checkpointing) |
 | `preguntas_fase` | Preguntas IA generadas para la siguiente fase |
 | `fase1_informe_necesidades` | Q&A parseado, brechas, objetivos, perfil del participante |
 | `fase2_analisis` | Módulos, modalidad, plataforma, perfil ajustado |
@@ -133,8 +137,7 @@ El Informe de Necesidades (F1) genera datos estructurados que pre-rellenan el fo
 - Fix de prefill F2: `perfil_participante` se extrae del JSON del extractor (no del parsing del documento LLM)
 - TypeScript compila sin errores (`tsc --noEmit`)
 
-### Pendiente / parcial
-- F5 (Verificación) y F6 (Ajustes/firmas) — prompts y controllers existen, flujo no revisado
+### Pendiente
 - Tests automatizados actualizados para F4
 - Deploy a producción (actualmente 100% local con Docker)
 
