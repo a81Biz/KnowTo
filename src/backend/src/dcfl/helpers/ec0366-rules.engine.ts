@@ -13,6 +13,7 @@ import type {
   P1Artifact,
   UnidadEvaluacion,
   Violacion,
+  FrozenProductionSpec,
 } from '../types/certification.types';
 
 // ── Bloom → valid instruments map (EC0366 taxonomy) ──────────────────────────
@@ -43,6 +44,7 @@ export class EC0366RulesEngine implements ICertificationRulesEngine {
       violaciones.push(...this._validateBloom(artifact));
     }
 
+    violaciones.push(...this._validateDuration(artifact, ctx.frozenSpec));
     violaciones.push(...this._validateModality(artifact, ctx));
     violaciones.push(...this._validateLanguage(artifact, ctx));
 
@@ -91,14 +93,42 @@ export class EC0366RulesEngine implements ICertificationRulesEngine {
   }
 
   private _validateCoverage(p1: P1Artifact, ctx: CertificationContext): Violacion[] {
-    if (!ctx.p4Artifact) return [];
-    const p4Chapters = ctx.p4Artifact.capitulos.length;
     const p1Units = p1.unidades.length;
-    if (p1Units === p4Chapters) return [];
+
+    // PT-152: frozenSpec.total_unidades is the authoritative unit count (from temario_base).
+    // Fall back to P4 chapter count when frozenSpec is absent.
+    const expectedUnits = ctx.frozenSpec?.total_unidades ?? ctx.p4Artifact?.capitulos.length;
+    if (expectedUnits == null) return [];
+
+    if (p1Units === expectedUnits) return [];
+    const source = ctx.frozenSpec?.total_unidades != null ? 'temario_base' : 'P4';
     return [{
       code: 'COVERAGE_INCOMPLETE',
-      message: `P1 cubre ${p1Units} unidades pero P4 tiene ${p4Chapters} capítulos. Deben coincidir.`,
+      message: `P1 cubre ${p1Units} unidades pero ${source} tiene ${expectedUnits}. Deben coincidir.`,
       field: 'unidades',
+      severity: 'error',
+    }];
+  }
+
+  /**
+   * PT-152: Validates that the module referenced in a multi-module artifact exists
+   * in the frozen production spec (temario_base). Prevents "phantom module" outputs
+   * where the LLM generates content for a module that was never declared.
+   */
+  private _validateDuration(artifact: CertificationArtifact, spec?: FrozenProductionSpec): Violacion[] {
+    if (!spec?.tiempos_por_modulo?.length) return [];
+    const art = artifact as any;
+    if (typeof art.modulo !== 'string' || !art.modulo.trim()) return [];
+
+    const moduloNorm = art.modulo.toLowerCase().trim();
+    const found = spec.tiempos_por_modulo.some(
+      t => t.modulo.toLowerCase().trim() === moduloNorm,
+    );
+    if (found) return [];
+    return [{
+      code: 'DURATION_MODULE_NOT_IN_SPEC',
+      message: `El módulo "${art.modulo}" no existe en el temario_base congelado. Módulos válidos: ${spec.tiempos_por_modulo.map(t => t.modulo).join(', ')}.`,
+      field: 'modulo',
       severity: 'error',
     }];
   }

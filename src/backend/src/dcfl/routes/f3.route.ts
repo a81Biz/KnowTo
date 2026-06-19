@@ -1,22 +1,96 @@
-import { Hono } from 'hono';
+import { OpenAPIHono, createRoute, z } from '@hono/zod-openapi';
 import { SupabaseService } from '../services/supabase.service';
 import { CertificationEngineFactory } from '../helpers/certification-engine.factory';
+import { F3StructuredPatchBody } from '../schemas/wizard.schemas';
 import type { Env } from '../../core/types/env';
 import type {
   F3Artifact, ModalidadCanonica, ISO639LanguageCode,
   CertificationScore, ArtifactStatus,
 } from '../types/certification.types';
 
-const f3Routes = new Hono<{ Bindings: Env; Variables: { userId: string } }>();
+const f3Routes = new OpenAPIHono<{ Bindings: Env; Variables: { userId: string } }>();
 
-// ── GET /dcfl/api/f3/:projectId/validation-status ──────────────────────────
+// ── Route specs ───────────────────────────────────────────────────────────────
+
+const ProjectIdParam = z.object({ projectId: z.string().uuid() });
+
+const routeGetF3ValidationStatus = createRoute({
+  method: 'get',
+  path: '/{projectId}/validation-status',
+  tags: ['f3'],
+  summary: 'Estado de validación F3',
+  description: 'Verifica si plataforma, modalidad e idioma de F3 están configurados.',
+  security: [{ bearerAuth: [] }],
+  request: { params: ProjectIdParam },
+  responses: {
+    200: {
+      description: 'Estado de validación F3',
+      content: {
+        'application/json': {
+          schema: z.object({
+            plataforma: z.boolean(),
+            modalidad: z.boolean(),
+            idioma_ok: z.boolean(),
+            f3_exists: z.boolean(),
+            error: z.string().optional(),
+          }).openapi('F3ValidationStatusResponse'),
+        },
+      },
+    },
+  },
+});
+
+const F3PatchOkSchema = z.object({
+  ok: z.literal(true),
+  updatedFields: z.object({
+    plataforma: z.boolean(),
+    modalidad: z.boolean(),
+    idioma: z.boolean(),
+    criteriosAceptacion: z.boolean(),
+  }),
+  certStatus: z.string(),
+}).openapi('F3StructuredPatchResponse');
+
+const routePatchF3Structured = createRoute({
+  method: 'patch',
+  path: '/{projectId}/structured',
+  tags: ['f3'],
+  summary: 'Actualizar criterios de aceptación F3',
+  description: 'Actualiza plataforma_navegador JSONB y persiste un ArtifactVersion para F3. Al menos un campo es requerido.',
+  security: [{ bearerAuth: [] }],
+  request: {
+    params: ProjectIdParam,
+    body: {
+      content: { 'application/json': { schema: F3StructuredPatchBody } },
+      required: true,
+    },
+  },
+  responses: {
+    200: {
+      description: 'F3 actualizado correctamente',
+      content: { 'application/json': { schema: F3PatchOkSchema } },
+    },
+    400: {
+      description: 'Bad request — ningún campo proporcionado o JSON inválido',
+      content: { 'application/json': { schema: z.object({ error: z.string() }) } },
+    },
+    403: {
+      description: 'Forbidden',
+      content: { 'application/json': { schema: z.object({ error: z.string() }) } },
+    },
+    500: {
+      description: 'Error interno',
+      content: { 'application/json': { schema: z.object({ error: z.string() }) } },
+    },
+  },
+});
+
+// ── GET /dcfl/api/f3/:projectId/validation-status ─────────────────────────────
+//
 // Returns { plataforma: bool, modalidad: bool, idioma_ok: bool }
-// plataforma = plataforma_navegador is not null and has a non-empty value
-// modalidad  = plataforma_navegador.modalidad_curso or .modalidad is set
-// idioma_ok  = criterios_aceptacion or calculo_duracion is not null (proxy for completed F3)
 
-f3Routes.get('/:projectId/validation-status', async (c) => {
-  const projectId = c.req.param('projectId');
+f3Routes.openapi(routeGetF3ValidationStatus, async (c) => {
+  const projectId = c.req.valid('param').projectId;
   const userId = c.get('userId');
   const supabase = new SupabaseService(c.env);
 
@@ -28,7 +102,7 @@ f3Routes.get('/:projectId/validation-status', async (c) => {
         .eq('id', projectId)
         .eq('user_id', userId)
         .maybeSingle();
-      if (!proj) return c.json({ error: 'Forbidden' }, 403);
+      if (!proj) return c.json({ error: 'Forbidden' }, 403) as any;
     }
 
     const f3 = await supabase.getF3Especificaciones(projectId);
@@ -45,16 +119,17 @@ f3Routes.get('/:projectId/validation-status', async (c) => {
     return c.json({ plataforma, modalidad, idioma_ok, f3_exists: true });
   } catch (err) {
     console.error('[f3-route] validation-status error:', err);
-    return c.json({ plataforma: false, modalidad: false, idioma_ok: false, f3_exists: false, error: String(err) }, 500);
+    return c.json({ plataforma: false, modalidad: false, idioma_ok: false, f3_exists: false, error: String(err) });
   }
 });
 
-// ── PATCH /dcfl/api/f3/:projectId/structured ──────────────────────────────
-// Accepts F3StructuredUpdate { plataforma?: string, modalidad?: string, idioma?: string }
+// ── PATCH /dcfl/api/f3/:projectId/structured ─────────────────────────────────
+//
+// Accepts F3StructuredPatchBody { plataforma?, modalidad?, idioma?, criteriosAceptacion? }
 // Updates plataforma_navegador JSONB and persists an ArtifactVersion for F3.
 
-f3Routes.patch('/:projectId/structured', async (c) => {
-  const projectId = c.req.param('projectId');
+f3Routes.openapi(routePatchF3Structured, async (c) => {
+  const projectId = c.req.valid('param').projectId;
   const userId = c.get('userId');
   const supabase = new SupabaseService(c.env);
 
@@ -68,15 +143,15 @@ f3Routes.patch('/:projectId/structured', async (c) => {
     if (!proj) return c.json({ error: 'Forbidden' }, 403);
   }
 
-  let body: { plataforma?: string; modalidad?: string; idioma?: string } = {};
+  let body: { plataforma?: string; modalidad?: string; idioma?: string; criteriosAceptacion?: string[] } = {};
   try {
-    body = await c.req.json();
+    body = c.req.valid('json');
   } catch {
     return c.json({ error: 'Invalid JSON body' }, 400);
   }
 
-  if (!body.plataforma && !body.modalidad && !body.idioma) {
-    return c.json({ error: 'At least one field required: plataforma, modalidad, or idioma' }, 400);
+  if (!body.plataforma && !body.modalidad && !body.idioma && !body.criteriosAceptacion) {
+    return c.json({ error: 'At least one field required: plataforma, modalidad, idioma, or criteriosAceptacion' }, 400);
   }
 
   try {
@@ -102,14 +177,20 @@ f3Routes.patch('/:projectId/structured', async (c) => {
 
     if (updateErr) throw new Error(`F3 update failed: ${updateErr.message}`);
 
+    // Persist criteriosAceptacion when provided
+    if (body.criteriosAceptacion && body.criteriosAceptacion.length > 0) {
+      await supabase.updateF3CriteriosAceptacion(projectId, body.criteriosAceptacion);
+    }
+
     // Build F3Artifact for ArtifactVersion
     const modalidadCcm = (body.modalidad ?? existingPn.modalidad_curso ?? existingPn.modalidad ?? 'presencial') as ModalidadCanonica;
     const idiomaCcm = (updatedIdioma) as ISO639LanguageCode;
+    const criterios = body.criteriosAceptacion ?? (f3?.criterios_aceptacion as string[] | null) ?? [];
 
     const f3Artifact: F3Artifact = {
       plataforma: body.plataforma ?? existingPn.plataforma ?? '',
       modalidad: modalidadCcm,
-      criteriosAceptacion: [],
+      criteriosAceptacion: criterios,
       reporteo: [],
       idioma: idiomaCcm,
     };
@@ -153,8 +234,8 @@ f3Routes.patch('/:projectId/structured', async (c) => {
     });
 
     return c.json({
-      ok: true,
-      updatedFields: { plataforma: !!body.plataforma, modalidad: !!body.modalidad, idioma: !!body.idioma },
+      ok: true as const,
+      updatedFields: { plataforma: !!body.plataforma, modalidad: !!body.modalidad, idioma: !!body.idioma, criteriosAceptacion: !!body.criteriosAceptacion },
       certStatus,
     });
   } catch (err) {

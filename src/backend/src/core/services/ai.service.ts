@@ -160,15 +160,25 @@ export class AIService {
       compactContextObj.userInputs = options.userInputs;
     }
 
-    // Dos versiones de compactContext:
-    // - fullContext  → extractor (inputs_from: []) → necesita userInputs para mapear el formulario
-    // - baseContext  → especialistas, jueces → reciben datos vía TRABAJO PREVIO (output del extractor)
-    //                  userInputs sería duplicado e innecesario para ellos
+    // Tres versiones de compactContext:
+    // - fullContext   → extractor (inputs_from: []) → necesita userInputs para mapear el formulario
+    // - baseContext   → especialistas → reciben datos vía TRABAJO PREVIO; en F4 omite userInputs
+    // - judgeContext  → jueces (juez_*) → SOLO necesitan comparar A vs B; el contexto completo
+    //                   del proyecto es ruido (causa timeouts >25min en fases tardías con 72K chars)
     const fullContext = JSON.stringify(compactContextObj);
     const baseContext = isF4DocPipeline ? (() => {
       const { userInputs: _omit, ...rest } = compactContextObj;
       return JSON.stringify(rest);
     })() : fullContext;
+    const judgeContext = (() => {
+      const essentials: Record<string, unknown> = {};
+      for (const key of ['_projectBrief', '_frozen', 'projectName', 'courseName', 'clientName', 'estandarNorma', 'idiomaRequerido']) {
+        if ((compactContextObj as Record<string, unknown>)[key] !== undefined) {
+          essentials[key] = (compactContextObj as Record<string, unknown>)[key];
+        }
+      }
+      return JSON.stringify(essentials);
+    })();
 
     params.compactContext = fullContext; // default; se sobreescribe por paso más abajo
 
@@ -224,9 +234,10 @@ export class AIService {
           .join('\n\n');
 
         // Extractor (inputs_from: []): contexto completo con userInputs
-        // Especialistas y jueces (inputs_from: [prev_agent]): contexto mínimo sin userInputs
-        // — ya tienen los datos mapeados en TRABAJO PREVIO
-        const stepContext = isExtractorStep ? fullContext : baseContext;
+        // Juez (juez_*): contexto mínimo — ya tiene outputs de A y B en TRABAJO PREVIO
+        // Especialistas con inputs previos: baseContext (sin userInputs en F4, full en non-F4)
+        const isJudgeAgent = step.agent.startsWith('juez_');
+        const stepContext = isExtractorStep ? fullContext : (isJudgeAgent ? judgeContext : baseContext);
 
         promptText =
           `TAREA ASIGNADA:\n${step.task ?? ''}\n\n` +
@@ -246,7 +257,7 @@ export class AIService {
         rendered = rendered.replace(/\{\{\s*userInputs\.notas\s*\}\}/g, String(options.userInputs.notas || 'Ninguna'));
       }
 
-      const ctxType = isExtractorStep ? 'full' : (isF4DocPipeline ? 'base(no-userInputs)' : 'full');
+      const ctxType = isExtractorStep ? 'full' : (step.agent.startsWith('juez_') ? 'judge-minimal' : (isF4DocPipeline ? 'base(no-userInputs)' : 'full'));
       console.log(`[PIPELINE] Ejecutando agente: ${step.agent} (Step ${stepIndex + 1}/${totalSteps}) ctx=${ctxType} prompt=${rendered.length}chars`);
 
       let raw = '';
@@ -315,7 +326,7 @@ export class AIService {
             const judgeRetryPrompt =
               `TAREA ASIGNADA:\n${step.task ?? ''}\n\n` +
               `TRABAJO PREVIO:\n${judgeRelevantOutputs}\n\n` +
-              `CONTEXTO:\n${baseContext}\n` +
+              `CONTEXTO:\n${judgeContext}\n` +
               (step.include_template !== false ? `\nPLANTILLA / REGLAS:\n${template}` : '');
             const judgeRetryRendered = this.registry.render(judgeRetryPrompt, params);
             console.log(`[PIPELINE] RETRY juez ${step.agent} (intento ${retries}/${MAX_RETRIES})`);

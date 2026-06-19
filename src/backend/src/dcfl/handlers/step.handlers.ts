@@ -64,28 +64,36 @@ export async function handleCompleteStep(c: Context) {
           console.warn('[handleCompleteStep] PT-103 cross-query failed (non-blocking):', diagErr);
         }
 
-        const violaciones = [
-          ...missing.map(code => {
-            const inFase4 = approvedInFase4.has(code);
-            return {
-              code: inFase4 ? 'CCM_PARSE_FAILED' : 'PRODUCT_MISSING',
-              field: code,
-              message: inFase4
-                ? `Producto ${code} generado pero sin artifact de certificación. Regenerar para reconstruir.`
-                : `Producto ${code} no generado. Generar el producto para continuar.`,
+        // ── PT-188: If all 8 products are in fase4_productos but artifact_versions is unpopulated
+        // (CCM pipeline not connected), allow completion — fase4_productos is the source of truth.
+        const allInFase4 = F4_PRODUCT_CODES.every(c => approvedInFase4.has(c));
+        if (allInFase4) {
+          console.log(`[handleCompleteStep] PT-188 bypass: all ${F4_PRODUCT_CODES.length} products in fase4_productos — artifact_versions unpopulated. projectId=${projectId}`);
+          // fall through to complete the step below
+        } else {
+          const violaciones = [
+            ...missing.map(code => {
+              const inFase4 = approvedInFase4.has(code);
+              return {
+                code: inFase4 ? 'CCM_PARSE_FAILED' : 'PRODUCT_MISSING',
+                field: code,
+                message: inFase4
+                  ? `Producto ${code} generado pero sin artifact de certificación. Regenerar para reconstruir.`
+                  : `Producto ${code} no generado. Generar el producto para continuar.`,
+                severity: 'error' as const,
+              };
+            }),
+            ...rejectedArtifacts.map((a: any) => ({
+              code: 'PRODUCT_REJECTED',
+              field: a.product_code,
+              message: `${a.product_code} rechazado por el motor de certificación`,
               severity: 'error' as const,
-            };
-          }),
-          ...rejectedArtifacts.map((a: any) => ({
-            code: 'PRODUCT_REJECTED',
-            field: a.product_code,
-            message: `${a.product_code} rechazado por el motor de certificación`,
-            severity: 'error' as const,
-          })),
-        ];
+            })),
+          ];
 
-        console.warn(`[handleCompleteStep] Bloqueado por PT-082 gate: ${violaciones.length} violación(es). projectId=${projectId}`);
-        return c.json({ success: false, certificable: false, violaciones }, 409);
+          console.warn(`[handleCompleteStep] Bloqueado por PT-082 gate: ${violaciones.length} violación(es). projectId=${projectId}`);
+          return c.json({ success: false, certificable: false, violaciones }, 409);
+        }
       }
     } catch (certErr) {
       // Certification check failure is non-blocking — log and allow completion

@@ -208,7 +208,7 @@ function appendDateWarning(doc: string, issues: string[]): string {
 
 ---
 
-> ⚠️ **Advertencia de fechas (PT-024.4):**
+> ⚠️ **Advertencia de fechas:**
 ${issues.map(i => `> - ${i}`).join('\n')}
 >
 > *Revisar y corregir las fechas antes de presentar este documento a la entidad certificadora.*
@@ -471,7 +471,7 @@ export async function handleDocumentP8Assembler(context: ProductContext): Promis
       promptTemplateId: 'F4_P8_GENERATE_DOCUMENT',
       promptTemplateVersion: '1.0',
       model: frozen.model ?? 'llama-3.1-8b',
-      generatedBy: 'ensamblador_doc_p8',
+      generatedBy: context.event.body?.userId ?? undefined,
     });
 
     console.log(`[p8-assembler] CCM: ${errorCount === 0 ? 'P8 módulo certificable ✅' : `${errorCount} error(es)`}`);

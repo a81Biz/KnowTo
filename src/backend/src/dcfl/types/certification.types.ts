@@ -245,6 +245,15 @@ export interface CorrectionLog {
   units_affected: Array<{ id: string; old: number; new: number }>;
 }
 
+/** Canonical production spec — injected from _frozen by buildEnrichedContext (PT-151). */
+export interface FrozenProductionSpec {
+  duracion_total_minutos?: number | null;
+  /** Per-module duration from temario_base.tiempos */
+  tiempos_por_modulo?: Array<{ modulo: string; duracion_total_minutos: number }> | null;
+  /** Total units count from temario_base — authoritative for P1 coverage */
+  total_unidades?: number | null;
+}
+
 /**
  * Explicit certification context passed to the engine on every call.
  * Engine is pure (no DB reads inside) — all context is provided by the caller.
@@ -258,6 +267,8 @@ export interface CertificationContext {
   estandarNorma: string | null;
   /** Max allowed absolute weight delta for auto-correction (default 3). */
   roundingThreshold: number;
+  /** PT-152: canonical production spec from _frozen — used by _validateDuration + _validateCoverage. */
+  frozenSpec?: FrozenProductionSpec;
 }
 
 /**

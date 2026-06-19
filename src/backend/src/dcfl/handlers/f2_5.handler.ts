@@ -89,7 +89,7 @@ export async function handleF2_5Assembler(params: {
   const pd = f2_5Payload.produccion_audiovisual || {};
   documentoFinal += `## 3. ESTRUCTURA DE VIDEOS RECOMENDADA\n\n`;
   documentoFinal += `- **Número Total de Videos**: ${pd.numero_total_videos || 0}\n`;
-  documentoFinal += `- **Duración Estimada Total**: ${pd.duracion_minima_minutos || 0} a ${pd.duracion_maxima_minutos || 0} minutos\n`;
+  documentoFinal += `- **Duración Estimada por Video**: ${pd.duracion_minima_minutos || 0} a ${pd.duracion_maxima_minutos || 0} minutos por video\n`;
   documentoFinal += `\n---\n\n`;
 
   if (f2_5Payload.referencias_bibliograficas && f2_5Payload.referencias_bibliograficas.length > 0) {

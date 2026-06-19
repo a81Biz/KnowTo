@@ -201,7 +201,7 @@ export async function handleDocumentP4Assembler(context: ProductContext): Promis
 
 ---
 
-> ⚠️ **Advertencia de bibliografía (PT-024.5):**
+> ⚠️ **Advertencia de bibliografía:**
 ${bibWarnings.map(w => `> - ${w}`).join('\n')}
 >
 > *Validar referencias con SME antes de entregar el manual a candidatos.*

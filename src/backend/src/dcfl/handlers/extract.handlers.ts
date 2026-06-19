@@ -67,12 +67,12 @@ async function runExtractAsync(
       content: result.content,
       parserUsed: result.parserUsed,
       extractedContextId,
-    });
+    }, { projectId: body.projectId });
 
     console.log(`[extract-async] job=${jobId} completado extractorId=${body.extractorId}`);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error(`[extract-async] job=${jobId} FAILED:`, msg);
-    await jobsSvc.failJob(jobId, msg);
+    await jobsSvc.failJob(jobId, msg, { projectId: body.projectId });
   }
 }

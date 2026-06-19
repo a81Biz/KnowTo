@@ -103,8 +103,8 @@ class Step2AnalysisController extends BaseStep {
 
       // ── Objetivos de aprendizaje (Bloom) ──────────────────────────────────
       const todosLosObjetivos = informe?.objetivos_aprendizaje || informe?.objetivos_especificos || [];
-      const objetivos = Array.isArray(todosLosObjetivos) 
-        ? todosLosObjetivos.filter((obj: any) => obj?.tipo && obj.tipo.toLowerCase() !== 'general')
+      const objetivos = Array.isArray(todosLosObjetivos)
+        ? todosLosObjetivos.filter((obj: any) => !obj?.tipo || obj.tipo.toLowerCase() !== 'general')
         : [];
 
       const objContent = this._container.querySelector<HTMLElement>('#objetivos-content');

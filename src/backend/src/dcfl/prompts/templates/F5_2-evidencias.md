@@ -1,135 +1,111 @@
 ---
 id: F5_2
-name: Anexo de Evidencias del Curso
+name: Anexo de Evidencias del Proceso
 version: 2.0.0
-tags: [EC0366, E1221, evidencias, plantillas, documentacion]
+tags: [evidencias, plantillas, documentacion, battle-pattern]
+pipeline_steps:
+
+  # ── ESPECIALISTA A ────────────────────────────────────────────────────────
+  - agent: agente_evidencias_A
+    model: "qwen2.5:14b"
+    inputs_from: []
+    include_template: true
+    task: |
+      Eres un documentador técnico especializado en expedientes de certificación conforme a {{estandarNorma}}.
+      Genera el listado de evidencias requeridas basándote en el contexto del proyecto.
+      Cada evidencia debe tener propósito claro, instrucción de captura específica y nombre de archivo sugerido.
+      REGLA: Las evidencias son PLANTILLAS con instrucciones, NO datos inventados.
+      SALIDA: SOLO JSON válido con la estructura evidencias descrita en la plantilla.
+
+  # ── ESPECIALISTA B ────────────────────────────────────────────────────────
+  - agent: agente_evidencias_B
+    model: "qwen2.5:14b"
+    inputs_from: []
+    include_template: true
+    task: |
+      Eres un coordinador de certificación experto en recopilación de evidencias para {{estandarNorma}}.
+      Genera el listado de evidencias con instrucciones detalladas de captura, adaptadas a la plataforma LMS del proyecto.
+      REGLA: Las evidencias son PLANTILLAS con instrucciones, NO datos inventados.
+      SALIDA: SOLO JSON válido con la estructura evidencias descrita en la plantilla.
+
+  # ── JUEZ ──────────────────────────────────────────────────────────────────
+  - agent: juez_evidencias
+    model: "qwen2.5:14b"
+    inputs_from: [agente_evidencias_A, agente_evidencias_B]
+    include_template: false
+    task: |
+      Compara los dos listados de evidencias (A y B).
+      Selecciona el más completo, con instrucciones más claras y mejor adaptado al contexto del proyecto.
+      DEVUELVE SOLO: {"seleccion":"A","razon":"justificación en una frase"}
+
+  # ── ENSAMBLADOR (TypeScript, sin LLM) ─────────────────────────────────────
+  - agent: ensamblador_f5_2
+    model: null
+    inputs_from: [juez_evidencias]
+    include_template: false
+    task: ""
 ---
 
-Actúa como un documentador técnico especializado en procesos de certificación.
+## CONTEXTO DEL PROYECTO
+{context}
 
-## CONTEXTO ACUMULADO DEL PROYECTO
-{{context}}
+## DATOS DEL USUARIO EN ESTA FASE
+{userInputs}
 
-## DATOS DE ENTRADA DEL USUARIO EN ESTA FASE
-{{userInputs}}
+## ESTRUCTURA JSON REQUERIDA (SALIDA OBLIGATORIA)
 
-## REGLA ABSOLUTA
-Este documento genera PLANTILLAS para ser llenadas por el candidato. NO inventes datos reales, NO rellenes campos con valores ficticios. Cada campo vacío debe llevar instrucciones claras de qué colocar, por qué es necesario y en qué formato.
+Responde SOLO con JSON válido. Sin texto adicional fuera del JSON.
 
-## PROCESO
-1. Para cada evidencia requerida por el estándar de certificación aplicable, genera una plantilla estructurada.
-2. Incluye: propósito de la evidencia, instrucciones de captura, formato de llenado, y criterios de validez.
-3. Si el usuario proporcionó datos reales en `userInputs` (URL del curso, URL de reportes, etc.), úsalos en los campos correspondientes. Los campos sin dato real quedan con la instrucción de llenado.
-4. Genera el documento en el formato obligatorio.
+```json
+{
+  "evidencias": {
+    "lista": [
+      {
+        "numero": 1,
+        "nombre": "Curso publicado en LMS",
+        "proposito": "Demostrar que el curso está activo y accesible en la plataforma",
+        "archivo": "evidencia-1-curso-publicado.png",
+        "instruccion_captura": "Captura de pantalla de la pantalla de inicio del curso con título visible y estado Activo",
+        "formato": "PNG o JPG, mínimo 1280×720 px"
+      },
+      {
+        "numero": 2,
+        "nombre": "Seguimiento y reporteo del LMS",
+        "proposito": "Demostrar que el LMS registra el progreso y actividad de los participantes",
+        "archivo": "evidencia-2-reporteo-lms.png",
+        "instruccion_captura": "Captura del panel de reportes con al menos un participante mostrando progreso",
+        "formato": "PNG o JPG, mínimo 1280×720 px"
+      },
+      {
+        "numero": 3,
+        "nombre": "Resultados de evaluaciones",
+        "proposito": "Demostrar que las evaluaciones funcionan y registran resultados",
+        "archivo": "evidencia-3-resultados-evaluaciones.png",
+        "instruccion_captura": "Captura del reporte de calificaciones en el LMS con datos de participantes de prueba",
+        "formato": "PNG o JPG"
+      },
+      {
+        "numero": 4,
+        "nombre": "Certificados o constancias emitidos",
+        "proposito": "Demostrar que el LMS puede generar comprobantes de finalización",
+        "archivo": "evidencia-4-certificado-ejemplo.pdf",
+        "instruccion_captura": "Ejemplo de una constancia generada durante la prueba piloto (puede ser la del administrador)",
+        "formato": "PDF o PNG"
+      }
+    ],
+    "lista_verificacion": [
+      {"numero": 1, "archivo": "evidencia-1-curso-publicado.png"},
+      {"numero": 2, "archivo": "evidencia-2-reporteo-lms.png"},
+      {"numero": 3, "archivo": "evidencia-3-resultados-evaluaciones.png"},
+      {"numero": 4, "archivo": "evidencia-4-certificado-ejemplo.pdf"}
+    ]
+  }
+}
+```
 
-## FORMATO DE SALIDA OBLIGATORIO
-
-# ANEXO DE EVIDENCIAS — {_frozen.estandar_norma || ESTÁNDAR APLICABLE}
-**Proyecto:** {{projectName}}
-**Candidato:** {{clientName}}
-**Fecha de elaboración:** {{fechaActual}}
-
-> **Instrucciones generales:** Este documento es una plantilla oficial para el expediente de certificación. Cada sección indica qué evidencia recopilar, cómo hacerlo y qué formato usar. Complete cada campo antes de entregar el expediente al organismo certificador.
-
----
-
-## EVIDENCIA 1: CURSO PUBLICADO EN LMS
-
-**Propósito:** Demostrar que el curso está activo y accesible en la plataforma indicada.
-**Elemento de competencia:** Ver estándar aplicable
-
-| Campo | Instrucción | Dato a capturar |
-|:---|:---|:---|
-| URL del curso | Copia la URL completa del curso publicado en tu LMS | [si el usuario proporcionó lmsUrl, usar; si no: escribir URL aquí] |
-| Plataforma LMS | Nombre de la plataforma donde está publicado | [del contexto F3 — plataforma seleccionada] |
-| Fecha de publicación | Fecha en que el curso quedó disponible para alumnos | [DD/MM/AAAA] |
-| Estado del curso | Activo / En prueba / Archivado | [indicar estado actual] |
-
-**Captura de pantalla requerida:**
-- Qué capturar: Pantalla de inicio del curso con título visible y estado "Activo"
-- Cómo: Usa la tecla Impr Pant o la herramienta de captura de tu sistema operativo
-- Formato: PNG o JPG, mínimo 1280×720 px
-- Nombrar el archivo: `evidencia-1-curso-publicado.png`
-
----
-
-## EVIDENCIA 2: SEGUIMIENTO Y REPORTEO DEL LMS
-
-**Propósito:** Demostrar que el LMS registra el progreso y actividad de los participantes.
-**Elemento de competencia:** Ver estándar aplicable
-
-| Campo | Instrucción | Dato a capturar |
-|:---|:---|:---|
-| URL del panel de reportes | Copia la URL del módulo de reportes/estadísticas de tu LMS | [si el usuario proporcionó reportUrl, usar; si no: escribir URL aquí] |
-| Tipo de seguimiento activo | Indica qué estándar de tracking está configurado | [SCORM 1.2 / SCORM 2004 / xAPI — del contexto F3] |
-| Métricas visibles | Lista las métricas que puedes ver en el reporte | Ej: Progreso, Calificación, Tiempo, Último acceso |
-
-**Captura de pantalla requerida:**
-- Qué capturar: Panel de reportes con al menos un participante de prueba mostrando progreso
-- Formato: PNG o JPG, mínimo 1280×720 px
-- Nombrar el archivo: `evidencia-2-reporteo-lms.png`
-
----
-
-## EVIDENCIA 3: RESULTADOS DE EVALUACIONES
-
-**Propósito:** Demostrar que las evaluaciones funcionan y registran resultados.
-**Elemento de competencia:** Ver estándar aplicable
-
-**Instrucción:** Completa esta tabla con los resultados reales de la prueba piloto. Si aún no hay participantes reales, usa los datos de la prueba de usuario de F5.
-
-| Evaluación | Participantes | Promedio obtenido | Aprobados | Reprobados |
-|:---|:---|:---|:---|:---|
-| Diagnóstica | [número de personas que la contestaron] | [promedio en %] | [cantidad] | [cantidad] |
-| Formativa Módulo 1 | [número] | [promedio %] | [cantidad] | [cantidad] |
-| Formativa Módulo 2 | [número, si aplica] | [promedio %] | [cantidad] | [cantidad] |
-| Sumativa (final) | [número] | [promedio %] | [cantidad] | [cantidad] |
-
-**Captura de pantalla requerida:**
-- Qué capturar: Pantalla del LMS mostrando el reporte de calificaciones
-- Formato: PNG o JPG
-- Nombrar el archivo: `evidencia-3-resultados-evaluaciones.png`
-
----
-
-## EVIDENCIA 4: CERTIFICADOS O CONSTANCIAS EMITIDOS
-
-**Propósito:** Demostrar que el LMS puede generar comprobantes de finalización.
-**Elemento de competencia:** Ver estándar aplicable
-
-| Campo | Instrucción | Dato a capturar |
-|:---|:---|:---|
-| ¿Tu LMS genera certificados? | Indica si la plataforma emite constancias automáticas | [Sí / No] |
-| Número de constancias emitidas | Cantidad total de constancias generadas durante la prueba | [número] |
-| Formato del certificado | PDF / Imagen / Badge digital / No aplica | [indicar formato] |
-
-**Si el LMS genera certificados:**
-- Qué capturar: Ejemplo de una constancia generada (puede ser la tuya como administrador)
-- Formato: PDF o PNG
-- Nombrar el archivo: `evidencia-4-certificado-ejemplo.pdf` o `.png`
-
-**Si el LMS NO genera certificados:**
-- Escribe aquí el mecanismo alternativo que usarás para emitir constancias: [describir el proceso]
-
----
-
-## DECLARACIÓN DE AUTENTICIDAD
-
-El candidato certifica que todas las evidencias presentadas son auténticas, corresponden al proceso de desarrollo del curso descrito en este expediente, y fueron generadas durante el proceso de certificación conforme al estándar aplicable.
-
-**Nombre completo:** [clientName del contexto]
-**Firma:** _________________________
-**Fecha de firma:** _________________________
-
----
-
-## LISTA DE VERIFICACIÓN FINAL DE EVIDENCIAS
-
-Antes de entregar el expediente, confirma que tienes cada archivo:
-
-| # | Archivo | ¿Listo? |
-|:---|:---|:---|
-| 1 | `evidencia-1-curso-publicado.png` | ☐ |
-| 2 | `evidencia-2-reporteo-lms.png` | ☐ |
-| 3 | `evidencia-3-resultados-evaluaciones.png` | ☐ |
-| 4 | `evidencia-4-certificado-ejemplo.pdf/.png` | ☐ (si aplica) |
+REGLAS ABSOLUTAS:
+- Las instrucciones de captura deben ser específicas y accionables (qué capturar, cómo, qué mostrar).
+- Adapta evidencias al tipo de plataforma LMS del proyecto si está disponible en el contexto.
+- NO inventes datos reales (URLs, nombres, fechas) — solo instrucciones de qué capturar.
+- Responde SOLO en {{idiomaRequerido}}.
+- OUTPUT SOLO JSON VÁLIDO — sin texto, sin markdown adicional.

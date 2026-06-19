@@ -1,7 +1,6 @@
 import { ProductContext } from './product.types';
 import { parseJsonSafely } from '../../../helpers/json-cleaner';
-import { sanitizeProductDocument } from '../../../helpers/doc-sanitizer.helper';
-import { validateBloomInstrumentAlignment, validateUnitCoverage, validateSemanticAnchor, BloomAlignmentResult } from '../../../helpers/assembler-utils.helper';
+import { enforceCanonicalCoherence, validateBloomInstrumentAlignment, validateUnitCoverage, type BloomAlignmentResult } from '../../../helpers/coherence';
 import { CertificationEngineFactory } from '../../../helpers/certification-engine.factory';
 import { EC0366RulesEngine } from '../../../helpers/ec0366-rules.engine';
 import type {
@@ -32,6 +31,17 @@ function verbToBloomLevel(verb: string): BloomLevel {
   const norm = verb.toLowerCase().trim()
     .replace(/á/g, 'a').replace(/é/g, 'e').replace(/í/g, 'i').replace(/ó/g, 'o').replace(/ú/g, 'u').replace(/ñ/g, 'nh');
   return VERB_BLOOM_LEVEL[norm] ?? 'aplicar';
+}
+
+function normalizarInstrumento(instrumento: string): { valor: string; normalizado: boolean } {
+  // Detecta patrón "X / Y" o "X / Y / Z" y extrae solo el primer elemento.
+  // El LLM a veces combina instrumentos con "/" a pesar de la instrucción INSTRUMENTO_UNICO.
+  const trimmed = instrumento.trim();
+  if (trimmed.includes('/')) {
+    const primero = trimmed.split('/')[0].trim();
+    return { valor: primero, normalizado: true };
+  }
+  return { valor: trimmed, normalizado: false };
 }
 
 function extractReactivosSection(md: string): string {
@@ -152,7 +162,7 @@ function buildCoverageWarning(missingUnits: string[]): string {
 
 ---
 
-> ⚠️ **Advertencia de cobertura (PT-024.3):** Las siguientes unidades del Manual del Participante (P4) no tienen instrumento de evaluación en este documento P1:
+> ⚠️ **Advertencia de cobertura:** Las siguientes unidades del Manual del Participante (P4) no tienen instrumento de evaluación en este documento P1:
 ${missingUnits.map(u => `> - ${u}`).join('\n')}
 >
 > *Revisar con el diseñador instruccional antes de aplicar los instrumentos.*
@@ -258,9 +268,22 @@ export async function handleDocumentP1Assembler(context: ProductContext): Promis
     }
   } catch {}
 
-  const { doc: _p1clean, warnings: _p1sw } = sanitizeProductDocument(documentoMd, 'P1');
-  if (_p1sw.length > 0) console.warn('[p1-assembler] Sanitizer:', _p1sw);
+  let briefDominioP1 = '';
+  let _anchorP1: { valido: boolean; ausentes: string[]; cobertura: number } = { valido: true, ausentes: [], cobertura: 1 };
+  try {
+    const briefP1 = await services.supabase.getProjectBrief(projectId);
+    briefDominioP1 = briefP1?.dominioTecnico ?? '';
+  } catch {}
+
+  const { doc: _p1clean, warnings: _p1sw, anchorValid: _p1anchorValid, anchorCobertura: _p1anchorCob } = enforceCanonicalCoherence(
+    documentoMd, 'P1', {
+      dominioTecnico: briefDominioP1,
+      blockOnAnchorDenylist: true,  // P1 (reactivos) — bloqueante para alucinaciones de dominio
+    },
+  );
   documentoMd = _p1clean;
+  _anchorP1 = { valido: _p1anchorValid, cobertura: _p1anchorCob, ausentes: [] };
+  if (_p1sw.length > 0) console.warn('[p1-assembler] Coherence warnings:', _p1sw);
 
   // Coverage check: warn if any P4 units are not covered in P1 (warn-not-block)
   try {
@@ -269,7 +292,7 @@ export async function handleDocumentP1Assembler(context: ProductContext): Promis
       .select('datos_producto')
       .eq('project_id', projectId)
       .eq('producto', 'P4')
-      .in('validacion_estado', ['valid', 'corrected'])
+      .in('validacion_estado', ['aprobado', 'aprobado_con_errores', 'aprobado_por_fallback'])
       .maybeSingle();
 
     const p4Capitulos: Array<{ nombre: string }> = p4Row?.datos_producto?.capitulos ?? [];
@@ -344,11 +367,22 @@ export async function handleDocumentP1Assembler(context: ProductContext): Promis
     console.warn(`[p1-assembler] ⚠️ ${validacionBloomErrors.length} desalineación(es) Bloom — advertencia (no bloquea el gate)`);
   }
 
-  let _anchorP1: { valido: boolean; ausentes: string[]; cobertura: number } = { valido: true, ausentes: [], cobertura: 1 };
+  // Declared here (before saveF4Produto) so datosProducto.validacion_instrumento_normalizado is accurate.
+  // The CCM block below re-uses this array and may append hint-corrected entries.
+  const instrumentoNormalizaciones: string[] = [];
   try {
-    const briefP1 = await services.supabase.getProjectBrief(projectId);
-    _anchorP1 = validateSemanticAnchor(documentoMd, briefP1?.dominioTecnico ?? '');
-    if (!_anchorP1.valido) console.warn(`[p1-assembler] ⚠ Ancla semántica: cobertura=${_anchorP1.cobertura}, ausentes=${_anchorP1.ausentes.join(', ')}`);
+    const _normModulos: any[] =
+      context.event?.body?.userInputs?.previousData?.temario_base?.temario?.modulos ??
+      context.event?.body?.context?.previousData?.temario_base?.temario?.modulos ?? [];
+    for (const m of _normModulos) {
+      for (const u of m.unidades ?? []) {
+        const raw = String(u.tipo_evaluacion ?? '');
+        const { valor, normalizado } = normalizarInstrumento(raw);
+        if (normalizado) {
+          instrumentoNormalizaciones.push(`"${String(u.nombre ?? '')}": instrumento mixto "${raw}" normalizado a "${valor}"`);
+        }
+      }
+    }
   } catch {}
 
   await services.supabase.saveF4Producto({
@@ -364,6 +398,7 @@ export async function handleDocumentP1Assembler(context: ProductContext): Promis
       validacion_cobertura: _coberturaP1,
       ...(validacionBloomInstrument.length > 0 ? { validacion_bloom_instrument: validacionBloomInstrument } : {}),
       ...(validacionBloomErrors.length > 0 ? { validacion_bloom_errors: validacionBloomErrors } : {}),
+      ...(instrumentoNormalizaciones.length > 0 ? { validacion_instrumento_normalizado: instrumentoNormalizaciones } : {}),
       validacion_anchor: _anchorP1,
     },
   });
@@ -399,7 +434,13 @@ export async function handleDocumentP1Assembler(context: ProductContext): Promis
     const p1UnidadesCcm: UnidadEvaluacion[] = flatUnidades.map((u: any, idx: number) => {
       const unitName = String(u.nombre ?? `Unidad ${idx + 1}`);
       const hint = hintMap.get(unitName.toLowerCase());
-      const instrumento = (hint?.expected_instruments?.[0] ?? String(u.tipo_evaluacion ?? 'Lista de Cotejo')) as TipoInstrumento;
+      const rawInstrumento = hint?.expected_instruments?.[0] ?? String(u.tipo_evaluacion ?? 'Lista de Cotejo');
+      const { valor: instrumento, normalizado } = normalizarInstrumento(rawInstrumento);
+      if (normalizado) {
+        const msg = `"${unitName}": instrumento mixto "${rawInstrumento}" normalizado a "${instrumento}"`;
+        console.warn(`[p1-assembler] PT-110 ${msg}`);
+        instrumentoNormalizaciones.push(msg);
+      }
       if (hint) {
         console.log(`[p1-assembler] PT-105 hint aplicado en "${unitName}": ${u.tipo_evaluacion} → ${instrumento}`);
       }
@@ -407,7 +448,7 @@ export async function handleDocumentP1Assembler(context: ProductContext): Promis
         id: String(u.id ?? `u${idx + 1}`),
         nombre: unitName,
         nivel_bloom: verbToBloomLevel(String((u.objetivo_bloom ?? '').split(/\s+/)[0] ?? '')),
-        instrumento,
+        instrumento: instrumento as TipoInstrumento,
         ponderacion: idx === 0 ? basePond + remainder : basePond,
         reactivos: [],
       };
@@ -483,7 +524,7 @@ export async function handleDocumentP1Assembler(context: ProductContext): Promis
       promptTemplateId: 'F4_P1_GENERATE_DOCUMENT',
       promptTemplateVersion: '1.0',
       model: frozen.model ?? 'llama-3.1-8b',
-      generatedBy: 'ensamblador_doc_p1',
+      generatedBy: context.event.body?.userId ?? undefined,
     });
 
     // If engine auto-corrected rounding, persist a derived corrected version
@@ -506,7 +547,7 @@ export async function handleDocumentP1Assembler(context: ProductContext): Promis
         promptTemplateId: 'F4_P1_GENERATE_DOCUMENT',
         promptTemplateVersion: '1.0',
         model: frozen.model ?? 'llama-3.1-8b',
-        generatedBy: 'ec0366-rules-engine',
+        generatedBy: context.event.body?.userId ?? undefined,
       });
       console.log(`[p1-assembler] CCM: corrección de pesos aplicada → v2 derivada de ${v1.id}`);
     }

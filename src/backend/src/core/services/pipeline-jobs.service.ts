@@ -23,6 +23,7 @@ export interface PipelineJob {
   result?: Record<string, unknown>;
   error?: string;
   userId: string;
+  progress?: { currentStep: string; stepIndex: number; totalSteps: number };
 }
 
 export type JobNotifier = (
@@ -34,6 +35,10 @@ export type JobNotifier = (
     error?: string;
   }
 ) => void;
+
+export interface BroadcastMeta {
+  projectId: string;
+}
 
 // ── Notificador global — se inyecta desde server.dev.ts en desarrollo ──────
 let _notifier: JobNotifier | undefined;
@@ -51,6 +56,8 @@ const _devJobs = new Map<string, PipelineJob>();
 export class PipelineJobsService {
   private readonly isDev: boolean;
   private readonly supabase: SupabaseClient | null;
+  private readonly _supabaseUrl: string;
+  private readonly _serviceKey: string;
 
   constructor(env: Env) {
     this.isDev = env.ENVIRONMENT !== 'production';
@@ -66,6 +73,42 @@ export class PipelineJobsService {
     this.supabase = hasRealSupabase
       ? createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } })
       : null;
+
+    this._supabaseUrl = hasRealSupabase ? url : '';
+    this._serviceKey  = hasRealSupabase ? key  : '';
+  }
+
+  private async _broadcastJobUpdate(
+    jobId: string,
+    status: 'completed' | 'failed' | 'progress',
+    projectId?: string,
+    payload?: { result?: Record<string, unknown>; error?: string; progress?: PipelineJob['progress'] },
+  ): Promise<void> {
+    if (!this._supabaseUrl || !projectId) return;
+    try {
+      const resp = await fetch(`${this._supabaseUrl}/realtime/v1/api/broadcast`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${this._serviceKey}`,
+          'apikey': this._serviceKey,
+        },
+        body: JSON.stringify({
+          messages: [{
+            topic: `project-jobs-${projectId}`,
+            event: 'job_update',
+            payload: { jobId, status, ...payload },
+          }],
+        }),
+      });
+      if (!resp.ok) {
+        console.warn('[broadcast] HTTP', resp.status, 'al notificar job', jobId);
+      } else {
+        console.info('[broadcast] OK job', jobId, 'status', status);
+      }
+    } catch (e) {
+      console.warn('[broadcast] fallo de red al notificar job', jobId, e);
+    }
   }
 
   /** Crea un job en estado 'pending' y devuelve su ID. */
@@ -95,7 +138,7 @@ export class PipelineJobsService {
   }
 
   /** Marca el job como completado y notifica si hay notificador registrado. */
-  async completeJob(jobId: string, result: Record<string, unknown>): Promise<void> {
+  async completeJob(jobId: string, result: Record<string, unknown>, meta?: BroadcastMeta): Promise<void> {
     if (!this.supabase) {
       const job = _devJobs.get(jobId);
       if (!job) return;
@@ -112,8 +155,7 @@ export class PipelineJobsService {
 
     if (error) throw new Error(`completeJob failed: ${error.message}`);
 
-    // Broadcast directo desactivado: se prefiere postgres_changes CDC.
-    // this._broadcastJobUpdate(jobId, { job_id: jobId, status: 'completed', result });
+    void this._broadcastJobUpdate(jobId, 'completed', meta?.projectId, { result });
   }
 
   /** Devuelve el estado actual de un job por su ID. */
@@ -124,7 +166,7 @@ export class PipelineJobsService {
 
     const { data, error } = await this.supabase!
       .from('pipeline_jobs')
-      .select('id, site_id, project_id, step_id, phase_id, prompt_id, status, context, user_inputs, result, error, user_id')
+      .select('id, site_id, project_id, step_id, phase_id, prompt_id, status, context, user_inputs, result, error, user_id, progress')
       .eq('id', jobId)
       .single();
 
@@ -142,6 +184,7 @@ export class PipelineJobsService {
       ...(data.user_inputs ? { userInputs: data.user_inputs as Record<string, unknown> } : {}),
       ...(data.result     ? { result:     data.result     as Record<string, unknown> }   : {}),
       ...(data.error      ? { error:      data.error      as string }                    : {}),
+      ...(data.progress   ? { progress:   data.progress   as PipelineJob['progress'] }  : {}),
     };
   }
 
@@ -227,8 +270,12 @@ export class PipelineJobsService {
     if (error) console.error('[pipeline-jobs] startJob failed:', error.message);
   }
 
-  /** Actualiza el progreso en tiempo real de un job. */
-  async updateJobProgress(jobId: string, progress: { currentStep: string; stepIndex: number; totalSteps: number }): Promise<void> {
+  /** Actualiza el progreso en tiempo real de un job y lo difunde por Realtime. */
+  async updateJobProgress(
+    jobId: string,
+    progress: { currentStep: string; stepIndex: number; totalSteps: number },
+    meta?: BroadcastMeta,
+  ): Promise<void> {
     if (!this.supabase) return;
 
     const { error } = await this.supabase!
@@ -236,7 +283,12 @@ export class PipelineJobsService {
       .update({ progress })
       .eq('id', jobId);
 
-    if (error) console.error(`[pipeline-jobs] fail updating progress for ${jobId}:`, error.message);
+    if (error) {
+      console.error(`[pipeline-jobs] fail updating progress for ${jobId}:`, error.message);
+      return;
+    }
+
+    void this._broadcastJobUpdate(jobId, 'progress', meta?.projectId, { progress });
   }
 
   /**
@@ -335,7 +387,7 @@ export class PipelineJobsService {
   }
 
   /** Marca el job como fallido y notifica si hay notificador registrado. */
-  async failJob(jobId: string, errorMsg: string): Promise<void> {
+  async failJob(jobId: string, errorMsg: string, meta?: BroadcastMeta): Promise<void> {
     if (!this.supabase) {
       const job = _devJobs.get(jobId);
       if (!job) return;
@@ -352,27 +404,6 @@ export class PipelineJobsService {
 
     if (error) throw new Error(`failJob failed: ${error.message}`);
 
-    // this._broadcastJobUpdate(jobId, { job_id: jobId, status: 'failed', error: errorMsg });
+    void this._broadcastJobUpdate(jobId, 'failed', meta?.projectId, { error: errorMsg });
   }
-
-  /*
-  private _broadcastJobUpdate(
-    jobId: string,
-    payload: { job_id: string; status: string; result?: Record<string, unknown>; error?: string },
-  ): void {
-    if (!this.supabase) return;
-
-    const ch = this.supabase.channel(`jobs-${jobId}`);
-
-    // Timeout de seguridad: si subscribe no conecta en 5s, liberar el canal
-    const cleanup = setTimeout(() => { ch.unsubscribe().catch(() => {}); }, 5_000);
-
-    ch.subscribe((status) => {
-      if (status !== 'SUBSCRIBED') return;
-      ch.send({ type: 'broadcast', event: 'job_update', payload })
-        .then(() => { clearTimeout(cleanup); ch.unsubscribe().catch(() => {}); })
-        .catch(() => { clearTimeout(cleanup); ch.unsubscribe().catch(() => {}); });
-    });
-  }
-  */
 }

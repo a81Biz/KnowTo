@@ -23,6 +23,13 @@ export async function handleGetF2_5Recomendaciones(c: Context) {
   return c.json({ success: true, data, timestamp: new Date().toISOString() }, 200 as 200);
 }
 
+export async function handleGetProjectDocuments(c: Context) {
+  const { projectId } = (c.req as any).valid('param');
+  const supabase = new SupabaseService(c.env);
+  const documents = await supabase.getProjectDocuments(projectId);
+  return c.json({ success: true as const, documents, timestamp: new Date().toISOString() }, 200 as 200);
+}
+
 export async function handleGetF3Especificaciones(c: Context) {
   const { projectId } = (c.req as any).valid('param');
   const supabase = new SupabaseService(c.env);

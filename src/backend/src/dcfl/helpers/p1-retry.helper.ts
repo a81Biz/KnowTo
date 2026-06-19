@@ -158,5 +158,5 @@ export async function runP1WithRetry(
   await jobsSvc.completeJob(metaJobId, {
     delegated_to_retry_orchestrator: true,
     max_attempts: maxRetries,
-  });
+  }, { projectId });
 }

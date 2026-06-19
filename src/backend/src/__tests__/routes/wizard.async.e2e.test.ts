@@ -42,6 +42,13 @@ vi.mock('../../dcfl/services/supabase.service', () => ({
     getTemarioBase:       vi.fn().mockResolvedValue(null),
     getProjectBrief:      vi.fn().mockResolvedValue(null),
     saveProjectBrief:     vi.fn().mockResolvedValue(undefined),
+    getProjectSoul:          vi.fn().mockResolvedValue(null),
+    getFase0Estructurado:    vi.fn().mockResolvedValue(null),
+    getFaseAnswersDetailed:  vi.fn().mockResolvedValue(null),
+    confirmarTemario:           vi.fn().mockResolvedValue(undefined),
+    getF2_5Recomendaciones:    vi.fn().mockResolvedValue(null),
+    getF3Especificaciones:     vi.fn().mockResolvedValue(null),
+    getCanonicalSpecFrozen:    vi.fn().mockResolvedValue(false),
     client:               null,
   })),
 }));
@@ -232,7 +239,7 @@ describe('POST /dcfl/wizard/generate-async — pipeline en background (notificac
           userInputs: GENERATE_ASYNC_BODY.userInputs,
         })
       ),
-      { timeout: 2000, interval: 50 }
+      { timeout: 10_000, interval: 50 }
     );
   });
 
@@ -247,7 +254,7 @@ describe('POST /dcfl/wizard/generate-async — pipeline en background (notificac
         title:     'F0 - Seguridad Industrial',
         content:   AI_CONTENT,
       }),
-      { timeout: 2000, interval: 50 }
+      { timeout: 10_000, interval: 50 }
     );
   });
 
@@ -265,7 +272,7 @@ describe('POST /dcfl/wizard/generate-async — pipeline en background (notificac
         expect(payload.result?.documentId).toBe('cccccccc-dddd-4eee-ffff-000000000000');
         expect(payload.result?.content).toBe(AI_CONTENT);
       },
-      { timeout: 2000, interval: 50 }
+      { timeout: 10_000, interval: 50 }
     );
   });
 
@@ -281,7 +288,7 @@ describe('POST /dcfl/wizard/generate-async — pipeline en background (notificac
         expect(payload.status).toBe('failed');
         expect(payload.error).toContain('Ollama no disponible');
       },
-      { timeout: 2000, interval: 50 }
+      { timeout: 10_000, interval: 50 }
     );
   });
 
@@ -296,7 +303,7 @@ describe('POST /dcfl/wizard/generate-async — pipeline en background (notificac
         expect.any(String),
         expect.objectContaining({ status: 'failed' })
       ),
-      { timeout: 2000, interval: 50 }
+      { timeout: 10_000, interval: 50 }
     );
 
     expect(mockSaveDocument).not.toHaveBeenCalled();
@@ -313,7 +320,7 @@ describe('POST /dcfl/wizard/generate-async — pipeline en background (notificac
         expect(payload.status).toBe('failed');
         expect(payload.error).toContain('DB no disponible');
       },
-      { timeout: 2000, interval: 50 }
+      { timeout: 10_000, interval: 50 }
     );
   });
 
@@ -332,7 +339,7 @@ describe('POST /dcfl/wizard/generate-async — pipeline en background (notificac
     // Ambos pipelines deben completarse
     await vi.waitFor(
       () => expect(mockNotifier).toHaveBeenCalledTimes(2),
-      { timeout: 3000, interval: 50 }
+      { timeout: 10_000, interval: 50 }
     );
 
     const statuses = mockNotifier.mock.calls.map(

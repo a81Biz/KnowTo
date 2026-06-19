@@ -187,3 +187,103 @@ describe('AIService — modo producción (Workers AI)', () => {
     fetchSpy.mockRestore();
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+describe('OllamaProvider — paths de error', () => {
+  // OLLAMA_TIMEOUT_MS = 25 * 60 * 1000 (constante de módulo en llm.provider.ts)
+  const TIMEOUT_25_MIN = 25 * 60 * 1000;
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  it('clasifica como "Ollama timeout" cuando el AbortController dispara tras 25 min', async () => {
+    vi.useFakeTimers();
+
+    // fetch que nunca resuelve pero responde al AbortSignal
+    vi.spyOn(globalThis, 'fetch').mockImplementation((_url, opts) => {
+      const signal = (opts as RequestInit)?.signal;
+      return new Promise<Response>((_, reject) => {
+        if (signal?.aborted) {
+          reject(new DOMException('This operation was aborted', 'AbortError'));
+          return;
+        }
+        signal?.addEventListener('abort', () =>
+          reject(new DOMException('This operation was aborted', 'AbortError'))
+        );
+      });
+    });
+
+    const provider = new OllamaProvider('http://ollama:11434', 'qwen2.5:14b');
+    const promise = provider.generate('test prompt');
+
+    // Handler adjuntado ANTES de avanzar timers — evita PromiseRejectionHandledWarning
+    const assertion = expect(promise).rejects.toThrow(/timeout/i);
+    await vi.advanceTimersByTimeAsync(TIMEOUT_25_MIN + 1000);
+    await assertion;
+  });
+
+  it('clasifica ECONNREFUSED como "Ollama no disponible"', async () => {
+    vi.spyOn(globalThis, 'fetch').mockRejectedValue(
+      new TypeError('fetch failed')
+    );
+    const provider = new OllamaProvider('http://ollama:11434', 'qwen2.5:14b');
+    await expect(provider.generate('test')).rejects.toThrow(/no disponible/i);
+  });
+
+  it('reintenta con modelo por defecto cuando Ollama responde 404 y tiene éxito', async () => {
+    let callCount = 0;
+    vi.spyOn(globalThis, 'fetch').mockImplementation(() => {
+      callCount++;
+      if (callCount === 1) {
+        return Promise.resolve(new Response('Not Found', { status: 404 }));
+      }
+      return Promise.resolve(
+        new Response(JSON.stringify({ response: 'respuesta-retry' }), { status: 200 })
+      );
+    });
+
+    // El modelo solicitado es diferente al defaultModel → activa el retry en 404
+    const provider = new OllamaProvider('http://ollama:11434', 'qwen2.5:14b');
+    const result = await provider.generate('test', 'modelo-inexistente:latest');
+
+    expect(result).toBe('respuesta-retry');
+    expect(callCount).toBe(2);
+  });
+
+  it('clasifica timeout del retry con AbortController propio (no reutiliza el primario)', async () => {
+    vi.useFakeTimers();
+    let callCount = 0;
+
+    vi.spyOn(globalThis, 'fetch').mockImplementation((_url, opts) => {
+      callCount++;
+      if (callCount === 1) {
+        // intento primario: 404 resuelve de inmediato
+        return Promise.resolve(new Response('Not Found', { status: 404 }));
+      }
+      // retry: cuelga — responde al AbortSignal del retryController
+      const signal = (opts as RequestInit)?.signal;
+      return new Promise<Response>((_, reject) => {
+        if (signal?.aborted) {
+          reject(new DOMException('This operation was aborted', 'AbortError'));
+          return;
+        }
+        signal?.addEventListener('abort', () =>
+          reject(new DOMException('This operation was aborted', 'AbortError'))
+        );
+      });
+    });
+
+    const provider = new OllamaProvider('http://ollama:11434', 'qwen2.5:14b');
+    const promise = provider.generate('test', 'modelo-inexistente:latest');
+
+    // Handler adjuntado ANTES de avanzar timers — evita PromiseRejectionHandledWarning
+    const assertion = expect(promise).rejects.toThrow(/timeout/i);
+    // advanceTimersByTimeAsync flushea microtasks: procesa el 404, lanza el retry,
+    // registra su AbortController, y luego dispara el timeout del retry
+    await vi.advanceTimersByTimeAsync(TIMEOUT_25_MIN + 1000);
+    await assertion;
+    expect(callCount).toBe(2);
+  });
+});

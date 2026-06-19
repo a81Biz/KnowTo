@@ -452,7 +452,7 @@ export async function handleDocumentP7Assembler(context: ProductContext): Promis
       promptTemplateId: 'F4_P7_GENERATE_DOCUMENT',
       promptTemplateVersion: '1.0',
       model: frozen.model ?? 'llama-3.1-8b',
-      generatedBy: 'ensamblador_doc_p7',
+      generatedBy: context.event.body?.userId ?? undefined,
     });
 
     console.log(`[p7-assembler] CCM: ${errorCount === 0 ? 'P7 tema certificable ✅' : `${errorCount} error(es)`}`);

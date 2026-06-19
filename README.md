@@ -9,7 +9,7 @@ Plataforma de microsites de certificación asistidos por IA. Arquitectura multi-
 | Frontend | TypeScript + Vite + Tailwind CSS (Vanilla TS, sin framework) |
 | Backend | Hono + `@hono/zod-openapi` — Node.js en dev, Cloudflare Workers en prod |
 | IA — producción | Workers AI — `@cf/meta/llama-3.2-3b-instruct` |
-| IA — desarrollo | Ollama local — `llama3.2:3b` (configurable) |
+| IA — desarrollo | Ollama local — `qwen2.5:14b` (configurable) |
 | Base de datos | Supabase self-hosted (PostgreSQL 15 + PostgREST + Realtime + GoTrue + Kong) |
 | Notificaciones async | Supabase Realtime — `postgres_changes` en tabla `pipeline_jobs` (WebSocket, sin polling) |
 | Routing local | Nginx (reverse proxy, único puerto expuesto: 80) |
@@ -44,9 +44,9 @@ docker compose up -d
 | `http://cce.localhost` | Microsite EC0249 (CCE) |
 | `http://api.localhost/docs` | Swagger UI (Scalar) |
 | `http://api.localhost/health` | Health check del API |
-| `http://localhost:54321` | Supabase Kong (API Gateway de Supabase) |
-| `http://localhost:54323` | Supabase Studio (UI de administración de la BD) |
-| `http://localhost:54321/rest/v1/` | PostgREST (API REST automática de la BD) |
+| `http://localhost:54200` | Supabase Kong (API Gateway de Supabase) |
+| `http://localhost:54210` | Supabase Studio (UI de administración de la BD) |
+| `http://localhost:54200/rest/v1/` | PostgREST (API REST automática de la BD) |
 
 El backend tarda ~20 s en estar listo (npm install + arranque de Node.js).
 El stack de Supabase tarda ~30 s en estar completamente operativo.
@@ -115,13 +115,13 @@ Browser
    ├── ollama             :11434
    │
    └── Supabase self-hosted
-       ├── supabase-kong     :54321  (único punto de entrada al stack Supabase)
+       ├── supabase-kong     :54200  (único punto de entrada al stack Supabase)
        ├── supabase-db       :5432   (PostgreSQL 15)
        ├── supabase-rest     :3000   (PostgREST — API REST automática)
        ├── supabase-realtime :4000   (Realtime v2 — WebSocket CDC)
        ├── supabase-auth     :9999   (GoTrue — autenticación JWT)
        ├── supabase-meta     :8080   (Supabase Meta — introspección DB)
-       └── supabase-studio   :54323  (Supabase Studio — UI de administración)
+       └── supabase-studio   :54210  (Supabase Studio — UI de administración)
 ```
 
 **Flujo de notificaciones async (pipeline de documentos):**
@@ -174,7 +174,7 @@ knowto/
 │           ├── services/         # SupabaseService (extiende BaseSupabaseService)
 │           ├── prompts/          # flow-map.yaml + templates/ (F0–F6, F0_CLIENT_QUESTIONS_FORM…)
 │           └── types/            # PromptId, ProjectContext…
-├── backend/src/__tests__/        # Vitest — 247 tests
+├── backend/src/__tests__/        # Vitest — 270 tests
 │   ├── middleware/auth.middleware.test.ts
 │   ├── routes/health.e2e.test.ts
 │   ├── routes/wizard.e2e.test.ts           # Flujo completo DCFL
@@ -311,7 +311,7 @@ En desarrollo             →  acepta cualquier *.localhost
 | `development` | Ollama local | `fetch(OLLAMA_URL/api/generate)` — sin auth |
 | `production` | Workers AI | `env.AI.run('@cf/meta/llama-3.2-3b-instruct')` — binding CF |
 
-El modelo de Ollama es configurable con `OLLAMA_MODEL` (default: `llama3.2:3b`).
+El modelo de Ollama es configurable con `OLLAMA_MODEL` (default: `qwen2.5:14b`).
 
 > **Tiempos esperados en dev (CPU sin GPU):** 60–180 s por documento.
 > En producción con Workers AI: 5–15 s.
@@ -324,7 +324,7 @@ El modelo de Ollama es configurable con `OLLAMA_MODEL` (default: `llama3.2:3b`).
 | Servicio | Desarrollo | Producción |
 |:---|:---|:---|
 | Runtime backend | Node.js (`server.dev.ts`) | Cloudflare Workers (workerd) |
-| IA | Ollama Docker (`llama3.2:3b`) | Workers AI (`llama-3.2-3b-instruct`) |
+| IA | Ollama Docker (`qwen2.5:14b`) | Workers AI (`llama-3.2-3b-instruct`) |
 | Base de datos | Supabase self-hosted (Docker) | Supabase cloud |
 | Notificaciones async | Supabase Realtime self-hosted | Supabase Realtime cloud |
 | Auth | Token literal `dev-local-bypass` | JWT Google OAuth via Supabase |
@@ -336,8 +336,8 @@ El modelo de Ollama es configurable con `OLLAMA_MODEL` (default: `llama3.2:3b`).
 ## Base de datos — Supabase self-hosted
 
 El stack de desarrollo incluye Supabase completo ejecutándose en Docker. El backend usa
-`SUPABASE_URL=http://supabase-kong:54321` y `SUPABASE_SERVICE_ROLE_KEY` para operar con
-`service_role` (sin RLS). El frontend usa `VITE_SUPABASE_URL=http://localhost:54321` y la
+`SUPABASE_URL=http://supabase-kong:54200` y `SUPABASE_SERVICE_ROLE_KEY` para operar con
+`service_role` (sin RLS). El frontend usa `VITE_SUPABASE_URL=http://localhost:54200` y la
 `anon key` para suscribirse a Realtime.
 
 ### Tablas clave
@@ -354,12 +354,12 @@ El stack de desarrollo incluye Supabase completo ejecutándose en Docker. El bac
 
 | Servicio | Puerto (host) | Descripción |
 |:---|:---|:---|
-| Kong (API Gateway) | `54321` | Punto de entrada único; autentica JWTs |
+| Kong (API Gateway) | `54200` | Punto de entrada único; autentica JWTs |
 | PostgreSQL 15 | `5432` | Base de datos; acceso directo con `psql` |
 | PostgREST | `3000` (interno) | REST automático sobre tablas de `public` |
 | Realtime | `4000` (interno) | WebSocket CDC — notifica cambios en `pipeline_jobs` |
 | GoTrue (Auth) | `9999` (interno) | Autenticación JWT |
-| Studio | `54323` | UI de administración — `http://localhost:54323` |
+| Studio | `54210` | UI de administración — `http://localhost:54210` |
 
 ### Migraciones
 
@@ -409,10 +409,10 @@ docker compose up -d
 
 ```bash
 # Health de Kong
-curl http://localhost:54321/rest/v1/ -H "apikey: <SUPABASE_ANON_KEY>"
+curl http://localhost:54200/rest/v1/ -H "apikey: <SUPABASE_ANON_KEY>"
 
 # Listar tabla pipeline_jobs via REST
-curl http://localhost:54321/rest/v1/pipeline_jobs \
+curl http://localhost:54200/rest/v1/pipeline_jobs \
   -H "apikey: <SUPABASE_SERVICE_ROLE_KEY>" \
   -H "Authorization: Bearer <SUPABASE_SERVICE_ROLE_KEY>"
 # → debe devolver [] (array vacío) con status 200
@@ -427,7 +427,7 @@ Las claves para desarrollo están en `.env.example` y son los valores por defect
 
 Studio puede aparecer como `(unhealthy)` en `docker compose ps`. Esto es un bug cosmético en
 Realtime v2 donde el healthcheck interno lanza `Protocol.UndefinedError`. Studio es
-**completamente funcional** en `http://localhost:54323` a pesar del estado reportado.
+**completamente funcional** en `http://localhost:54210` a pesar del estado reportado.
 
 ---
 
@@ -534,9 +534,9 @@ npm run type-check
 ```ini
 ENVIRONMENT=development
 OLLAMA_URL=http://localhost:11434
-OLLAMA_MODEL=llama3.2:3b
-# Supabase self-hosted local (puerto 54321 = Kong)
-SUPABASE_URL=http://localhost:54321
+OLLAMA_MODEL=qwen2.5:14b
+# Supabase self-hosted local (puerto 54200 = Kong)
+SUPABASE_URL=http://localhost:54200
 SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...  # ver .env.example
 SUPABASE_JWT_SECRET=super-secret-jwt-token-with-at-least-32-characters-long
 ```
@@ -552,7 +552,7 @@ En Docker las variables vienen de `docker-compose.yml`; `.dev.vars` se ignora.
 [vars]
 ENVIRONMENT   = "development"
 OLLAMA_URL    = "http://ollama:11434"   # nombre de servicio Docker
-OLLAMA_MODEL  = "llama3.2:3b"
+OLLAMA_MODEL  = "qwen2.5:14b"
 ```
 
 ### Backend — producción (secretos en Cloudflare Dashboard o wrangler)
@@ -653,7 +653,7 @@ curl http://api.localhost/health   # debe devolver {"success":true,...}
 
 ```bash
 # Prerrequisito: Ollama corriendo en el host
-ollama list   # ver modelos; si falta llama3.2:3b → ollama pull llama3.2:3b
+ollama list   # ver modelos; si falta qwen2.5:14b → ollama pull qwen2.5:14b
 
 cd backend
 npm run dev:debug   # Node.js en :8787 + inspector en :9229
@@ -801,7 +801,7 @@ docker compose restart backend
 ```bash
 curl -X POST http://api.localhost/dcfl/test/run-all \
   -H "Content-Type: application/json" \
-  -d '{ "projectId": "625cf334-4fda-470a-924a-661656d2f514" }'
+  -d '{ "projectId": "c5768584-b6d4-4667-ab42-716edc60d0fd" }'
 ```
 
 Retorna `202` inmediatamente. La generación corre en background (2-6 horas con Ollama local).
@@ -840,7 +840,7 @@ curl http://localhost:11434/api/tags
 # Prueba rápida de generación
 curl -X POST http://localhost:11434/api/generate \
   -H "Content-Type: application/json" \
-  -d '{"model":"llama3.2:3b","prompt":"Di hola en español","stream":false}'
+  -d '{"model":"qwen2.5:14b","prompt":"Di hola en español","stream":false}'
 ```
 
 ---
@@ -864,7 +864,7 @@ curl -X POST http://localhost:11434/api/generate \
 | `ENOTFOUND dcfl.localhost` (en logs del contenedor) | `hmr.host` resuelve dentro del contenedor donde no existe | Usar `hmr.clientPort` en vez de `hmr.host` en `vite.config.ts` |
 | Recargas infinitas en el navegador | Windows Docker genera eventos inotify espurios | `server.watch: { usePolling: true, interval: 1000 }` en `vite.config.ts` |
 | `Network connection lost` | workerd bloqueando IPs privadas | Usar `npm run dev` (Node.js), no `npm run dev:wrangler` |
-| `AI generation failed: model not found` | Modelo no descargado | `ollama pull llama3.2:3b` o editar `OLLAMA_MODEL` en `.dev.vars` |
+| `AI generation failed: model not found` | Modelo no descargado | `ollama pull qwen2.5:14b` o editar `OLLAMA_MODEL` en `.dev.vars` |
 | `Cannot attach: port 9229 not open` | Backend aún arrancando | Esperar 15 s y reintentar; `"restart": true` en `launch.json` reintenta solo |
 | `EADDRINUSE 8787` | Otra instancia corriendo | `pkill -f server.dev` o reiniciar Docker |
 | `Unauthorized` | Token incorrecto | Usar exactamente `Bearer dev-local-bypass` |
@@ -874,7 +874,7 @@ curl -X POST http://localhost:11434/api/generate \
 | `PGRST301: JWSInvalidSignature` | JWT firmado con secret diferente al configurado | Asegúrate de que `JWT_SECRET` en `.env` coincide con el usado para generar `SUPABASE_ANON_KEY` |
 | `permission denied for table pipeline_jobs` | `service_role` carece de GRANT a nivel de tabla | Ejecutar `GRANT ALL ON TABLE pipeline_jobs TO service_role;` en psql, o resetear la BD |
 | `Bad key size` en Realtime | `DB_ENC_KEY` no tiene exactamente 16 bytes (AES-128) | El valor en `docker-compose.yml` debe ser exactamente 16 caracteres |
-| Studio `(unhealthy)` en `docker compose ps` | Bug cosmético en Realtime v2.28.x (`Protocol.UndefinedError`) | Ignorar — Studio funciona en `http://localhost:54323`; no afecta WebSocket |
+| Studio `(unhealthy)` en `docker compose ps` | Bug cosmético en Realtime v2.28.x (`Protocol.UndefinedError`) | Ignorar — Studio funciona en `http://localhost:54210`; no afecta WebSocket |
 | Realtime no notifica cambios | `pipeline_jobs` no está en publicación `supabase_realtime` | La publicación se crea al conectar el primer suscriptor; si persiste, revisar RLS policies |
 | WebSocket no conecta | Kong no tiene configuración CORS para WebSocket | Verificar `kong.yml` con `protocols: [ws, wss, http, https]` |
 

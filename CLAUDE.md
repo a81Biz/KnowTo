@@ -2,6 +2,17 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+It has four parts:
+
+1. **Project Reference** — how to run, build and reason about the KnowTo codebase.
+2. **FDGE** — the binding development framework (any code/doc/refactor/investigation work).
+3. **PTSA V3** — the binding audit & certification framework (activated only on explicit trigger).
+4. **FPGE** — the binding prioritization framework that closes the loop `FDGE → PTSA → FPGE → FDGE` (activated only on explicit trigger).
+
+---
+
+# Part 1 — Project Reference
+
 ## Commands
 
 ### Development (Docker — recommended)
@@ -49,8 +60,8 @@ Add to the OS hosts file (`C:\Windows\System32\drivers\etc\hosts` on Windows, ne
 | `http://cce.localhost` | CCE microsite |
 | `http://api.localhost/docs` | Swagger UI (Scalar) |
 | `http://api.localhost/health` | API health check |
-| `http://localhost:54321` | Supabase Kong (API gateway) |
-| `http://localhost:54323` | Supabase Studio |
+| `http://localhost:54200` | Supabase Kong (API gateway) |
+| `http://localhost:54210` | Supabase Studio |
 | `http://localhost:11434` | Ollama (local LLM) |
 
 ---
@@ -107,10 +118,17 @@ All prompts live as `.md` files in `src/backend/src/dcfl/prompts/templates/`. Ea
 
 ### Supabase connectivity (two different URLs)
 - **Backend → Supabase**: connects via `http://supabase-kong:8000` (internal Docker network)
-- **Frontend → Supabase**: connects via `http://localhost:54321` (external, from the browser)
+- **Frontend → Supabase**: connects via `http://localhost:54200` (external, from the browser)
 
 ### DB migrations
 Ordered SQL files in `src/supabase/migrations/` (prefix `NNN_name.sql`). Applied automatically by Docker on first startup via `docker-entrypoint-initdb.d`.
+
+### Docker — backend does NOT use nodemon
+The backend runs with `tsx` directly (no nodemon). **It requires a manual restart to load changes:**
+```bash
+docker compose restart backend
+```
+Changes to `.ts` files are not hot-reloaded.
 
 ---
 
@@ -219,13 +237,75 @@ docker logs knowto-backend 2>&1 | grep -E "p5-assembler|p6-assembler|p7-assemble
 
 **Señal de bug**: assembler no aparece en logs pero el job completa → el nombre del agente en el template no coincide con `productHandlers` en `f4.phase.ts`.
 
-### Docker — backend NO usa nodemon
+---
 
-El backend corre con `tsx` directamente (no nodemon). **Requiere reinicio manual** para cargar cambios:
-```bash
-docker compose restart backend
+## TEMARIO_BASE
+
+Gate obligatorio antes de cualquier producción F4. Si `confirmado_por_usuario === false`, el área de generación de productos queda oculta en `mount()`.
+
+### Tabla BD
+```sql
+temario_base (project_id UNIQUE, temario JSONB, tiempos JSONB,
+              duracion_total_minutos INT, total_unidades INT,
+              confirmado_por_usuario BOOLEAN DEFAULT false, confirmado_at TIMESTAMPTZ)
 ```
-Los cambios en archivos `.ts` no se recargan automáticamente.
+- `temario` = `[{modulo, unidades:[{nombre, objetivo_bloom, duracion_minutos, tipo_evaluacion}]}]`
+- `tiempos` = `[{modulo, duracion_total_minutos, justificacion}]`
+
+### Endpoints
+| Método | URL | Descripción |
+|---|---|---|
+| GET | `/dcfl/api/temario/:projectId` | Devuelve temario o `{confirmado_por_usuario: false}` si no existe |
+| PATCH | `/dcfl/api/temario/:projectId/confirm` | Confirma temario; body opcional: `{ediciones:{temario?,tiempos?}}` |
+
+### Pipeline TEMARIO_BASE
+Prompt: `TEMARIO_BASE.md` — agnóstico, sin referencias a EC0366/CONOCER/SEP.
+
+```
+extractor_temario (TS) → agente_estructura_A + agente_estructura_B → juez_estructura
+                       → agente_tiempos_A + agente_tiempos_B → juez_tiempos
+                       → ensamblador_temario (TS)
+```
+
+**Assembler `ensamblador_temario`** (`temario.phase.ts`):
+- Lee `juez_estructura` y `juez_tiempos` de `pipeline_agent_outputs`.
+- Selecciona ganador, fusiona, valida verbos Bloom prohibidos (Conocer, Entender, Saber, Comprender, Aprender, Familiarizar).
+- Valida aritmética: `sum(duracion_minutos) = duracion_total_minutos`.
+- UPSERT en `temario_base` vía `saveTemarioBase()`.
+
+**Gate en `mount()` (step4.production.ts):**
+- Si `!_temarioConfirmado` → muestra bloque ámbar con botones "Generar Temario" y "Confirmar Temario".
+- `_showGenerateArea()` solo se llama cuando `_temarioConfirmado === true`.
+
+**Gate duro para regeneración** (`document.handlers.ts`): bloquea regeneración de `TEMARIO_BASE` cuando ya existen productos F4 aprobados → devuelve job fallido inmediatamente.
+
+### Archivos clave
+- `src/backend/src/dcfl/prompts/templates/TEMARIO_BASE.md`
+- `src/backend/src/dcfl/handlers/phases/temario.phase.ts`
+- `src/backend/src/dcfl/routes/temario.route.ts`
+- `src/supabase/migrations/038_temario_base.sql`
+
+### Diagnóstico
+```bash
+docker exec knowto-supabase-db psql -U postgres -d postgres \
+  -c "SELECT project_id, total_unidades, confirmado_por_usuario FROM temario_base;"
+```
+
+---
+
+## F7 — Step 11 (Cierre / Resumen Cualitativo)
+
+Genera el resumen cualitativo del proceso de certificación. **Sí invoca LLM.**
+
+- `promptId: 'F7'`, `phaseId: 'F7'` — ver `step11.closing.ts`.
+- `allowManualOverride: false` — el textarea de notas viene del template HTML (`tpl-step9-closing.html`), no de la clase base.
+- Botón `#btn-download-expediente` deshabilitado hasta que `wizardStore.getState().steps[5]?.status === 'completed'` (verificado en `mount()`).
+
+**Post-PT-129:** F7 pasará a Battle Pattern completo (agente_resumen_A + agente_resumen_B → juez_resumen → ensamblador_resumen TS). El ensamblador guardará en la tabla `documents` con `phase = 'F7'`. Hasta entonces opera como single-agent legacy (`{{context}}`).
+
+**Output:** Al finalizar genera un ZIP con todos los documentos del expediente; los 8 productos F4 se obtienen de `fase4_productos` en BD.
+
+---
 
 ## graphify
 
@@ -237,384 +317,488 @@ Rules:
 - For cross-module "how does X relate to Y" questions, prefer `graphify query "<question>"`, `graphify path "<A>" "<B>"`, or `graphify explain "<concept>"` over grep — these traverse the graph's EXTRACTED + INFERRED edges instead of scanning files
 - After modifying code, run `graphify update src/` to keep the graph current (AST-only, no API cost). The graph indexes only `src/` — do not run `graphify update .` as it would re-index docs/PTSA/output.
 
-## Operational Mode: Cascading State Protocol (Strict)
+---
 
-### PHASE 1: Audit & State (SESSION_SUMMARY.md)
-* **Action**: Analyze logs/infra (db-seed, migrations, docker-compose).
-* **Deliverable**: Delta update to `docs/implementation/SESSION_SUMMARY.md`.
-* **STOP**: Wait for User ACK. Do not plan, do not code.
+# Part 2 — FDGE: Evidence-Governed Development Framework (v1.0 Production)
 
-### PHASE 2: Strategy (PLAN_ACTUAL.md)
-* **Action**: Design technical path + Task ID (PT-XXX) from history.
-* **STOP**: Wait for User ACK.
+FDGE is the binding framework for **all development work**: implementation, bug fixing, refactoring, investigation, planning, documentation, and validation. PTSA (Part 3) is a separate, audit-only framework that activates only on explicit trigger; the two do not bypass each other.
 
-### PHASE 3: Registration (PENDING_TASKS.md)
-* **Action**: Atomize plan into numbered tasks.
-* **STOP**: Wait for User ACK.
+## Authority
 
-### PHASE 4: Execution & Cleanup (HISTORY.log + Documentation)
-* **Action**: Execute -> Verify -> Update `HISTORY.log` -> Purge `PENDING_TASKS.md`.
-* **Documentation**: Update `README.md`, `HANDOFF.md`, and run `/graphify src/ --update` ONLY in this phase if architecture changed.
+FDGE is the governing development framework for this repository.
 
-### Strict Rules:
-1. **Delta-Only**: Never rewrite full files; append timestamped sections to save tokens.
-2. **No Chat-Verbose**: Reasoning goes to docs, not chat.
-3. **Infra-First**: Audit `docker-compose.yml` for real service names before any Docker command.
+The canonical, conceptual definition of FDGE lives in `docs/methodology/Framework-FDGE.md`.
+The operational, copy-paste prompts that drive each state live in `docs/implementation/instrucctions.md`.
+This CLAUDE.md section is the binding ruleset. The three must stay consistent;
+`Framework-FDGE.md` is the source of truth for the *method*, this file for the *rules in force*.
 
-# Motor PTSA v4.1 — Agente Autónomo de Auditoría
+All implementation, bug fixing, refactoring, investigation, planning, documentation, and validation activities must follow FDGE.
+
+No alternative workflow may bypass FDGE states.
+
+When uncertainty exists:
+
+1. Consult FDGE documentation (`docs/methodology/Framework-FDGE.md`).
+2. Consult architecture documentation.
+3. Consult PRD.
+4. Consult TRD.
+5. Consult Graphify.
+6. Consult HISTORY.log.
+7. Consult HANDOFF.md.
+
+Documentation is authoritative. Assumptions are not.
+
+## State Model — Mapping
+
+`Framework-FDGE.md` describes the method as fine-grained cognitive states (Estado 0–9).
+This ruleset and `instrucctions.md` group them into the 7 operational STATES below.
+Both views describe the same flow; this is the canonical mapping:
+
+| Framework-FDGE.md (cognitive state) | Operational STATE (this file / instrucctions.md) |
+|:---|:---|
+| Estado 0 — Solicitud | *(entry — implicit)* |
+| Estado 1 — Descubrimiento + Estado 2 — Comprensión Arquitectónica | **STATE 1** — Discovery & Architecture Analysis |
+| Estado 3 — Clasificación + Estado 4 — Estrategia | **STATE 2** — Classification & Strategy |
+| Estado 5 — Atomización | **STATE 3** — Atomic Planning |
+| Estado 6 — Implementación | **STATE 4** — Implementation |
+| Estado 7 — Evidencia | **STATE 5** — Evidence Generation |
+| Estado 8 — Validación | **STATE 6** — Validation Gate |
+| Estado 9 — Persistencia | **STATE 7** — History & Handoff |
+
+Grouping cognitive states into an operational STATE is permitted (it is condensing, not skipping).
+Skipping any cognitive state is forbidden — see "No Phase Collapse".
+
+## Core Principle
+
+The agent must never optimize for speed at the expense of understanding.
+
+The primary objective is: **Understanding → Strategy → Execution → Evidence → Validation**
+
+Not: Request → Code
+
+## Mandatory Expansion Rule
+
+The user's request is never considered a complete specification.
+
+Before planning any solution, the agent must expand the request into a complete operational, technical, and architectural understanding.
+
+Expansion must include when applicable:
+
+* Context
+* Scope
+* Business impact
+* Technical impact
+* Affected users
+* Dependencies
+* Constraints
+* Risks
+* Reproduction steps
+* Expected behavior
+* Actual behavior
+* Existing evidence
+* Missing evidence
+* Affected components
+* Potential root causes
+
+The expanded analysis must contain substantially more detail than the original request.
+
+## Complexity Classification
+
+Every request must be classified before planning.
+
+### TRIVIAL
+
+Examples: typo correction, label update, text replacement, simple CSS adjustment, static content update.
+
+Requirements: Discovery, minimal architecture verification, Implementation, Evidence, History/Handoff.
+
+Strategy and atomization may be condensed.
+
+### STANDARD
+
+Examples: typical bug fixes, CRUD modifications, business rule changes, validation changes.
+
+Requirements: Full FDGE workflow.
+
+### MAJOR
+
+Examples: new modules, new workflows, architectural changes, authentication changes, database redesign, multi-component features.
+
+Requirements: Full FDGE workflow. Mandatory risk analysis. Mandatory regression analysis. Mandatory architecture review.
+
+## Mandatory Knowledge Sources
+
+Before strategy or implementation, the agent must consult all relevant sources:
+
+* Graphify
+* Architecture documentation
+* PRD
+* TRD
+* FDGE documentation
+* HISTORY.log
+* HANDOFF.md
+* Existing implementation
+* Related source code
+
+The agent must never design solutions without first consulting the architecture.
+
+## Cognitive State Pipeline (Strict)
+
+The following states are sequential. No state may be skipped.
+
+No phase collapse is allowed. (For TRIVIAL complexity, states may be condensed into fewer
+blocks with merged ACK gates — condensing is not skipping. See "No Phase Collapse" and
+the "STATE 1-EXPRESS" path in `instrucctions.md`.)
+
+### STATE 1 — Discovery & Architecture Analysis
+
+Artifacts: DISCOVERY.md, CONTEXT_ANALYSIS.md, SESSION_SUMMARY.md
+
+Actions:
+
+1. Generate a new PT-XXX identifier.
+2. Classify complexity.
+3. Expand the request.
+4. Determine: What / Where / When / How / Why (if known).
+5. Document reproduction steps.
+6. Document expected behavior.
+7. Document actual behavior.
+8. Identify affected users.
+9. Identify business impact.
+10. Consult Graphify.
+11. Consult architecture documentation.
+12. Consult PRD and TRD.
+13. Identify: Components / Services / Dependencies / Data flows / Risks / Constraints.
+14. Record actual operational state.
+
+Required Confidence Assessment: Root Cause Confidence (%), Architecture Confidence (%), Solution Confidence (%).
+
+Output: Append entries to DISCOVERY.md, CONTEXT_ANALYSIS.md, SESSION_SUMMARY.md.
+
+STOP. Wait for explicit human ACK.
+
+Forbidden: Solution design, code modification, task execution.
+
+#### Investigation Gate
+
+If any of the following conditions exist:
+
+* Root cause unknown
+* Architecture impact unknown
+* Dependencies unknown
+* Confidence below 70%
+
+The task must immediately be classified as INVESTIGATION.
+
+Implementation planning is forbidden until investigation completes.
+
+### STATE 2 — Classification & Strategy
+
+Artifact: PLAN_ACTUAL.md
+
+Classify as: BUG, FEATURE, REFACTOR, INVESTIGATION.
+
+Design the strategy. Required sections:
+
+* Objective
+* Proposed solution
+* Alternatives considered
+* Alternatives rejected
+* Dependencies
+* Risks
+* Constraints
+* Success criteria
+
+Mandatory Regression Analysis — the strategy must explicitly identify:
+
+* What may break
+* Affected workflows
+* Affected services
+* Affected APIs
+* Affected UI flows
+* Data integrity risks
+
+Mandatory Self-Review — before presenting the strategy:
+
+* Search for contradictions
+* Search for missing dependencies
+* Search for architecture conflicts
+* Search for edge cases
+* Evaluate alternative approaches
+
+The selected strategy must be justified.
+
+Output: Overwrite PLAN_ACTUAL.md.
+
+STOP. Wait for explicit human ACK.
+
+Forbidden: Code modification, task execution.
+
+### STATE 3 — Atomic Planning
+
+Artifact: PENDING_TASKS.md
+
+Convert strategy into atomic tasks. Each task must contain: Objective, Inputs, Outputs, Validation method, Status.
+
+Example:
+
+```
+PT-201.1
+Objective:   Validate endpoint
+Input:       Architecture analysis
+Output:      Confirmed endpoint
+Validation:  Endpoint verified
+Status:      PENDING
+```
+
+Output: Overwrite PENDING_TASKS.md.
+
+STOP. Wait for explicit human ACK.
+
+Forbidden: Code modification.
+
+### STATE 4 — Implementation
+
+Execute only approved tasks. No implementation outside approved scope. No undocumented modifications.
+
+Rule: Before this state, 0 lines of code may be modified.
+
+Outputs (strictly tied to approved PT tasks): source code changes, infrastructure changes, configuration changes.
+
+### STATE 5 — Evidence Generation
+
+Artifact: docs/implementation/evidence/PT-XXX/
+
+Rule: **Code is not evidence. Execution is evidence.** Every implementation must generate evidence.
+
+#### Technical Evidence
+
+Examples: unit tests, integration tests, E2E tests, build validation, logs, coverage reports, database verification, API verification.
+
+#### Functional Evidence
+
+Examples: browser screenshots, before/after screenshots, user flow validation, UI verification, navigation verification, workflow completion.
+
+Output: Store all evidence under `docs/implementation/evidence/PT-XXX/`.
+
+Implementation without evidence is incomplete.
+
+### STATE 6 — Validation Gate
+
+Work type determines closure path.
+
+#### BUG
+
+Required status: VALIDATION_PENDING
+
+Rules: Agent may not close bugs. Agent may not mark bugs CLOSED. Human confirmation is mandatory.
+
+Flow: Implementation → Evidence → VALIDATION_PENDING → Human Validation → CLOSED.
+
+#### FEATURE
+
+May be marked DONE only if: tests pass, evidence exists, documentation updated.
+
+#### REFACTOR
+
+May be marked DONE only if: existing behavior preserved, evidence exists, documentation updated.
+
+#### INVESTIGATION
+
+May be marked CLOSED after findings are documented.
+
+### STATE 7 — History & Handoff
+
+Artifacts: HISTORY.log, HANDOFF.md
+
+Append to HISTORY.log: PT identifier, Type, Status, Objective, Root cause, Solution, Modified files, Evidence location.
+
+Update HANDOFF.md: Current system state, Open bugs, Pending validations, Active investigations, Risks, Recommended next actions.
+
+Rules: HISTORY.log is append-only. Never rewrite history. HANDOFF.md represents current state only.
+
+## Allowed Status Values
+
+PENDING · IN_PROGRESS · BLOCKED · DONE · VALIDATION_PENDING · CLOSED
+
+## Absolute Constraints
+
+### No Solution First
+Never design before understanding.
+
+### No Architecture Blindness
+Never modify code before consulting Graphify, architecture, documentation.
+
+### No Phase Collapse
+Never skip FDGE states. Condensing is not collapsing. For TRIVIAL complexity, several cognitive states may be documented together in one block and their ACK gates merged (see "STATE 1-EXPRESS" in `instrucctions.md`). Every state still happens and is still recorded. Skipping a state — omitting discovery, evidence, validation, or History/Handoff — is always forbidden, regardless of complexity.
+
+### No Memory-Driven Development
+Never act from memory. Always verify.
+
+### No Bug Auto-Close
+Bugs require human validation. The agent has no authority to close bugs.
+
+### No Missing Evidence
+Every implementation must generate evidence. No exceptions.
+
+### No Undocumented Changes
+Every modification must be traceable to PT-XXX, Discovery, Strategy, Tasks, Evidence.
+
+### No Hidden Reasoning
+Strategic reasoning must be materialized in project artifacts. Important decisions must not exist exclusively in chat.
+
+## Framework Compliance Rule
+
+If any FDGE phase is incomplete: STOP. Report the blocking condition. Do not continue until the required phase is completed or the human explicitly authorizes continuation.
+
+## Framework Self-Reference Rule
+
+If uncertainty exists regarding FDGE execution, the agent must consult FDGE documentation, FDGE implementation documentation, and project architecture documentation before proceeding. The framework itself is a valid source of operational truth and may be consulted whenever ambiguity exists.
+
+---
+
+# Part 3 — PTSA V3: Continuous Audit & Certification Framework
+
+PTSA is the binding **audit & certification framework** for this repository. It is independent from FDGE: FDGE governs how code is *built*; PTSA governs how generated *products* are *audited and certified*. PTSA never bypasses FDGE and FDGE never bypasses PTSA.
+
+## Authority
+
+The canonical, normative specification lives in `docs/methodology/PTSA/PTSA-V3-Especificacion-Oficial.md` (the exhaustive standard — definitions, schemas, algorithms, templates).
+The operational agent manual lives in `PTSA/Motor-PTSA.md`; the working protocol in `PTSA/PTSA.md`.
+This CLAUDE.md section is the binding ruleset (rules in force). When detail is missing here, the official specification prevails.
 
 ## Trigger Rule
 
-ONLY activate PTSA mode if the user explicitly invokes one of:
+**ONLY** activate PTSA mode when the user explicitly invokes one of:
 
-* `[START PTSA]`
-* `resume PTSA`
-* `continue PTSA`
-* `status PTSA`
-* `audit PTSA`
+* `[START PTSA]` — start audit from F-1.
+* `resume PTSA` / `continue PTSA` — resume / run Delta Sync.
+* `status PTSA` — report status without modifying artifacts.
+* `audit PTSA` — a discrete audit operation (e.g. close a finding).
 
-Otherwise operate as a normal assistant.
+Otherwise, operate as a normal assistant. PTSA never self-activates.
 
----
+## Purpose
 
-# Propósito
+PTSA does not verify that code runs without errors. It proves, with evidence, that the products the
+system generates are **legally, operationally and semantically valid** for the business domain declared in
+F-1, and computes a System Health Score based exclusively on evidence. The unit of audit is the **product**,
+not the component. If technical execution passes but domain requirements fail, register a D1 finding.
 
-Operar como arquitecto de empresa y auditor forense autónomo usando la metodología PTSA v2.0.
+## Core Principles
 
-El objetivo NO es verificar que el código ejecuta sin errores. El objetivo es probar que el sistema genera outputs que son legal, operativa y semánticamente válidos para el dominio de negocio declarado en F-1, y calcular un Score de Salud del Sistema basado exclusivamente en evidencia.
+* **Evidence over opinion (A1)** — Unsupported claims become findings, never conclusions. No "probably / should / seems".
+* **Product over implementation (A2)** — Audit products, not isolated folders/modules.
+* **Inverse traceability (A3)** — Always start at the product: `Product ← Transformation ← Service ← Rule ← Data Source ← User Action`.
+* **Domain supremacy / Potable-Water Rule (A4)** — Technical correctness never compensates a domain failure. If `D1 < 60`, Health is capped at D1.
+* **Autonomous audit (A5)** — If you have shell/DB/log access, gather evidence yourself; never ask the user to run diagnostics for you.
+* **Auditable immutability (A6)** — Findings are closed, never deleted; evidence is replaced by revisions, never overwritten.
+* **Continuous certification (A7)** — Audit is permanent; every score expires (freshness).
+* **Declared coverage (A8)** — No score is valid without declared coverage and freshness.
 
-Todas las conclusiones deben ser basadas en evidencia. Si la ejecución técnica pasa pero los requisitos de dominio fallan, registrar un hallazgo D1 CRÍTICO.
+## Quality Model (5 dimensions)
 
----
+Every finding belongs to **exactly one** dimension.
 
-# Principios Fundamentales
+| Dim | Evaluates | Phase | Weight |
+|:--:|:--|:--:|:--|
+| **D1 — Domain Alignment** | Business rules, product quality, rubric compliance | F6 | 30% + global cap |
+| **D2 — Architectural Integrity** | Code, security, tech debt, DB integrity | F5 | 30% |
+| **D3 — Observability & Recovery** | Logs, traceability, fallbacks, recovery | F8 | 30% |
+| **D4 — Documentary Fidelity** | Docs ↔ reality coherence | F7 | 10% |
+| **D5 — Operational Reliability** | Stability, drift, reproducibility (Success/Retry/Failure/Hallucination/Drift) | F8 | modulator |
 
-## Evidencia sobre Suposición
+The phase indicates *when* a finding was detected; the dimension indicates *which* score it penalizes. D5 imputes its findings to D2/D3 and feeds Risk + Confidence.
 
-Si documentación, código, configuración, logs, pruebas o comportamiento observable no soportan una afirmación, tratarla como no verificada. Las afirmaciones no verificadas se convierten en hallazgos.
-
-## Productos sobre Componentes
-
-No auditar carpetas o módulos aislados. Auditar productos. Los componentes importan solo en la medida que explican cómo se crea un producto y si preservan la fidelidad al dominio.
-
-## Trazabilidad Inversa
-
-Reconstruir siempre: `Producto ← Transformación ← Servicio ← Regla de Negocio ← Fuente de Datos ← Acción del Usuario`. Siempre empezar desde el producto entregado y moverse hacia atrás.
-
-## Supremacía del Dominio (La Regla del Agua Potable)
-
-El cumplimiento técnico es un prerrequisito, no una validación. Un producto es completamente inválido si su contenido no satisface las rúbricas operativas, estándares profesionales o restricciones taxonómicas del dominio objetivo. Si el Score D1 < 60, el Score Global queda tapado en ese valor.
-
-## Las 4 Dimensiones como Espina Dorsal
-
-Cada hallazgo registrado pertenece a exactamente una dimensión:
-
-| Dimensión | Qué evalúa | Fases principales | Peso |
-|---|---|---|---|
-| **D1 — Alineación de Dominio** | Reglas de negocio, calidad de productos, cumplimiento de rúbricas | F6 | 30% + Multiplicador Global |
-| **D2 — Integridad Arquitectónica** | Código, seguridad, deuda técnica, integridad de BD | F5 | 30% |
-| **D3 — Trazabilidad y Observabilidad** | Logs, fallbacks, trazabilidad de datos, recuperación | F8 | 30% |
-| **D4 — Fidelidad Documental** | Coherencia entre documentación y realidad | F7 | 10% |
-
-Un hallazgo detectado en F5 puede ser D2 o D3 según su naturaleza. La fase indica cuándo se detectó; la dimensión indica qué score afecta.
-
-## Autonomía Real
-
-Si posees acceso a terminal, shell o entorno de ejecución, NUNCA pidas al usuario que ejecute comandos diagnósticos, queries SQL, inspecciones de contenedores o búsquedas de filesystem en tu lugar. Debes ejecutarlos tú mismo, capturar el output y continuar la auditoría. Solo detener si el entorno niega explícitamente el permiso de ejecución.
-
-## Inmutabilidad Auditable
-
-La auditoría es acumulativa. Los archivos de fases y hallazgos usan delta-append (bloques `## Update U-XXX`). RESUMEN.md y ESTADO_ACTUAL.md son excepción: se **sobreescriben** al cierre de cada fase, nunca se les hace append parcial.
-
-## Progresión Autónoma
-
-Proceder automáticamente cuando exista evidencia suficiente y certeza de dominio. Solo detenerse ante una barrera hard del entorno.
-
----
-
-# Estructura de Directorios
+## Scoring (exact formulas)
 
 ```
-PTSA/
-├── PTSA.md                     # Protocolo (fuente de verdad del método)
-├── Motor PTSA.md               # Este archivo — instrucciones operativas del agente
-├── RESUMEN.md                  # Estado global + score parcial (se sobreescribe, no append)
-├── ESTADO_ACTUAL.md            # Puntero granular de seguimiento (se sobreescribe, no append)
-├── RELACIONES.md               # Índice plano cache (hallazgos ↔ evidencias ↔ productos)
-├── AUDIT_LOG.md                # Registro operativo inmutable (solo append)
-├── PENDIENTES.md               # Bloqueantes y preguntas abiertas
-│
-├── Hallazgos/
-│   └── H-XXX.md               # Un archivo por hallazgo
-│
-├── Evidencias/
-│   └── E-XXX.md               # Un archivo por evidencia
-│
-└── Productos/                  # FUENTE DE VERDAD POR PRODUCTO — creado en F3
-    └── P-XXX_Nombre.md        # Un archivo por producto auditable
-│
-└── Fases/
-    ├── F-1_Declaracion_Valor.md
-    ├── F0_Inventario.md
-    ├── F1_Mapa_Sistema.md
-    ├── F2_Alcance.md
-    ├── F3_Productos.md
-    ├── F3_5_Criticidad.md
-    ├── F4_Trazabilidad.md
-    ├── F5_Tecnica.md
-    ├── F6_Funcional.md
-    ├── F7_Documental.md
-    ├── F8_Observabilidad.md
-    ├── F9_Hallazgos.md
-    └── F10_Matriz_Maestra.md
+Score_Dn   = max(0, 100 − Σ penalty(active Dn findings))      # penalty: 30/15/5/1 = CRITICA/ALTA/MEDIA/BAJA
+Health     = (D1×0.30)+(D2×0.30)+(D3×0.30)+(D4×0.10)
+             IF D1 < 60: Health = min(Health, D1)              # Potable-Water Rule — state it explicitly
+Risk_Score = min(100, Risk_bruto × 4)                          # Risk_bruto = Σ (Impact×Probability), each 1–16
+Confidence = coverage×0.40 + freshness×0.25 + evidence_validity×0.20 + autonomy×0.15
 ```
 
-**Regla de Fuente de Verdad:** Los archivos `Productos/P-XXX.md` son la verdad autoritativa de estado de cada producto. `RELACIONES.md` es únicamente un índice cache. Si hay inconsistencia entre ambos, los archivos individuales prevalecen y el agente debe reconstruir `RELACIONES.md` desde los archivos autoritativos.
+Classification: **A** Health ≥ 90 · **B** 75–89 · **C** 60–74 · **F** < 60. `freshness = UNKNOWN` caps at C; D5-red (`health_unstable`) caps at B. Full matrices, thresholds and worked examples: Part III of the official specification.
 
----
-
-# Schemas YAML
-
-## Schema de Fases (Fases/F*.md)
-
-```yaml
----
-ptsa_version: 2.0
-motor_version: 4.1
-fase: F0
-estado: NO_INICIADA # [NO_INICIADA, EN_PROGRESO, BLOQUEADA, COMPLETADA, REQUIERE_REVISION]
-ultima_actualizacion: YYYY-MM-DD
-confidence: 0
----
-```
-
-## Schema de Hallazgos (Hallazgos/H-XXX.md)
-
-```yaml
----
-id: H-001
-estado: ABIERTA # [ABIERTA, CORREGIDA, VERIFICADA, REABIERTA]
-dimension: D1    # [D1, D2, D3, D4] — determina qué score penaliza
-producto_id: P-001 # null si es un problema sistémico
-fase_detectada: F6
-severidad: CRITICA # [BAJA, MEDIA, ALTA, CRITICA]
-penalizacion: 30   # 30/15/5/1 según severidad
-confidence: 95
-evidencias:
-  - E-003
-origen_actualizacion: U-001
----
-```
-
-## Schema de Evidencias (Evidencias/E-XXX.md)
-
-```yaml
----
-id: E-001
-tipo: codigo # [codigo, documentacion, configuracion, log, base_datos, prueba, infraestructura]
-origen: src/services/ai.service.ts
-lineas: 381-385
-capturada: YYYY-MM-DD
-fingerprint: SHA256-estructural # hash del contenido estructural del fragmento
----
-```
-
-## Schema de Productos (Productos/P-XXX.md)
-
-```yaml
----
-producto_id: P-001
-nombre: Marco de Referencia del Cliente
-criticidad: ALTA # [BAJA, MEDIA, ALTA, CRITICA]
-estado: BORRADOR # [BORRADOR, IDENTIFICADO, RECHAZADO_DOMINIO, VALIDADO, REQUIERE_REVISION, RETIRADO]
-dimension_primaria: D1
-confidence: 0
-domain_validation:
-  semantic_drift_detected: false
-  rubric_compliance_score: null  # % 0-100; null hasta que F6 lo evalúe
-  cross_coherence_verified: false
-hallazgos_relacionados: []
----
-```
-
-**Criterio de transición a VALIDADO:** Requiere pasar todas las verificaciones técnicas Y obtener `rubric_compliance_score = 100` (sin drift semántico, sin falla de rúbrica, con coherencia inter-producto verificada).
-
----
-
-# Framework de Dominio — Acid Test (F6)
-
-Esta sección gobierna la Fase F6. Aplica a TODOS los sistemas. La sección de IA es condicional.
-
-## Nivel 1 — Exactitud de Reglas de Negocio
-
-Verificar que los productos cumplan exactamente las reglas del dominio declarado en F-1: cálculos matemáticos, rangos válidos, campos obligatorios, restricciones de formato, criterios de aceptación del cliente.
-
-## Nivel 2 — Cumplimiento Taxonómico y de Rúbrica
-
-Mapear el texto/contenido generado contra las rúbricas formales del dominio. Para sistemas que generan documentos, evaluar: vocabulario correcto del dominio, ausencia de términos prohibidos, estructura requerida, referencias válidas.
-
-## Nivel 3 — Coherencia Inter-Producto
-
-Los productos no existen en aislamiento. El Producto B debe coincidir perfectamente con las premisas establecidas por el Producto A. Si un producto downstream contradice o introduce elementos no declarados en un producto upstream, toda la cadena se marca `REQUIERE_REVISION`.
-
-## Nivel 4 — Guardrails de IA (CONDICIONAL — solo si el sistema usa LLM o generación con IA)
-
-Si el sistema usa modelos de lenguaje, evaluar adicionalmente:
-* Validación de outputs contra rúbricas del dominio (¿existen validadores de dominio efectivos?).
-* Manejo de alucinaciones: ¿hay detectores de contenido hallucinated (URLs inventadas, referencias fuera del dominio, datos sin fuente)?
-* Control de formatos inválidos: JSON malformado del LLM, respuestas en idioma incorrecto (Prompt Bleeding).
-* Guardrails activos: ¿bloquean o solo loguean cuando detectan un problema?
-* Fallback quality: cuando el juez fuerza una selección por timeout o rechazo repetido, ¿qué calidad garantiza el fallback?
-* Trazabilidad de prompts: ¿el sistema registra qué prompt y modelo generó cada output?
-
----
-
-# Mandato de Diagramas
-
-Generar diagramas `mermaid.js` inline en los archivos correspondientes:
-
-* **F1_Mapa_Sistema.md:** Diagrama completo de flujo de requests + mapa de dependencias de módulos.
-* **F5_Tecnica.md:** ERD del schema real verificado con psql o equivalente.
-* **F10_Matriz_Maestra.md:** Diagrama de arquitectura global de alto nivel.
-
-Confrontar cada diagrama con la documentación existente para localizar desviaciones estructurales.
-
----
-
-# Mandatos de BD y Observabilidad
-
-**F5 (Técnica):** Ejecutar comandos de shell para extraer el schema real de la BD. No aceptar archivos de migración como fuente de verdad — verificar el estado real del schema en el motor de BD en ejecución.
-
-**F8 (Observabilidad):** Prohibido asumir que el logging funciona. Ejecutar comandos de shell para leer logs del sistema en vivo (contenedores Docker, archivos de log, procesos en ejecución) y capturar excepciones no manejadas o fallos silenciosos activos.
-
----
-
-# Reglas de Gestión de Estado
-
-Para garantizar idempotencia de lectura, seguir estas reglas sin excepción:
-
-1. **RESUMEN.md** — Sobreescribir completo al cerrar cada fase. Nunca hacer append parcial. Es la vista ejecutiva del estado actual.
-2. **ESTADO_ACTUAL.md** — Sobreescribir completo cada vez que cambia el puntero de seguimiento. Es un puntero, no un log.
-3. **AUDIT_LOG.md** — Solo append. Registro inmutable de operaciones.
-4. **Fases/F*.md** — Delta-append con bloques `## Update U-XXX \n Timestamp: YYYY-MM-DD HH:MM`.
-5. **Hallazgos/H-XXX.md** — Si un hallazgo cambia de severidad o estado, agregar un bloque `## Revisión` al final del archivo. No sobreescribir el hallazgo original.
-6. **Productos/P-XXX.md** — Sobreescribir el frontmatter YAML cuando el estado cambia. El cuerpo del documento usa append.
-7. **RELACIONES.md** — Sobreescribir completo cuando se reconstruye. Es un cache, no un log.
-
-**Nunca duplicar filas en tablas de RESUMEN.md.** Si una fase cambia de estado, actualizar la fila existente, no agregar una nueva.
-
----
-
-# Loop de Ejecución Autónoma
+## Phases (15)
 
 ```
-[Paso 1: Resume & Sync]
-       ↓ Leer RESUMEN.md, ESTADO_ACTUAL.md, RELACIONES.md, PENDIENTES.md
-
-[Paso 2: Investigar & Ejecutar Shell Nativo]
-       ↓ Extraer código, logs en vivo, datos de BD directamente vía terminal
-
-[Paso 3: Registrar Evidencia Factual]
-       ↓ Crear E-XXX.md con origen, líneas, fingerprint estructural
-
-[Paso 4: Ejecutar Domain Acid Tests (F6)]
-       ↓ Validar D1: Drift semántico, rúbricas, coherencia inter-producto
-       ↓ Si usa IA: ejecutar también Nivel 4 (guardrails)
-
-[Paso 5: Registrar Hallazgos con Dimensión]
-       ↓ Crear H-XXX.md con dimension: D1/D2/D3/D4 y penalizacion calculada
-
-[Paso 6: Aplicar Delta Updates Secuenciales]
-       ↓ Append a archivos de fase: ## Update U-XXX \n Timestamp: YYYY-MM-DD HH:MM
-
-[Paso 7: Actualizar Estado y Auto-Avanzar]
-       ↓ Sobreescribir RESUMEN.md y ESTADO_ACTUAL.md
-       ↓ La fase avanza a COMPLETADA cuando phase_confidence >= 90 o fuentes agotadas
+F-1 Declaración de Valor → F0 Inventario → F1 Mapa del Sistema → F2 Alcance →
+F3 Productos → F3.5 Criticidad → F4 Trazabilidad (CENTRAL MILESTONE) →
+{ F5 Técnica · F6 Domain Acid Test · F7 Documental · F8 Observabilidad } →
+F9 Consolidación → F10 Matriz Ejecutiva → F11 Certificación Continua → F12 Gobernanza de Dominio
 ```
 
-**Regla de Confidence de Fase:** `phase_confidence` se calcula como el MÍNIMO de `confidence` entre todos los hallazgos activos/no resueltos creados durante esa fase. Los archivos de evidencia no participan en el cálculo.
+* **F4 is the central milestone** — F5/F6/F7/F8 cannot start until F4 is 100% complete for every identified product.
+* **F3** must create `PTSA/Productos/P-XXX.md` (BORRADOR) per product, or F3 cannot close.
+* **F5** verifies the REAL DB schema via shell (not migrations) + ERD. **F8** reads live logs (never assumes logging works).
+* **F6 (Domain Acid Test)** evaluates the REAL semantic output of each product against F-1 rules/rubric — not unit tests. Levels: (1) business rules, (2) taxonomy/rubric → `rubric_compliance_score`, (3) inter-product coherence, (4) AI guardrails (only if it uses an LLM).
+* **F11/F12** (new in V3) govern freshness, `audit_due`, delta sync (`audit-scope.yaml`), CI checkpoints (D2/D3/D5), and versioned evolution of domain rules (Domain Rules as Code).
+
+## Operating Rules (binding)
+
+* **Autonomy is real** — with shell/DB/log access, run diagnostics yourself; capture output; continue.
+* **Materialize reasoning** — every conclusion lives in a `PTSA/` artifact, not only in chat.
+* **Evidence before conclusion** — capture `E-XXX.md` (with origin, lines, structural fingerprint) first.
+* **Verify in the real source** — derive states/scores from direct observation (DB/output/logs), never inference or memory.
+* **Never auto-close BUG/DOMAIN findings** — take them to CORREGIDA/VERIFICADA/VALIDATION_PENDING and stop; human validates and closes.
+* **Never overwrite** findings or evidence (use revisions/append); **never duplicate rows** in RESUMEN.md.
+* **A product reaches VALIDADO** only with post-fix evidence observed in the real source (e.g. `validacion_estado='aprobado'` in DB), never by inference.
+
+## State management of audit files
+
+`RESUMEN.md` and `ESTADO_ACTUAL.md` → overwrite fully on each phase/sync close. `AUDIT_LOG.md` → append-only. `Fases/F*.md` → delta-append `## Update U-XXX` + timestamp. `Hallazgos/H-XXX.md` → frontmatter updatable, body append (`## Revisión`). `Productos/P-XXX.md` → frontmatter overwritable on state change, body append. `RELACIONES.md` → cache, rebuilt by overwrite (individual files prevail). `score-history.json` → append one record per emission.
+
+## Halt conditions
+
+Stop and report a blocking state ONLY if: (1) the environment explicitly denies shell/execution permissions; (2) access credentials/parameters cannot be resolved from local files; (3) the user issued an explicit manual breakpoint. On halt: record blockers in `PENDIENTES.md`, set `BLOQUEADA`, append to `AUDIT_LOG.md`, show a hard-stop report.
+
+For the full operating manual (loop, per-phase mandates, official prompts) see `PTSA/Motor-PTSA.md`. For the complete normative standard see `docs/methodology/PTSA/PTSA-V3-Especificacion-Oficial.md`.
 
 ---
 
-# Acciones Obligatorias por Fase
+# Part 4 — FPGE: Priorización Gobernada por Evidencia
 
-## En F3 (Identificación de Productos)
+FPGE is the binding **prioritization framework** that closes the loop `FDGE (build) → PTSA (audit) → FPGE (prioritize) → FDGE (build next)`. It answers the question the other two leave ungoverned: **what should we build next, and why?** It does not decide *how* to build (FDGE) or *whether* a product is valid (PTSA) — it decides which work, justified by evidence, enters the next development cycle.
 
-Crear el directorio `PTSA/Productos/` y generar un archivo `P-XXX_Nombre.md` para cada producto identificado. El estado inicial es `BORRADOR`. Sin esta acción, F3 no puede marcarse `COMPLETADA`.
+## Authority
 
-## En F9 (Consolidación de Hallazgos)
+The canonical method lives in `docs/methodology/Framework-FPGE.md`; the operational implementation in `docs/methodology/FPGE-Implementation.md`. This CLAUDE.md section is the binding ruleset (rules in force). When detail is missing here, the framework documents prevail.
 
-Calcular el puntaje parcial de cada dimensión aplicando la tabla de penalizaciones a todos los hallazgos registrados. Documentar en F9:
+## Trigger Rule
+
+**ONLY** activate FPGE mode when the user explicitly invokes one of:
+
+* `[START FPGE]` / `roadmap FPGE` / `prioritize FPGE` — full run: read evidence, synthesize, prioritize, emit `ROADMAP.md`, then stop.
+* `promote FPGE R-XXX` — promote an approved roadmap item to FDGE STATE 1 with a new PT-XXX.
+* `status FPGE` — report the current roadmap without recomputing.
+
+Otherwise, operate as a normal assistant. FPGE never self-activates.
+
+## Core Principles
+
+* **Evidence-governed prioritization** — every proposed item must cite its origin evidence (`H-XXX`, a `HISTORY.log` entry, a `HANDOFF.md` recommendation, a `score-history.json` trend). No evidence → not a candidate.
+* **Framework independence (no merge)** — FPGE is **read-only** over FDGE and PTSA artifacts; it writes only its own `ROADMAP.md` and `ROADMAP_HISTORY.log`. It never modifies FDGE or PTSA files.
+* **Inherited domain supremacy** — D1 (domain) items outrank D2/D3/D4 at equal priority (Potable-Water Rule, via a 1.5× domain multiplier).
+* **Human gate** — FPGE *proposes*; the human *disposes*. It never starts FDGE itself nor auto-converts findings to tasks. Promotion of `R-XXX → PT-XXX` is a human decision (consistent with FDGE's ACK discipline and PTSA's no-auto-close).
+* **Reproducibility** — same evidence ⇒ same priority order (deterministic algorithm).
+* **Freshness gate** — if PTSA `score_freshness` is STALE/UNKNOWN, recommend a PTSA delta sync *before* trusting the order.
+
+## Inputs (read-only) and output
+
+Reads — PTSA: `RESUMEN.md`, active `Hallazgos/H-XXX.md`, `Productos/P-XXX.md`, `PENDIENTES.md`, `score-history.json`. FDGE: `HISTORY.log`, `HANDOFF.md`, in-flight `PLAN_ACTUAL.md`/`PENDING_TASKS.md`. Optional: graphify, git history.
+
+Writes — only `docs/implementation/ROADMAP.md` (overwritten each run) and `docs/implementation/ROADMAP_HISTORY.log` (append-only).
+
+## Prioritization (reproducible)
 
 ```
-Score_D1_Parcial = 100 − Σ(penalizaciones hallazgos D1)
-Score_D2_Parcial = 100 − Σ(penalizaciones hallazgos D2)
-Score_D3_Parcial = 100 − Σ(penalizaciones hallazgos D3)
-Score_D4_Parcial = 100 − Σ(penalizaciones hallazgos D4)
+Priority(item) = (EvidenceWeight × ScoreImpact × Urgency × DomainMultiplier) / Effort
 ```
+EvidenceWeight = originating finding's PTSA risk (Impact×Probability, 1–16) · ScoreImpact = expected Health gain · Urgency = 1.0 (+0.5 if `audit_due` overdue, +0.5 if the dimension is STALE/regressing) · DomainMultiplier = 1.5 for D1 else 1.0 · Effort = 1/2/4 (S/M/L). Tie-breakers: higher Priority → D1 before D2/D3/D4 → higher risk-of-not-doing → lower id. The roadmap must surface the **Top-3 by impact** and the **Top-3 quick wins**.
 
-## En F10 (Matriz Maestra)
+## Closing the loop
 
-**Calcular y publicar el Score Global** siguiendo la fórmula exacta:
-
-```
-Score_Global_Calculado = (Score_D1 × 0.30) + (Score_D2 × 0.30) + (Score_D3 × 0.30) + (Score_D4 × 0.10)
-
-SI Score_D1 < 60: Score_Global = mín(Score_Global_Calculado, Score_D1)
-EN CASO CONTRARIO: Score_Global = Score_Global_Calculado
-```
-
-Publicar en F10 y en RESUMEN.md:
-* Score por dimensión (D1 / D2 / D3 / D4)
-* Score Global calculado
-* Clasificación ejecutiva (A / B / C / F)
-* Si aplica la Regla del Multiplicador Global, indicarlo explícitamente
-
----
-
-# Reglas de Dependencia entre Fases
-
-F4 es el hito operativo central. Las fases F5, F6, F7 y F8 no pueden inicializarse hasta que F4 esté 100% completa para todos los productos identificados.
-
-**Criterio de compleción de F4:** Cada producto identificado debe contener al menos una cadena completa e ininterrumpida: `Producto ← Transformación ← Servicio ← Regla ← Fuente de Datos`.
-
-**Regla de F6:** No depender de pruebas unitarias para validar la exactitud del producto. Extraer y evaluar el output semántico real contra las reglas del dominio o estándares del mundo real establecidos en F-1.
-
----
-
-# Mandato F10 — Dossier Ejecutivo
-
-`Fases/F10_Matriz_Maestra.md` debe ser un documento standalone diseñado para stakeholders ejecutivos. Prohibido incluir snippets de código raw. Debe incluir obligatoriamente:
-
-1. **Blueprint de Tech Stack e Infraestructura:** Tabla categorizada de runtimes, frameworks, motor de BD, límites de deployment.
-2. **Matriz de Patrones de Diseño Sistémicos:** Definición de los patrones de ingeniería de software utilizados con evaluación de implementación.
-3. **Diagrama del Ecosistema Global:** Mapa de arquitectura de alto nivel en Mermaid.js.
-4. **Matriz de Auditoría Comprehensiva:** Tabla maestra: `ID Producto | Título | Estado D1 | Estado D2 | Hallazgos | Impacto de Negocio`.
-5. **Score de Salud del Sistema:** Puntaje por dimensión + Score Global + Clasificación ejecutiva + Roadmap de correcciones priorizadas.
-
----
-
-# Condiciones de Halt
-
-Solo detener y reportar estado bloqueante al usuario si:
-
-1. El entorno niega explícitamente permisos de shell/ejecución para queries o evaluaciones de contenedores.
-2. Faltan claves de red encriptadas o parámetros de acceso a producción que no pueden resolverse desde archivos locales.
-3. El usuario emitió explícitamente una instrucción de breakpoint manual.
-
-Al detenerse: registrar parámetros bloqueantes en `PENDIENTES.md`, establecer estado `BLOQUEADA`, registrar en `AUDIT_LOG.md`, mostrar un reporte de hard stop.
-
----
-
-# Criterio de Compleción de la Auditoría
-
-Una auditoría es completa solo cuando:
-
-1. Todos los productos tienen archivo `Productos/P-XXX.md` con estado final (VALIDADO o RECHAZADO_DOMINIO o REQUIERE_REVISION — nunca BORRADOR al cierre).
-2. Todos los productos tienen cadena de trazabilidad completa.
-3. Toda evidencia está catalogada con origen y fingerprint.
-4. Todas las validaciones de dominio pasan o están explícitamente registradas como hallazgos con severidad y dimensión.
-5. `F10_Matriz_Maestra.md` está completo incluyendo el Score Global calculado.
-6. `RESUMEN.md` refleja un estado consistente con todos los archivos de fase (sin filas duplicadas, sin estados contradictorios).
-
-Solo entonces puede escribirse `auditoria_estado: COMPLETADA` en `RESUMEN.md`.
+A full run ends by emitting `ROADMAP.md` (all items `PROPUESTO`) and stopping. The human marks items `APROBADO`/`DIFERIDO`/`DESCARTADO`; each `APROBADO` is promoted (`promote FPGE R-XXX`) to a new `PT-XXX` handed to **FDGE STATE 1**, using the item's origin evidence as initial context. FDGE runs its normal cycle; PTSA re-audits the result on its next delta sync; the next FPGE run sees the new state and re-orders. For the full method, algorithm detail and the three-way contract with FDGE/PTSA see `docs/methodology/Framework-FPGE.md`.

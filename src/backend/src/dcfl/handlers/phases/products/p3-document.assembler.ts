@@ -589,7 +589,7 @@ export async function handleDocumentP3Assembler(context: ProductContext): Promis
       promptTemplateId: 'F4_P3_GENERATE_DOCUMENT',
       promptTemplateVersion: '1.0',
       model: frozen.model ?? 'llama-3.1-8b',
-      generatedBy: 'ensamblador_doc_p3',
+      generatedBy: context.event.body?.userId ?? undefined,
     });
 
     console.log(`[p3-assembler] CCM: ${errorCount === 0 ? 'P3 módulo certificable ✅' : `${errorCount} error(es)`}`);

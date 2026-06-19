@@ -108,12 +108,24 @@ class Step11ClosingController extends BaseStep {
         .trim()
         .replace(/\s+/g, '_');
 
+      // Fallback desde BD: recupera documentos para pasos cuyo store está vacío (recarga de página)
+      let docsByPhase: Record<string, string> = {};
+      try {
+        const docsRes = await getData<{ documents: Array<{ phaseId: string; content: string }> }>(
+          buildEndpoint(ENDPOINTS.wizard.documents(projectId)),
+        );
+        for (const d of docsRes.data?.documents ?? []) {
+          docsByPhase[d.phaseId] = d.content;
+        }
+      } catch { /* ZIP parcial — no bloquear la descarga */ }
+
       // Paso a paso (excluye step 5 — se añade por separado como productos individuales)
       for (const step of state.steps) {
         if (step.stepNumber === 5) continue;
-        if (!step.documentContent) continue;
+        const content = step.documentContent ?? docsByPhase[step.phaseId];
+        if (!content) continue;
         const filename = STEP_FILENAMES[step.stepNumber];
-        if (filename) zip.addFile(filename, step.documentContent);
+        if (filename) zip.addFile(filename, content);
       }
 
       // Fase 4: productos individuales desde BD

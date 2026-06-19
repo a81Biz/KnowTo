@@ -156,15 +156,56 @@ export function validateMaterialsByModule(
 // ── Semantic Anchor Validation ────────────────────────────────────────────
 
 /**
+ * Obvious off-domain hallucination patterns — catch cases where the LLM generated
+ * art/history/generic content instead of course-specific technical content.
+ * These patterns are checked regardless of keyword coverage threshold.
+ */
+const DOMAIN_HALLUCINATION_DENYLIST: RegExp[] = [
+  /miniatura\s+pintada/gi,
+  /\b(?:óleos?|acuarela|pincel|lienzo|paleta\s+de\s+colores?)\b/gi,
+  /\b(?:cuadro\s+famoso|obra\s+de\s+arte|museo\s+del\s+prado|galería\s+de\s+arte)\b/gi,
+  /siglo\s+(?:xvi|xvii|xviii|xix)\b.*curso/gi,      // historical century ref in course context
+  /lorem\s+ipsum/gi,
+  /\[nombre\s+del\s+(?:curso|instructor|empresa)\]/gi,
+];
+
+/**
  * Validates that a product document reflects ≥60% of keywords from dominioTecnico.
  * Keywords: words ≥4 chars extracted from the domain string.
- * Warn-not-fail: valido=false only when coverage is below threshold.
+ * Warn-not-fail by default; use `options.blockOnDenylistHit = true` (P1/P5) to treat
+ * obvious hallucinations as blocking errors.
  */
 export function validateSemanticAnchor(
   documentoMd: string,
   dominioTecnico: string,
-): { valido: boolean; ausentes: string[]; cobertura: number } {
+  options?: { blockOnDenylistHit?: boolean },
+): { valido: boolean; ausentes: string[]; cobertura: number; denylistHit?: string } {
   if (!dominioTecnico || !dominioTecnico.trim()) return { valido: true, ausentes: [], cobertura: 1 };
+
+  // Check denylist before keyword coverage (fast path for obvious hallucinations)
+  for (const pattern of DOMAIN_HALLUCINATION_DENYLIST) {
+    const match = documentoMd.match(pattern);
+    if (match) {
+      const hit = match[0];
+      if (options?.blockOnDenylistHit) {
+        return { valido: false, ausentes: [], cobertura: 0, denylistHit: hit };
+      }
+      // Warn-only: set valido=false but still compute coverage
+      const keywords = dominioTecnico
+        .toLowerCase()
+        .split(/[\s,;/()]+/)
+        .map(w => w.replace(/[^a-záéíóúüñ]/gi, '').trim())
+        .filter(w => w.length >= 4);
+      const unique = [...new Set(keywords)];
+      const docLower = documentoMd.toLowerCase();
+      const ausentes = unique.filter(kw => !docLower.includes(kw));
+      const cobertura = unique.length > 0
+        ? Math.round(((unique.length - ausentes.length) / unique.length) * 100) / 100
+        : 1;
+      return { valido: false, ausentes, cobertura, denylistHit: hit };
+    }
+  }
+
   const keywords = dominioTecnico
     .toLowerCase()
     .split(/[\s,;/()]+/)

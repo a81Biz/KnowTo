@@ -13,6 +13,7 @@ import {
   routeGetF2_5Recomendaciones,
   routeGetF3Especificaciones,
   routeGetF4Productos,
+  routeGetProjectDocuments,
   routeGetF0Context,
   routeGetPhaseQuestions,
   routePostPhaseAnswers,
@@ -35,6 +36,7 @@ import {
   handleGetF2Analisis,
   handleGetF2_5Recomendaciones,
   handleGetF3Especificaciones,
+  handleGetProjectDocuments,
 } from '../handlers/phase.handlers';
 
 import {
@@ -102,6 +104,9 @@ wizard.openapi(routeGetF2Resolucion, handleGetF2Resolucion);
 
 // Productos F4
 wizard.openapi(routeGetF4Productos, handleGetF4Productos);
+
+// Documentos del proyecto (fallback para expediente ZIP)
+wizard.openapi(routeGetProjectDocuments, handleGetProjectDocuments);
 
 // F0 contexto
 wizard.openapi(routeGetF0Context, handleGetF0Context);

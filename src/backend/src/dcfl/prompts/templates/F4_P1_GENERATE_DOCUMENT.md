@@ -61,15 +61,21 @@ pipeline_steps:
       RESTRICCIONES_OBLIGATORIAS (verifica ANTES de escribir cualquier línea):
       - IDIOMA: Escribe EXCLUSIVAMENTE en {_frozen.idioma_requerido ?? 'español'}. PROHIBIDO mezclar idiomas.
       - MODALIDAD: Refleja la modalidad "{_frozen.modalidad_canonica ?? 'presencial'}". Usa vocabulario apropiado.
-      - TABLA_BLOOM_INSTRUMENTO válido por EC0366:
-        | Nivel Bloom            | Instrumento EC0366 válido                          |
+      - TABLA_BLOOM_INSTRUMENTO:
+        | Nivel Bloom            | Instrumento válido                                 |
         |------------------------|----------------------------------------------------|
         | Recordar / Comprender  | Cuestionario (Examen Escrito)                      |
         | Aplicar / Analizar     | Guía de Observación / Lista de Cotejo              |
         | Evaluar / Crear        | Rúbrica / Portafolio de Evidencias / Proyecto      |
         PROHIBIDO asignar instrumento de nivel inferior al nivel Bloom declarado.
       - PONDERACION_SUM: sum(ponderacion de TODAS las unidades) = 100 exactamente. Ajusta la última si es necesario.
+      - INSTRUMENTO_UNICO: Cada unidad de competencia tiene EXACTAMENTE UN tipo de instrumento. PROHIBIDO usar "/" para combinar tipos (ej: "Lista de Cotejo / Guía de Observación" es INVÁLIDO). ELEGIR el instrumento con mayor evidencia observable según el nivel Bloom declarado de la unidad.
       - NO_PLACEHOLDERS: PROHIBIDO {{variable}}, [PENDIENTE], [INSERTAR], TBD en cualquier campo.
+      - VOCABULARIO_MEDIBLE (MANDATORY): En cada reactivo usa EXCLUSIVAMENTE verbos de acción observable.
+        PERMITIDOS: Identifica, Describe, Aplica, Analiza, Evalúa, Crea, Demuestra, Calcula, Compara, Ejecuta, Produce, Selecciona, Verifica, Registra, Muestra (sólo con acción física concreta).
+        PROHIBIDO en reactivos: adecuado, correcto, correctamente, bien, efectivo, apropiado, notable, mejorado, entendimiento, comprensión, conocimiento, conciencia, dominio.
+        INCORRECTO: "Realiza el procedimiento correctamente" / "Muestra entendimiento del proceso"
+        CORRECTO: "Ejecuta los 5 pasos en el orden establecido completando cada verificación sin omisiones" / "Produce el resultado con las características X, Y, Z especificadas en la unidad"
 
       YOU ARE A DOCUMENT GENERATOR. OUTPUT ONLY MARKDOWN. DO NOT CONVERSE. DO NOT ADD JSON WRAPPERS OR CODE BLOCKS.
 
@@ -182,15 +188,21 @@ pipeline_steps:
       RESTRICCIONES_OBLIGATORIAS (verifica ANTES de escribir cualquier línea):
       - IDIOMA: Escribe EXCLUSIVAMENTE en {_frozen.idioma_requerido ?? 'español'}. PROHIBIDO mezclar idiomas.
       - MODALIDAD: Refleja la modalidad "{_frozen.modalidad_canonica ?? 'presencial'}". Usa vocabulario apropiado.
-      - TABLA_BLOOM_INSTRUMENTO válido por EC0366:
-        | Nivel Bloom            | Instrumento EC0366 válido                          |
+      - TABLA_BLOOM_INSTRUMENTO:
+        | Nivel Bloom            | Instrumento válido                                 |
         |------------------------|----------------------------------------------------|
         | Recordar / Comprender  | Cuestionario (Examen Escrito)                      |
         | Aplicar / Analizar     | Guía de Observación / Lista de Cotejo              |
         | Evaluar / Crear        | Rúbrica / Portafolio de Evidencias / Proyecto      |
         PROHIBIDO asignar instrumento de nivel inferior al nivel Bloom declarado.
       - PONDERACION_SUM: sum(ponderacion de TODAS las unidades) = 100 exactamente. Ajusta la última si es necesario.
+      - INSTRUMENTO_UNICO: Cada unidad de competencia tiene EXACTAMENTE UN tipo de instrumento. PROHIBIDO usar "/" para combinar tipos (ej: "Lista de Cotejo / Guía de Observación" es INVÁLIDO). ELEGIR el instrumento con mayor evidencia observable según el nivel Bloom declarado de la unidad.
       - NO_PLACEHOLDERS: PROHIBIDO {{variable}}, [PENDIENTE], [INSERTAR], TBD en cualquier campo.
+      - VOCABULARIO_MEDIBLE (MANDATORY): En cada reactivo usa EXCLUSIVAMENTE verbos de acción observable.
+        PERMITIDOS: Identifica, Describe, Aplica, Analiza, Evalúa, Crea, Demuestra, Calcula, Compara, Ejecuta, Produce, Selecciona, Verifica, Registra, Muestra (sólo con acción física concreta).
+        PROHIBIDO en reactivos: adecuado, correcto, correctamente, bien, efectivo, apropiado, notable, mejorado, entendimiento, comprensión, conocimiento, conciencia, dominio.
+        INCORRECTO: "Realiza el procedimiento correctamente" / "Muestra entendimiento del proceso"
+        CORRECTO: "Ejecuta los 5 pasos en el orden establecido completando cada verificación sin omisiones" / "Produce el resultado con las características X, Y, Z especificadas en la unidad"
 
       YOU ARE A DOCUMENT GENERATOR. OUTPUT ONLY MARKDOWN. DO NOT CONVERSE. DO NOT ADD JSON WRAPPERS OR CODE BLOCKS.
 

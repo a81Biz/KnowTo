@@ -34,6 +34,16 @@ vi.mock('../../dcfl/services/supabase.service', () => ({
     getUserProjects:      mockGetProjects,
     markStepError:        vi.fn(),
     saveExtractedContext: mockSaveExtractedContext,
+    getTemarioBase:       vi.fn().mockResolvedValue(null),
+    getProjectBrief:      vi.fn().mockResolvedValue(null),
+    saveProjectBrief:     vi.fn().mockResolvedValue(undefined),
+    getProjectSoul:          vi.fn().mockResolvedValue(null),
+    getFase0Estructurado:    vi.fn().mockResolvedValue(null),
+    getFaseAnswersDetailed:  vi.fn().mockResolvedValue(null),
+    confirmarTemario:           vi.fn().mockResolvedValue(undefined),
+    getF2_5Recomendaciones:    vi.fn().mockResolvedValue(null),
+    getF3Especificaciones:     vi.fn().mockResolvedValue(null),
+    getCanonicalSpecFrozen:    vi.fn().mockResolvedValue(false),
   })),
 }));
 

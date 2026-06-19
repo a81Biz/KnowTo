@@ -1,75 +1,87 @@
 # ESTADO ACTUAL — Puntero de seguimiento PTSA
 **Motor v4.1 | Sobreescribir completo en cada cambio de puntero**
-**Timestamp:** 2026-06-14 06:30
+**Timestamp:** 2026-06-18 (sesión S-009 / PT-193)
 
 ---
 
 ## Estado de la auditoría
 
-**COMPLETADA** — Todas las fases F-1 a F10 han sido ejecutadas y cerradas.
+**COMPLETADA** — Audit original cerrada 2026-06-14. Delta syncs S-004 → S-009 completados.
 
-**Score Global: 78.2 / 100 — Clasificación B**
+**Score Global: 92.5 / 100 — Clasificación A** (antes S-008: 90.4/A)
+Variación +2.1: H-025 CORREGIDA (+5 D3), H-016 CORREGIDA (+1 D2), H-006 CORREGIDA (+1 D2).
+
+---
+
+## Resumen sesión S-009 (PT-193, 2026-06-18)
+
+Cierre de 3 hallazgos abiertos post-PT-192. Todos los hallazgos de D2 y D3 están ahora CORREGIDOS. Solo quedan 3 hallazgos D1 activos que requieren validación de usuario mediante regeneración de pipeline.
+
+### PT-193.1 — H-025 CORREGIDA (D3/Media/+5 pts):
+- Nuevo método `getProjectDocuments()` en `supabase.service.ts`
+- Nueva ruta `GET /dcfl/wizard/project/{projectId}/documents` (schema + handler + registro)
+- Nuevo endpoint `ENDPOINTS.wizard.documents(projectId)` en `endpoints.ts`
+- `_downloadExpediente()` en `step11.closing.ts`: carga BD fallback antes del loop de pasos
+
+### PT-193.2 — H-016 CORREGIDA (D2/Baja/+1 pt):
+- `getF2_5Recomendaciones`, `getF3Especificaciones`, `getCanonicalSpecFrozen: false` añadidos en ambos archivos de test E2E
+
+### PT-193.3 — H-006 CORREGIDA (D2/Baja/+1 pt):
+- `src/backend/src/graphify-out/` eliminado
+- `src/backend/tsconfig.json`: `"src/graphify-out"` añadido a exclude
+
+### Test suite:
+- 41 archivos, 361 tests — todos pasan (0 regresiones)
 
 ---
 
 ## Fase activa
 
-Ninguna — auditoría finalizada.
+Ninguna — auditoría finalizada. S-009 = delta sync post-PT-193.
 
 ---
 
-## Próximas acciones (responsabilidad del equipo de desarrollo)
+## Hallazgos activos restantes (3 — todos D1)
 
-### Sprint 1 — Inmediato (≤ 2 horas)
-- [ ] Corregir H-013: `certification-route` usa `is_active` en lugar de `status`
-- [ ] Corregir H-012: `saveArtifactVersion` recibe `userId` UUID, no nombre de agente
+| ID | Dim | Sev | Descripción | Acción requerida |
+|:---:|:---:|:---:|:---|:---|
+| H-008 | D1 | ALTA | P1 rechazado — instrumento mixto | Regenerar P1 y verificar `aprobado` en BD |
+| H-009 | D1 | MEDIA | Nombre módulo repite curso | Regenerar TEMARIO_BASE y verificar nombres en BD |
+| H-010 | D1 | MEDIA | Verbo "Identificar" propagado | Depende de H-009 |
 
-### Sprint 2 — Dominio (≤ 1 día)
-- [ ] Regenerar Temario Base (corregir nombre módulo + verbo objetivo)
-- [ ] Verificar que P-008 cambia de `rejected` a `aprobado` tras regeneración
-- [ ] Verificar que P-011 cambia de `aprobado_con_errores` a `aprobado`
-
-### Sprint 3 — Deuda técnica (1–2 días)
-- [ ] Actualizar mocks de tests (H-005)
-- [ ] Actualizar wrangler a v4+ (H-014)
-- [ ] Documentar TAVILY_API_KEY en .dev.vars.example (H-011)
-- [ ] Excluir graphify-out/ del árbol src/ (H-006)
-
-### Sprint 4 — Documentación
-- [ ] Actualizar README.md, CLAUDE.md, PROYECTO.md (H-001, H-002, H-003, H-004, H-007)
+**Acción para cerrar D1:** Ver procedimiento exacto en HANDOFF.md.
 
 ---
 
-## Archivos de auditoría creados
+## Archivos de auditoría
 
 ```
 PTSA/
-├── RESUMEN.md              ✅ Actualizado con scores finales
-├── ESTADO_ACTUAL.md        ✅ Este archivo
-├── AUDIT_LOG.md            ✅ Log de sesiones
-├── RELACIONES.md           ✅ Índice completo reconstruido
-├── PENDIENTES.md           ✅ Q-001 y Q-002 resueltos
+├── RESUMEN.md              ✅ Score 92.5/A actualizado (S-009)
+├── ESTADO_ACTUAL.md        ✅ Este archivo (S-009)
+├── AUDIT_LOG.md            ✅ S-009 appendeado
+├── RELACIONES.md           ✅ Refresheado en S-009 (25 hallazgos)
+├── PENDIENTES.md           ✅ Sin bloqueantes
 ├── Hallazgos/
-│   ├── H-001.md a H-014.md  ✅ 14 hallazgos registrados
+│   ├── H-001.md a H-007.md   CORREGIDAS ✅
+│   ├── H-006.md              CORREGIDA ✅ (PT-193)
+│   ├── H-008.md              ABIERTA — prompt mitigado ⚠️
+│   ├── H-009.md              ABIERTA — guardrails añadidos ⚠️
+│   ├── H-010.md              ABIERTA (depende H-009) ⚠️
+│   ├── H-011.md a H-015.md   CORREGIDAS ✅
+│   ├── H-016.md              CORREGIDA ✅ (PT-193)
+│   ├── H-017.md a H-024.md   CORREGIDAS ✅ (PT-192)
+│   └── H-025.md              CORREGIDA ✅ (PT-193)
 ├── Evidencias/
-│   ├── E-001.md a E-014.md  ✅ 14 evidencias catalogadas
+│   └── E-001.md a E-025.md ✅ 25 evidencias
 ├── Productos/
 │   ├── P-002.md  VALIDADO
 │   ├── P-007.md  REQUIERE_REVISION
-│   ├── P-008.md  RECHAZADO_DOMINIO
-│   └── P-011.md  REQUIERE_REVISION
+│   ├── P-008.md  RECHAZADO_DOMINIO (pendiente regenerar)
+│   ├── P-011.md  REQUIERE_REVISION
+│   ├── P-012.md  RECHAZADO_DOMINIO (H-019 corregido) ✅
+│   ├── P-014.md  RECHAZADO_DOMINIO (H-020 corregido) ✅
+│   └── P-013, P-015, P-016, P-017  IDENTIFICADO
 └── Fases/
-    ├── F-1_Declaracion_Valor.md  ✅
-    ├── F0_Inventario.md          ✅
-    ├── F1_Mapa_Sistema.md        ✅
-    ├── F2_Alcance.md             ✅
-    ├── F3_Productos.md           ✅
-    ├── F3_5_Criticidad.md        ✅
-    ├── F4_Trazabilidad.md        ✅
-    ├── F5_Tecnica.md             ✅
-    ├── F6_Funcional.md           ✅
-    ├── F7_Documental.md          ✅
-    ├── F8_Observabilidad.md      ✅
-    ├── F9_Hallazgos.md           ✅
-    └── F10_Matriz_Maestra.md     ✅
+    └── F-1 a F10 ✅ Todas COMPLETADAS
 ```

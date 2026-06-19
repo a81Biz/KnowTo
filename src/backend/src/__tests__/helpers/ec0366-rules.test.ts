@@ -193,6 +193,81 @@ describe('EC0366RulesEngine — language compliance', () => {
   });
 });
 
+// ── Duration / module validation (PT-152) ────────────────────────────────────
+
+describe('EC0366RulesEngine — _validateDuration (module in frozen spec)', () => {
+  it('no violation when artifact has no modulo field (P1)', () => {
+    const p1 = makeP1([makeUnidad()]);
+    const ctx = makeCtx({
+      frozenSpec: {
+        tiempos_por_modulo: [{ modulo: 'Módulo 1', duracion_total_minutos: 60 }],
+      },
+    });
+    const { violaciones } = engine.runCertificationCheck(p1, ctx);
+    expect(violaciones.some(v => v.code === 'DURATION_MODULE_NOT_IN_SPEC')).toBe(false);
+  });
+
+  it('no violation when frozenSpec has no tiempos_por_modulo', () => {
+    // A P2-like artifact with modulo field
+    const p2 = { productCode: 'P2', modalidad: 'presencial', idioma: 'es', modulo: 'Módulo 5', slides: [] } as any;
+    const ctx = makeCtx({ frozenSpec: {} });
+    const { violaciones } = engine.runCertificationCheck(p2, ctx);
+    expect(violaciones.some(v => v.code === 'DURATION_MODULE_NOT_IN_SPEC')).toBe(false);
+  });
+
+  it('DURATION_MODULE_NOT_IN_SPEC when artifact.modulo not in frozen spec', () => {
+    const p2 = { productCode: 'P2', modalidad: 'presencial', idioma: 'es', modulo: 'Módulo Fantasma', slides: [] } as any;
+    const ctx = makeCtx({
+      frozenSpec: {
+        tiempos_por_modulo: [{ modulo: 'Módulo 1', duracion_total_minutos: 60 }],
+      },
+    });
+    const { violaciones } = engine.runCertificationCheck(p2, ctx);
+    expect(violaciones.some(v => v.code === 'DURATION_MODULE_NOT_IN_SPEC')).toBe(true);
+  });
+
+  it('no violation when artifact.modulo matches frozen spec (case-insensitive)', () => {
+    const p2 = { productCode: 'P2', modalidad: 'presencial', idioma: 'es', modulo: 'módulo 1', slides: [] } as any;
+    const ctx = makeCtx({
+      frozenSpec: {
+        tiempos_por_modulo: [{ modulo: 'Módulo 1', duracion_total_minutos: 60 }],
+      },
+    });
+    const { violaciones } = engine.runCertificationCheck(p2, ctx);
+    expect(violaciones.some(v => v.code === 'DURATION_MODULE_NOT_IN_SPEC')).toBe(false);
+  });
+});
+
+// ── Coverage with frozenSpec.total_unidades (PT-152) ─────────────────────────
+
+describe('EC0366RulesEngine — _validateCoverage uses frozenSpec.total_unidades', () => {
+  it('COVERAGE_INCOMPLETE when P1 units != frozenSpec.total_unidades (no P4)', () => {
+    const p1 = makeP1([makeUnidad()]);
+    const ctx = makeCtx({ frozenSpec: { total_unidades: 3 }, p4Artifact: undefined });
+    const { violaciones } = engine.runCertificationCheck(p1, ctx);
+    expect(violaciones.some(v => v.code === 'COVERAGE_INCOMPLETE')).toBe(true);
+    expect(violaciones.find(v => v.code === 'COVERAGE_INCOMPLETE')?.message).toContain('temario_base');
+  });
+
+  it('no COVERAGE_INCOMPLETE when P1 units === frozenSpec.total_unidades', () => {
+    const p1 = makeP1([makeUnidad({ ponderacion: 50 }), makeUnidad({ id: 'u2', ponderacion: 50 })]);
+    const ctx = makeCtx({ frozenSpec: { total_unidades: 2 }, p4Artifact: undefined });
+    const { violaciones } = engine.runCertificationCheck(p1, ctx);
+    expect(violaciones.some(v => v.code === 'COVERAGE_INCOMPLETE')).toBe(false);
+  });
+
+  it('frozenSpec.total_unidades takes precedence over P4 chapters when both present', () => {
+    // P1 has 2 units, P4 has 2 chapters, but frozen spec says 3 → should error
+    const p1 = makeP1([makeUnidad({ ponderacion: 50 }), makeUnidad({ id: 'u2', ponderacion: 50 })]);
+    const ctx = makeCtx({
+      frozenSpec: { total_unidades: 3 },
+      p4Artifact: makeP4(2),
+    });
+    const { violaciones } = engine.runCertificationCheck(p1, ctx);
+    expect(violaciones.some(v => v.code === 'COVERAGE_INCOMPLETE')).toBe(true);
+  });
+});
+
 // ── Correction log ────────────────────────────────────────────────────────────
 
 describe('EC0366RulesEngine — buildCorrectionLog', () => {

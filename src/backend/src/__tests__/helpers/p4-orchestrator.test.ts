@@ -96,7 +96,7 @@ describe('orchestrateP4Chapters', () => {
     expect(result[2]).toEqual({ index: 2, md: '# Capítulo 3 contenido' });
   });
 
-  it('skips failed chapter and returns chapters 0 and 2 when chapter 1 fails', async () => {
+  it('throws with missing chapter list when chapter 1 fails (PT-153 coverage gate)', async () => {
     mockGetTemarioBase.mockResolvedValue(makeTemario(3));
     mockCreateJob
       .mockResolvedValueOnce('job-cap-0')
@@ -104,42 +104,25 @@ describe('orchestrateP4Chapters', () => {
       .mockResolvedValueOnce('job-cap-2');
     mockWaitForJob
       .mockResolvedValueOnce('completed') // cap 0
-      .mockResolvedValueOnce('failed')    // cap 1
+      .mockResolvedValueOnce('failed')    // cap 1 — triggers gate
       .mockResolvedValueOnce('completed'); // cap 2
     mockGetAgentOutput
       .mockResolvedValueOnce('# Capítulo 1')
       .mockResolvedValueOnce('# Capítulo 3');
 
-    const result = await orchestrateP4Chapters(
-      'proj-abc',
-      {},
-      {},
-      DEV_ENV,
-      'user-1',
-      runPipeline,
-    );
-
-    expect(result).toHaveLength(2);
-    expect(result[0].index).toBe(0);
-    expect(result[1].index).toBe(2);
+    await expect(
+      orchestrateP4Chapters('proj-abc', {}, {}, DEV_ENV, 'user-1', runPipeline),
+    ).rejects.toThrow('Cobertura incompleta');
   });
 
-  it('omits chapter on timeout and returns no crash', async () => {
+  it('throws with missing chapter on timeout (PT-153 coverage gate)', async () => {
     mockGetTemarioBase.mockResolvedValue(makeTemario(1));
     mockCreateJob.mockResolvedValueOnce('job-cap-0');
     mockWaitForJob.mockResolvedValue('timeout');
 
-    const result = await orchestrateP4Chapters(
-      'proj-abc',
-      {},
-      {},
-      DEV_ENV,
-      'user-1',
-      runPipeline,
-    );
-
-    expect(result).toHaveLength(0);
-    expect(runPipeline).toHaveBeenCalledTimes(1);
+    await expect(
+      orchestrateP4Chapters('proj-abc', {}, {}, DEV_ENV, 'user-1', runPipeline),
+    ).rejects.toThrow('Cobertura incompleta');
   });
 
   it('returns empty array when temario has no units', async () => {

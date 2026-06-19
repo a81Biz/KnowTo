@@ -54,6 +54,15 @@ export const GenerateDocumentBody = z
   })
   .openapi('GenerateDocumentBody');
 
+export const F3StructuredPatchBody = z
+  .object({
+    plataforma: z.string().optional().openapi({ example: 'Moodle' }),
+    modalidad: z.string().optional().openapi({ example: 'virtual' }),
+    idioma: z.string().optional().openapi({ example: 'es' }),
+    criteriosAceptacion: z.array(z.string().min(1)).optional().openapi({ example: ['Calificación mínima 80%', 'Asistencia completa'] }),
+  })
+  .openapi('F3StructuredPatchBody');
+
 export const GenerateFormBody = z
   .object({
     projectId: z.string().uuid(),
@@ -525,6 +534,30 @@ export const routeGetF4Productos = createRoute({
             }),
             timestamp: z.string(),
           }).openapi('F4ProductosResponse'),
+        },
+      },
+    },
+  },
+});
+
+export const routeGetProjectDocuments = createRoute({
+  method: 'get',
+  path: '/project/{projectId}/documents',
+  tags: TAG,
+  summary: 'Obtener todos los documentos del proyecto',
+  description: 'Retorna el documento más reciente por fase para un proyecto. Usado por el expediente ZIP para recuperar documentos cuando el store en memoria está vacío.',
+  security: BEARER,
+  request: { params: ProjectIdParam },
+  responses: {
+    200: {
+      description: 'Lista de documentos por fase',
+      content: {
+        'application/json': {
+          schema: z.object({
+            success:   z.literal(true),
+            documents: z.array(z.object({ phaseId: z.string(), content: z.string() })),
+            timestamp: z.string(),
+          }).openapi('ProjectDocumentsResponse'),
         },
       },
     },

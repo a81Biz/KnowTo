@@ -10,6 +10,7 @@ import { wizard } from './routes/wizard.route';
 import formSchemaRoutes from './api/routes/form-schema.routes';
 import { testRoutes } from './routes/test.route';
 import { temarioRoutes } from './routes/temario.route';
+import { canonicalSpecRoutes } from './routes/canonical-spec.route';
 import { f3Routes } from './routes/f3.route';
 import { certificationRoutes } from './routes/certification.route';
 import { SupabaseService } from './services/supabase.service';
@@ -64,6 +65,8 @@ export function createDcflRouter() {
   router.route('/api/form-schema', formSchemaRoutes);
   router.use('/api/temario/*', authMiddleware);
   router.route('/api/temario', temarioRoutes);
+  router.use('/api/canonical-spec/*', authMiddleware);
+  router.route('/api/canonical-spec', canonicalSpecRoutes);
   router.use('/api/f3/*', authMiddleware);
   router.route('/api/f3', f3Routes);
   router.use('/api/certification-status/*', authMiddleware);

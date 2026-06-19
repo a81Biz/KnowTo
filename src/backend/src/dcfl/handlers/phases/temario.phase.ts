@@ -75,6 +75,28 @@ function fusionarTemario(estructura: ModuloTemario[], tiempos: ModuloTiempos[]):
   });
 }
 
+function similitudNombre(a: string, b: string): number {
+  // Ratio de palabras compartidas (case-insensitive, ignora stopwords cortas)
+  const stopwords = new Set(['de', 'del', 'el', 'la', 'los', 'las', 'un', 'una', 'y', 'al', 'en', 'a']);
+  const tokenize = (s: string) => s.toLowerCase().split(/\s+/).filter(w => w.length > 2 && !stopwords.has(w));
+  const tokensA = tokenize(a);
+  const tokensB = new Set(tokenize(b));
+  if (tokensA.length === 0 || tokensB.size === 0) return 0;
+  const comunes = tokensA.filter(t => tokensB.has(t)).length;
+  return comunes / Math.max(tokensA.length, tokensB.size);
+}
+
+function validarNombresModulos(modulos: ModuloTemario[], courseName: string): string[] {
+  const advertencias: string[] = [];
+  for (const modulo of modulos) {
+    const ratio = similitudNombre(modulo.nombre, courseName);
+    if (ratio >= 0.7) {
+      advertencias.push(`Módulo "${modulo.nombre}" es ≥70% similar al nombre del curso ("${courseName}") — debe describir un sub-dominio técnico específico`);
+    }
+  }
+  return advertencias;
+}
+
 function validarVerbosObservables(modulos: ModuloTemario[]): string[] {
   const advertencias: string[] = [];
   for (const modulo of modulos) {
@@ -125,6 +147,13 @@ export async function handleTemarioEvents(event: PipelineEvent): Promise<string 
     justificacion: '',
     unidades: m.unidades.map(u => ({ nombre: u.nombre, duracion_minutos: u.duracion_minutos })),
   })));
+
+  // Invariante semántica: nombres de módulos no deben repetir el nombre del curso
+  const courseName: string = (event.body?.context?._frozen?.nombre_oficial_curso as string)
+    || (event.body?.context?.projectName as string)
+    || '';
+  const advertenciasNombres = courseName ? validarNombresModulos(modulosFinal, courseName) : [];
+  for (const warn of advertenciasNombres) console.warn(`[temario-assembler] ⚠️ PT-111 ${warn}`);
 
   // Invariante pedagógica: verbos observables (warn-not-block)
   const violaciones = validarVerbosObservables(modulosFinal);
@@ -180,6 +209,7 @@ export async function handleTemarioEvents(event: PipelineEvent): Promise<string 
     validacionBloom,
     advertenciaDuracion,
     validacionBloomInstrument,
+    ...(advertenciasNombres.length > 0 ? { advertenciasNombres } : {}),
   });
 
   const resultado = JSON.stringify({

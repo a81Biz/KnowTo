@@ -1,6 +1,5 @@
 import { ProductContext } from './product.types';
-import { sanitizeProductDocument, enforceModalidad } from '../../../helpers/doc-sanitizer.helper';
-import { pickWinnerOutput, extractAny, validateUnitCoverage, validateMaterialsByModule, validateSemanticAnchor } from '../../../helpers/assembler-utils.helper';
+import { enforceCanonicalCoherence, pickWinnerOutput, extractAny, validateUnitCoverage, validateMaterialsByModule } from '../../../helpers/coherence';
 import { parseP5Output } from '../../../helpers/renderers/p5.renderer';
 import { CertificationEngineFactory } from '../../../helpers/certification-engine.factory';
 import type {
@@ -364,19 +363,23 @@ export async function handleDocumentP5Assembler(context: ProductContext): Promis
   const f2DataP5 = await services.supabase.getF2Analisis(projectId);
   const _modalidadP5: Record<string, string> | null = (f2DataP5?.modalidad ?? null) as Record<string, string> | null;
   const canonicalModalidadP5: string | null = _modalidadP5 ? (Object.values(_modalidadP5)[0] ?? null) : null;
-  const { doc: _p5modal } = enforceModalidad(documentoFinal, canonicalModalidadP5);
-  documentoFinal = _p5modal;
 
-  let _anchorP5: { valido: boolean; ausentes: string[]; cobertura: number } = { valido: true, ausentes: [], cobertura: 1 };
+  let briefDominioP5 = '';
   try {
     const briefP5 = await services.supabase.getProjectBrief(projectId);
-    _anchorP5 = validateSemanticAnchor(documentoFinal, briefP5?.dominioTecnico ?? '');
-    if (!_anchorP5.valido) console.warn(`[p5-assembler] ⚠ Ancla semántica: cobertura=${_anchorP5.cobertura}, ausentes=${_anchorP5.ausentes.join(', ')}`);
+    briefDominioP5 = briefP5?.dominioTecnico ?? '';
   } catch {}
 
-  const { doc: _p5clean, warnings: _p5sw } = sanitizeProductDocument(documentoFinal, 'P5');
-  if (_p5sw.length > 0) console.warn('[p5-assembler] Sanitizer:', _p5sw);
+  const { doc: _p5clean, warnings: _p5sw, anchorValid, anchorCobertura } = enforceCanonicalCoherence(
+    documentoFinal, 'P5', {
+      canonicalModalidad: canonicalModalidadP5,
+      dominioTecnico: briefDominioP5,
+      blockOnAnchorDenylist: true,  // P5 (evidencia) — bloqueante para alucinaciones de dominio
+    },
+  );
   documentoFinal = _p5clean;
+  const _anchorP5 = { valido: anchorValid, cobertura: anchorCobertura, ausentes: [] };
+  if (_p5sw.length > 0) console.warn('[p5-assembler] Coherence warnings:', _p5sw);
 
   await services.supabase.saveF4Producto({
     projectId,
@@ -440,7 +443,7 @@ export async function handleDocumentP5Assembler(context: ProductContext): Promis
       promptTemplateId: 'F4_P5_GENERATE_DOCUMENT',
       promptTemplateVersion: '1.0',
       model: frozen.model ?? 'llama-3.1-8b',
-      generatedBy: 'ensamblador_doc_p5',
+      generatedBy: context.event.body?.userId ?? undefined,
     });
 
     console.log(`[p5-assembler] CCM: ${errorCount === 0 ? 'P5 unidad certificable ✅' : `${errorCount} error(es)`}`);

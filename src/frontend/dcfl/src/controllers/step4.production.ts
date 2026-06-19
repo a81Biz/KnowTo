@@ -10,7 +10,7 @@ import { ENDPOINTS, buildEndpoint } from '../shared/endpoints';
 import { showLoading, hideLoading, showError, renderMarkdown, printDocument } from '@core/ui';
 import { wizardStore } from '../stores/wizard.store';
 import type { PromptId } from '../types/wizard.types';
-import { subscribeToJob, type JobSubscription } from '../shared/supabase.realtime';
+import { jobHub } from '../shared/supabase.realtime';
 
 interface F4ProductoBD {
   id: string;
@@ -47,11 +47,12 @@ class Step5ProductionController extends BaseStep {
   private _rejectedProducts: Set<number> = new Set();
   /** Caché por código de producto (P1-P8). Evita re-fetch al cambiar de tab. */
   private _schemaCache = new Map<string, any>();
-  private _schemaSubscription: JobSubscription | null = null;
+  private _schemaJobId: string | null = null;
   private _temarioSubscription: JobSubscription | null = null;
   private _projectSoul: string | null = null;
   private _temarioConfirmado = false;
   private _f3Valid = false;
+  private _canonicalSpecFrozen = false;
   /** Raw datos_producto for P1 — populated in _loadProductsFromBD for strategy panel */
   private _p1DatosProducto: Record<string, unknown> | null = null;
   /** Whether the P1 strategy confirmation has been dismissed this session */
@@ -114,30 +115,26 @@ class Step5ProductionController extends BaseStep {
       if (result.status === 'generating' && result.jobId) {
         this._showGeneratingStatus();
         return new Promise<any>((resolve) => {
-          this._schemaSubscription?.cancel();
-          this._schemaSubscription = subscribeToJob(
-            result.jobId,
-            async () => {
-              try {
-                const ready = await getData<any>(url) as any;
-                const schema = ready.status === 'ready' ? ready : null;
-                if (schema) this._schemaCache.set(producto, schema);
-                resolve(schema);
-              } catch {
-                resolve(null);
-              }
-            },
-            (error) => {
-              console.error('[F4] Schema generation failed:', error);
-              this._showErrorForm();
+          if (this._schemaJobId) { jobHub.cancel(this._schemaJobId); this._schemaJobId = null; }
+          this._schemaJobId = result.jobId;
+          jobHub.waitForJob(result.jobId, (job) => {
+            if (job.progress?.currentStep) this._showGeneratingStatus(job.progress.currentStep);
+          }).then(async () => {
+            this._schemaJobId = null;
+            try {
+              const ready = await getData<any>(url) as any;
+              const schema = ready.status === 'ready' ? ready : null;
+              if (schema) this._schemaCache.set(producto, schema);
+              resolve(schema);
+            } catch {
               resolve(null);
-            },
-            (job) => {
-              if (job.progress?.currentStep) {
-                this._showGeneratingStatus(job.progress.currentStep);
-              }
             }
-          );
+          }).catch((error: Error) => {
+            this._schemaJobId = null;
+            console.error('[F4] Schema generation failed:', error.message);
+            this._showErrorForm();
+            resolve(null);
+          });
         });
       }
     } catch (err) {
@@ -404,7 +401,7 @@ class Step5ProductionController extends BaseStep {
 
     const tabs = this._subDom.productIndicators.querySelectorAll('.product-tab');
     tabs.forEach(tab => {
-      tab.addEventListener('click', (e) => {
+      tab.addEventListener('click', async (e) => {
         const target = e.currentTarget as HTMLElement;
         const index = parseInt(target.getAttribute('data-index') || '-1', 10);
         if (index < 0) return;
@@ -415,8 +412,16 @@ class Step5ProductionController extends BaseStep {
         const prod = this._approvedProducts.get(index);
         if (prod) {
           this._showProductPreview(prod.content);
-        } else if (this._temarioConfirmado && this._f3Valid) {
-          this._showGenerateArea();
+        } else if (this._temarioConfirmado && this._f3Valid && this._canonicalSpecFrozen) {
+          // Refresh from BD before showing generate area — product may exist if generated this session
+          const pid = wizardStore.getState().projectId;
+          if (pid) await this._loadProductsFromBD(pid);
+          const prodRefreshed = this._approvedProducts.get(index);
+          if (prodRefreshed) {
+            this._showProductPreview(prodRefreshed.content);
+          } else {
+            this._showGenerateArea();
+          }
         }
       });
     });
@@ -441,6 +446,66 @@ class Step5ProductionController extends BaseStep {
       this._f3Valid = true;
     }
     return this._f3Valid;
+  }
+
+  private async _checkCanonicalSpecGate(projectId: string): Promise<boolean> {
+    try {
+      const res = await getData<any>(buildEndpoint(ENDPOINTS.canonicalSpec.status(projectId)));
+      this._canonicalSpecFrozen = res?.canonical_spec_frozen === true;
+    } catch {
+      // Fail-open: if the endpoint is unavailable (legacy project or DB issue), allow production.
+      this._canonicalSpecFrozen = true;
+    }
+    return this._canonicalSpecFrozen;
+  }
+
+  private _renderCanonicalSpecGate(projectId: string): void {
+    const gateId = 'canonical-spec-gate-area';
+    if (this._container.querySelector(`#${gateId}`)) return;
+
+    const gate = document.createElement('div');
+    gate.id = gateId;
+    gate.className = 'bg-amber-50 border border-amber-300 rounded-lg p-5 mb-6';
+    gate.innerHTML = `
+      <h3 class="font-semibold text-amber-800 mb-2">🔒 Confirmación de Especificación Canónica de Producción</h3>
+      <p class="text-amber-700 text-sm mb-3">
+        Antes de generar los productos del curso, confirma que las especificaciones de producción están listas.
+        Una vez confirmadas, el <strong>temario</strong>, el <strong>plan de video</strong> y el <strong>estándar de seguimiento</strong>
+        quedarán congelados como fuente de verdad inmutable para todos los productos F4–F7.
+      </p>
+      <p class="text-amber-600 text-xs mb-4">
+        Asegúrate de haber completado: Temario Base (confirmado), Paso 2.5 (recomendaciones de video) y Paso 3 (especificaciones técnicas).
+      </p>
+      <div id="canonical-spec-gate-status" class="text-sm mb-3"></div>
+      <button id="btn-confirm-canonical-spec"
+        class="px-4 py-2 bg-amber-600 text-white rounded-lg text-sm hover:bg-amber-700 disabled:opacity-50">
+        Confirmar y comenzar producción
+      </button>
+    `;
+
+    this._container.insertBefore(gate, this._container.firstChild);
+
+    const statusEl = gate.querySelector<HTMLElement>('#canonical-spec-gate-status')!;
+    const btnConfirm = gate.querySelector<HTMLButtonElement>('#btn-confirm-canonical-spec')!;
+
+    btnConfirm.addEventListener('click', async () => {
+      btnConfirm.disabled = true;
+      btnConfirm.textContent = 'Confirmando...';
+      statusEl.textContent = '';
+
+      try {
+        await patchData(buildEndpoint(ENDPOINTS.canonicalSpec.confirm(projectId)), {});
+        this._canonicalSpecFrozen = true;
+        gate.remove();
+        void this._renderConfirmedTemarioPanel(projectId);
+        this._showGenerateArea();
+      } catch (err) {
+        statusEl.textContent = `❌ Error al confirmar: ${err instanceof Error ? err.message : String(err)}`;
+        statusEl.className = 'text-sm text-red-600 mb-3';
+        btnConfirm.disabled = false;
+        btnConfirm.textContent = 'Confirmar y comenzar producción';
+      }
+    });
   }
 
   private _renderF3Gate(projectId: string): void {
@@ -513,10 +578,15 @@ class Step5ProductionController extends BaseStep {
         statusEl.className = 'text-sm text-green-600 mb-3';
         this._f3Valid = true;
 
-        setTimeout(() => {
+        setTimeout(async () => {
           gate.remove();
-          void this._renderConfirmedTemarioPanel(projectId);
-          this._showGenerateArea();
+          await this._checkCanonicalSpecGate(projectId);
+          if (!this._canonicalSpecFrozen) {
+            this._renderCanonicalSpecGate(projectId);
+          } else {
+            void this._renderConfirmedTemarioPanel(projectId);
+            this._showGenerateArea();
+          }
         }, 800);
       } catch (err) {
         statusEl.textContent = `❌ Error al guardar: ${err instanceof Error ? err.message : String(err)}`;
@@ -723,9 +793,9 @@ class Step5ProductionController extends BaseStep {
         if (!res.data?.jobId) throw new Error('No jobId recibido del servidor');
         statusEl.textContent = 'Pipeline iniciado. Esperando resultado...';
 
-        // Paso 4: subscribeToJob en lugar de setInterval
+        // Paso 4: jobHub en lugar de subscribeToJob
         this._temarioSubscription?.cancel();
-        this._temarioSubscription = subscribeToJob(
+        this._temarioSubscription = jobHub.subscribeToJobCallback(
           res.data.jobId,
           async () => {
             try {
@@ -791,7 +861,14 @@ class Step5ProductionController extends BaseStep {
             </div>
           </details>
         `;
-        this._showGenerateArea();
+        await this._checkCanonicalSpecGate(projectId);
+        if (!this._f3Valid) {
+          this._renderF3Gate(projectId);
+        } else if (!this._canonicalSpecFrozen) {
+          this._renderCanonicalSpecGate(projectId);
+        } else {
+          this._showGenerateArea();
+        }
         this._renderProductIndicators();
       } catch (err) {
         statusEl.textContent = `❌ Error al confirmar: ${err}`;
@@ -1008,8 +1085,8 @@ class Step5ProductionController extends BaseStep {
 
   private _showGenerateArea(): void {
     console.log('[F4] _showGenerateArea Front called');
-    this._schemaSubscription?.cancel();
-    this._schemaSubscription = null;
+    this._setLoading(false);
+    if (this._schemaJobId) { jobHub.cancel(this._schemaJobId); this._schemaJobId = null; }
     if (this._subDom.productNotStarted) this._subDom.productNotStarted.classList.add('hidden');
     if (this._subDom.productPreviewArea) this._subDom.productPreviewArea.classList.add('hidden');
     if (this._subDom.productGenerateArea) this._subDom.productGenerateArea.classList.remove('hidden');
@@ -1023,14 +1100,9 @@ class Step5ProductionController extends BaseStep {
   }
 
   private _waitForJobComplete(jobId: string, onProgress?: (step: string) => void): Promise<void> {
-    return new Promise((resolve, reject) => {
-      subscribeToJob(
-        jobId,
-        () => { resolve(); },
-        (err) => { reject(new Error(err)); },
-        (job) => { if (job.progress?.currentStep) onProgress?.(job.progress.currentStep); }
-      );
-    });
+    return jobHub.waitForJob(jobId, (job) => {
+      if (job.progress?.currentStep) onProgress?.(job.progress.currentStep);
+    }).then(() => undefined);
   }
 
   private async _generateCurrentProduct(): Promise<void> {
@@ -1520,7 +1592,7 @@ class Step5ProductionController extends BaseStep {
       if (res.data && res.data.jobId) {
         const jobId = res.data.jobId;
         this._jobSubscription?.cancel();
-        this._jobSubscription = subscribeToJob(
+        this._jobSubscription = jobHub.subscribeToJobCallback(
           jobId,
           async (result) => {
             const idx = this._currentProductIndex;
@@ -1763,8 +1835,19 @@ class Step5ProductionController extends BaseStep {
       const axes = Object.entries(AXIS_LABELS)
         .map(([k, label]) => {
           const val = (projectCertScore as any)[k] ?? 0;
-          const cls = val >= 80 ? 'text-green-700' : val >= 50 ? 'text-yellow-700' : 'text-red-700';
-          return `<tr><td class="border p-2">${label}</td><td class="border p-2 font-mono ${cls}">${val}%</td></tr>`;
+          const barCls = val >= 80 ? 'bg-green-500' : val >= 50 ? 'bg-yellow-400' : 'bg-red-500';
+          const textCls = val >= 80 ? 'text-green-700' : val >= 50 ? 'text-yellow-700' : 'text-red-700';
+          return `<tr>
+            <td class="border p-2 text-xs font-medium w-24">${label}</td>
+            <td class="border p-2">
+              <div class="flex items-center gap-2">
+                <div class="flex-1 bg-gray-200 rounded-full h-2">
+                  <div class="h-2 rounded-full ${barCls}" style="width:${val}%"></div>
+                </div>
+                <span class="font-mono text-xs ${textCls} w-10 text-right">${val}%</span>
+              </div>
+            </td>
+          </tr>`;
         }).join('');
 
       const productRows = ['P1','P2','P3','P4','P5','P6','P7','P8'].map(code => {
@@ -1775,10 +1858,14 @@ class Step5ProductionController extends BaseStep {
       }).join('');
 
       const totalScore = (projectCertScore as any).total ?? 0;
-      const scoreCls = totalScore >= 80 ? 'text-green-800 bg-green-50' : totalScore >= 50 ? 'text-yellow-800 bg-yellow-50' : 'text-red-800 bg-red-50';
+      const totalBadgeCls = totalScore >= 80
+        ? 'bg-green-100 text-green-800 border-green-300'
+        : totalScore >= 50
+          ? 'bg-yellow-100 text-yellow-800 border-yellow-300'
+          : 'bg-red-100 text-red-800 border-red-300';
 
       const gateMsg = certificable
-        ? '<p class="text-green-700 text-sm font-semibold">✅ Todos los productos cumplen los criterios EC0366. Puedes iniciar el expediente.</p>'
+        ? '<p class="text-green-700 text-sm font-semibold">✅ Todos los productos cumplen los criterios de certificación. Puedes iniciar el expediente.</p>'
         : '<p class="text-red-700 text-sm font-semibold">⛔ Uno o más productos no cumplen los criterios. Corrígelos antes de iniciar el expediente.</p>';
 
       contentEl.innerHTML = `
@@ -1786,9 +1873,16 @@ class Step5ProductionController extends BaseStep {
           <div>
             <h3 class="font-semibold text-gray-700 mb-2">Score por Eje (Proyecto)</h3>
             <table class="w-full text-xs border-collapse">
-              <thead><tr class="bg-gray-100"><th class="border p-2 text-left">Eje</th><th class="border p-2 text-left">Score</th></tr></thead>
+              <thead><tr class="bg-gray-100"><th class="border p-2 text-left">Eje</th><th class="border p-2 text-left">Progreso</th></tr></thead>
               <tbody>${axes}</tbody>
-              <tfoot><tr class="${scoreCls}"><td class="border p-2 font-bold">TOTAL</td><td class="border p-2 font-bold font-mono">${totalScore}%</td></tr></tfoot>
+              <tfoot>
+                <tr class="bg-gray-50">
+                  <td class="border p-2 font-bold text-xs">TOTAL</td>
+                  <td class="border p-2">
+                    <span class="inline-block px-3 py-1 rounded-full text-sm font-bold border ${totalBadgeCls}">${totalScore}%</span>
+                  </td>
+                </tr>
+              </tfoot>
             </table>
           </div>
           <div>
@@ -1934,8 +2028,10 @@ class Step5ProductionController extends BaseStep {
 
     const projectId = wizardStore.getState().projectId;
     if (projectId) {
+      jobHub.activate(projectId);
       await this._checkTemarioGate(projectId);
       await this._checkF3Gate(projectId);
+      await this._checkCanonicalSpecGate(projectId);
       await this._loadProductsFromBD(projectId);
       await this._loadProjectSoul(projectId);
     }
@@ -1944,7 +2040,9 @@ class Step5ProductionController extends BaseStep {
       this._renderTemarioGate(projectId);
     } else if (this._temarioConfirmado && !this._f3Valid && projectId) {
       this._renderF3Gate(projectId);
-    } else if (this._temarioConfirmado && this._f3Valid && projectId) {
+    } else if (this._temarioConfirmado && this._f3Valid && !this._canonicalSpecFrozen && projectId) {
+      this._renderCanonicalSpecGate(projectId);
+    } else if (this._temarioConfirmado && this._f3Valid && this._canonicalSpecFrozen && projectId) {
       void this._renderConfirmedTemarioPanel(projectId);
     }
 
@@ -1957,7 +2055,7 @@ class Step5ProductionController extends BaseStep {
     const existingProduct = this._approvedProducts.get(this._currentProductIndex);
     if (existingProduct) {
       this._showProductPreview(existingProduct.content);
-    } else if (this._temarioConfirmado && this._f3Valid) {
+    } else if (this._temarioConfirmado && this._f3Valid && this._canonicalSpecFrozen) {
       this._showGenerateArea();
     } else {
       if (this._subDom.productGenerateArea) this._subDom.productGenerateArea.classList.add('hidden');

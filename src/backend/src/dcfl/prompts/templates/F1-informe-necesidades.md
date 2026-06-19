@@ -2,7 +2,7 @@
 id: F1
 name: Informe de Necesidades Validado
 version: 3.0.0
-tags: [EC0249, gap_analysis, SMART]
+tags: [EC0366, gap_analysis, SMART]
 pipeline_steps:
 
   # ── BATALLA 1: ANÁLISIS DE BRECHAS ────────────────────────────────

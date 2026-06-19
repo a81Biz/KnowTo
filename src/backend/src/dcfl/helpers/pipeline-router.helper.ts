@@ -7,6 +7,9 @@ import { handleF1Events } from '../handlers/phases/f1.phase';
 import { handleF2Events } from '../handlers/phases/f2.phase';
 import { handleF3Events } from '../handlers/phases/f3.phase';
 import { handleF4Events } from '../handlers/phases/f4.phase';
+import { handleF5Events } from '../handlers/phases/f5.phase';
+import { handleF6Events } from '../handlers/phases/f6.phase';
+import { handleF7Events } from '../handlers/phases/f7.phase';
 import { handleTemarioEvents } from '../handlers/phases/temario.phase';
 import { DCFL_PROMPT_VERSIONS } from '../prompts/index';
 
@@ -22,9 +25,15 @@ const PhaseRouters: Record<string, PipelineHandler> = {
   'F0': handleF0Events,
   'F1': handleF1Events,
   'F2': handleF2Events,
-  'F2_5': handleF2Events, // Delega al mismo handler de F2 que ya maneja ambos
+  'F2_5': handleF2Events,
   'F3': handleF3Events,
   'TEMARIO_BASE': handleTemarioEvents,
+  'F5': handleF5Events,
+  'F5_2': handleF5Events,
+  'F6': handleF6Events,
+  'F6_2a': handleF6Events,
+  'F6_2b': handleF6Events,
+  'F7': handleF7Events,
 };
 
 /**

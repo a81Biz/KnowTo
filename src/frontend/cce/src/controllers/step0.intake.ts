@@ -59,7 +59,7 @@ class Step0IntakeController extends BaseStep {
           if (res.data?.status === 'completed' || res.data?.status === 'failed') {
             resolve();
           } else {
-            setTimeout(poll, 2000);
+            setTimeout(poll, 10_000);
           }
         } catch {
           resolve(); // Fallback on error

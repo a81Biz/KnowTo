@@ -149,8 +149,10 @@ class Step4SpecsController extends BaseStep {
       }
     }
 
-    // Aplicar DEFAULTS para los campos que sigan vacíos
+    // Aplicar DEFAULTS solo para campos que F2.5 no haya podido rellenar
     for (const [key, value] of Object.entries(DEFAULTS)) {
+      const el = form.elements.namedItem(key) as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement | null;
+      if (el && el.value !== '') continue;
       setField(key, value);
     }
   }

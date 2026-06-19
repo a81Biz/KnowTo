@@ -9,6 +9,7 @@ import { BaseStep } from '../shared/step.base';
 import { getData } from '@core/http.client';
 import { ENDPOINTS, buildEndpoint } from '../shared/endpoints';
 import { wizardStore } from '../stores/wizard.store';
+import { jobHub } from '../shared/supabase.realtime';
 
 interface F0ContextResponse {
   questions: string[];
@@ -247,9 +248,10 @@ class Step1NeedsController extends BaseStep {
       );
 
       if (res.data?.jobId) {
-        const { subscribeToJob } = await import('../shared/supabase.realtime');
+        const projectId = wizardStore.getState().projectId;
+        if (projectId) jobHub.activate(projectId);
         this._jobSubscription?.cancel();
-        this._jobSubscription = subscribeToJob(
+        this._jobSubscription = jobHub.subscribeToJobCallback(
           res.data.jobId,
           (result) => {
             wizardStore.setStepDocument(1, result.content, result.documentId);

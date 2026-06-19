@@ -3,12 +3,12 @@ _format_version: "2.1"
 # =============================================================================
 # Supabase Kong — API Gateway declarativo (sin base de datos)
 # Unifica Auth, REST, Realtime y Studio en un solo punto de entrada
-# expuesto en el host en el puerto 54321.
+# expuesto en el host en el puerto 54200.
 #
 # Flujo de una petición:
-#   Host:54321/auth/v1/...    → supabase-auth:9999
-#   Host:54321/rest/v1/...    → supabase-rest:3000
-#   Host:54321/realtime/v1/...→ supabase-realtime:4000 (WebSocket upgrade)
+#   Host:54200/auth/v1/...    → supabase-auth:9999
+#   Host:54200/rest/v1/...    → supabase-rest:3000
+#   Host:54200/realtime/v1/...→ supabase-realtime:4000 (WebSocket upgrade)
 # =============================================================================
 
 services:
@@ -35,11 +35,41 @@ services:
     plugins:
       - name: cors
 
+  # ── Realtime Broadcast REST API ────────────────────────────────────────────
+  # El endpoint de broadcast REST de Realtime v2 vive en /api/broadcast (Plug
+  # router), distinto del socket Phoenix montado en /socket.
+  #
+  # Path math:
+  #   POST /realtime/v1/api/broadcast
+  #   strip /realtime/v1/api → /broadcast
+  #   upstream: http://supabase-realtime:4000/api + /broadcast
+  #          =  http://supabase-realtime:4000/api/broadcast  ✓
+  #
+  # Kong 2.8.x prioriza el path más largo: /realtime/v1/api (18 chars) gana
+  # sobre /realtime/v1 (12 chars), por lo que no colisiona con el WebSocket.
+  - name: realtime-broadcast-api
+    url: http://supabase-realtime:4000/api
+    routes:
+      - name: realtime-broadcast-api-route
+        strip_path: true
+        paths:
+          - /realtime/v1/api
+        protocols:
+          - http
+          - https
+    plugins:
+      - name: cors
+      - name: request-transformer
+        config:
+          replace:
+            headers:
+              - "Host:realtime-dev.localhost"
+
   # ── Realtime (WebSocket) ──────────────────────────────────────────────────
   # Supabase Realtime v2 monta su socket Phoenix en /socket.
   # El endpoint WebSocket es /socket/websocket (no /websocket).
   #
-  # Flujo: cliente → ws://localhost:54321/realtime/v1/websocket
+  # Flujo: cliente → ws://localhost:54200/realtime/v1/websocket
   #   Kong strip_path: /realtime/v1  →  /websocket
   #   upstream: http://supabase-realtime:4000/socket + /websocket
   #          =  http://supabase-realtime:4000/socket/websocket  ✓

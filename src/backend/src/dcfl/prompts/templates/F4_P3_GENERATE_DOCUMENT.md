@@ -95,7 +95,7 @@ pipeline_steps:
           "objetivo_aprendizaje": "Acción observable. STRICT RULE: PROHIBIDO USAR la raíz de las palabras: aprender, comprender, entender, saber, conocer.",
           "duracion": "{duracion}",
           "recursos": ["Format: Array de STRINGS SIMPLES. Ej: 'Animación 2D', 'Close-up'. PROHIBIDO devolver objetos JSON."],
-          "equipamiento": "PRODUCCIÓN: [filming equipment]. MATERIALES EN CÁMARA: [items from inventario_p4 only].",
+          "equipamiento": "PRODUCCIÓN: cámara, trípode, micrófono, iluminación LED. MATERIALES EN CÁMARA: [listar solo materiales del {inventario_p4} o {ficha_tecnica_form} que aparecen físicamente en cámara; si no hay ninguno, escribir 'Sin materiales adicionales en cámara'].",
           "perfil_talento": "Narrador/actor sugerido..."
         }
       }
@@ -127,7 +127,7 @@ pipeline_steps:
           "objetivo_aprendizaje": "Acción observable. STRICT RULE: PROHIBIDO USAR la raíz de las palabras: aprender, comprender, entender, saber, conocer.",
           "duracion": "{duracion}",
           "recursos": ["Format: Array de STRINGS SIMPLES. Ej: 'Animación 2D', 'Close-up'. PROHIBIDO devolver objetos JSON."],
-          "equipamiento": "PRODUCCIÓN: [filming equipment]. MATERIALES EN CÁMARA: [items from inventario_p4 only].",
+          "equipamiento": "PRODUCCIÓN: cámara, trípode, micrófono, iluminación LED. MATERIALES EN CÁMARA: [listar solo materiales del {inventario_p4} o {ficha_tecnica_form} que aparecen físicamente en cámara; si no hay ninguno, escribir 'Sin materiales adicionales en cámara'].",
           "perfil_talento": "Narrador/actor sugerido..."
         }
       }

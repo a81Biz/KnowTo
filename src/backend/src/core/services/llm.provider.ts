@@ -1,12 +1,16 @@
 import { Agent, setGlobalDispatcher } from 'undici';
 
-// Configurar agente global para peticiones de larga duración (Ollama 27B)
-// Esto anula los timeouts de socket por defecto de Node.js (5 min)
+// Dos capas de timeout independientes con roles distintos:
+//   OLLAMA_TIMEOUT_MS (AbortController): guarda la generación LLM — produce mensaje clasificado al frontend.
+//   globalDispatcher (undici bodyTimeout): guarda TCP/socket — previene conexiones zombie a nivel de undici.
+// Ambas capas usan el mismo valor. Si se modifica OLLAMA_TIMEOUT_MS, actualizar también bodyTimeout aquí.
+const OLLAMA_TIMEOUT_MS = 25 * 60 * 1000; // 25 minutos — qwen2.5:14b con num_predict:8192 puede superar 15 min
+
 const globalDispatcher = new Agent({
-  connect: { timeout: 900000 },
-  headersTimeout: 900000,
-  bodyTimeout: 900000,
-  keepAliveTimeout: 900000,
+  connect:          { timeout: OLLAMA_TIMEOUT_MS },
+  headersTimeout:   OLLAMA_TIMEOUT_MS,
+  bodyTimeout:      OLLAMA_TIMEOUT_MS,
+  keepAliveTimeout: OLLAMA_TIMEOUT_MS,
 });
 setGlobalDispatcher(globalDispatcher);
 
@@ -20,12 +24,24 @@ export interface ILLMProvider {
   ): Promise<{ content: string; toolCalls?: Array<{ name: string; arguments: any }> }>;
 }
 
+function classifyOllamaError(err: unknown, timeoutMs: number): Error {
+  const msg = err instanceof Error ? err.message : String(err);
+  const name = err instanceof Error ? err.name : '';
+  if (name === 'AbortError' || msg.toLowerCase().includes('aborted')) {
+    return new Error(`Ollama timeout (>${Math.round(timeoutMs / 60_000)}min): generación detenida por límite de tiempo`);
+  }
+  if (msg.includes('ECONNREFUSED') || msg.toLowerCase().includes('fetch failed') || msg.includes('connect ')) {
+    return new Error(`Ollama no disponible (ECONNREFUSED): verifica que el contenedor ollama esté corriendo`);
+  }
+  return new Error(`Ollama fetch failed: ${msg}`);
+}
+
 export class OllamaProvider implements ILLMProvider {
   private url: string;
   private defaultModel: string;
 
 
-  private readonly OLLAMA_TIMEOUT = 15 * 60 * 1000; // 15 minutos
+  private readonly OLLAMA_TIMEOUT = OLLAMA_TIMEOUT_MS;
 
   constructor(url: string, defaultModel: string) {
     this.url = url.replace(/\/$/, '');
@@ -69,22 +85,56 @@ export class OllamaProvider implements ILLMProvider {
       });
     } catch (err) {
       clearTimeout(timeout);
-      throw new Error(`Ollama fetch failed: ${err instanceof Error ? err.message : String(err)}`);
+      throw classifyOllamaError(err, this.OLLAMA_TIMEOUT);
     }
     clearTimeout(timeout);
     
     if (!res.ok) {
-      // Leer el cuerpo del error para diagnóstico
       const errBody = await res.text();
+      // Si el modelo no existe y hay un fallback disponible, reintentar una vez con el modelo por defecto
+      if (res.status === 404 && finalModel !== defaultLocalModel) {
+        console.warn(`[Ollama] 404 para modelo '${finalModel}', reintentando con '${defaultLocalModel}'`);
+        finalModel = defaultLocalModel;
+        let retryRes: Response;
+        const retryController = new AbortController();
+        const retryTimeout = setTimeout(() => retryController.abort(), this.OLLAMA_TIMEOUT);
+        try {
+          retryRes = await fetch(`${base}/api/generate`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              model: finalModel,
+              prompt,
+              system: systemPrompt ?? '',
+              stream: false,
+              options: { num_ctx: 20480, num_predict: 8192 },
+            }),
+            signal: retryController.signal,
+          });
+        } catch (err) {
+          clearTimeout(retryTimeout);
+          throw classifyOllamaError(err, this.OLLAMA_TIMEOUT);
+        }
+        clearTimeout(retryTimeout);
+        if (!retryRes.ok) {
+          const retryErrBody = await retryRes.text();
+          console.error(`[Ollama] HTTP ${retryRes.status} (retry) - Response body: ${retryErrBody}`);
+          throw new Error(`Ollama error: ${retryRes.status} - ${retryErrBody.slice(0, 300)}`);
+        }
+        const retryData = await retryRes.json() as { response?: string };
+        if (!retryData.response) throw new Error('Ollama response empty (retry)');
+        console.log(`[Ollama] Respuesta recibida (retry con ${finalModel}), tamaño: ${retryData.response.length} chars`);
+        return retryData.response;
+      }
       console.error(`[Ollama] HTTP ${res.status} - Response body: ${errBody}`);
       throw new Error(`Ollama error: ${res.status} - ${errBody.slice(0, 300)}`);
     }
-    
+
     const data = await res.json() as { response?: string };
     if (!data.response) {
       throw new Error('Ollama response empty');
     }
-    
+
     console.log(`[Ollama] Respuesta recibida, tamaño: ${data.response.length} chars`);
     return data.response;
   }

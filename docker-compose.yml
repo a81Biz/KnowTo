@@ -7,8 +7,8 @@
 #   http://cce.localhost      → Microsite EC0249
 #   http://api.localhost      → API Gateway
 #   http://api.localhost/docs → Swagger UI (Scalar)
-#   http://localhost:54321    → Supabase API Gateway (REST + Auth + Realtime)
-#   http://localhost:54323    → Supabase Studio (administración de BD)
+#   http://localhost:54200    → Supabase API Gateway (REST + Auth + Realtime)
+#   http://localhost:54210    → Supabase Studio (administración de BD)
 #
 # Prerequisito (una sola vez en cada máquina):
 #   Añadir al archivo hosts del sistema operativo:
@@ -120,7 +120,7 @@ services:
     environment:
       NODE_ENV: development
       # Kong externo — el frontend se conecta desde el navegador del host
-      VITE_SUPABASE_URL: ${VITE_SUPABASE_URL:-http://localhost:54321}
+      VITE_SUPABASE_URL: ${VITE_SUPABASE_URL:-http://localhost:54200}
       VITE_SUPABASE_ANON_KEY: ${VITE_SUPABASE_ANON_KEY:-eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1sb2NhbCIsInJvbGUiOiJhbm9uIiwiaWF0IjoxNjEzNTMxOTg1LCJleHAiOjQ3NjkyMDU5ODV9.9oDfITnetRe3EYQzDh9CmgUFEJkLgHsGeKT8s1tHtvM}
     depends_on:
       - backend
@@ -145,7 +145,7 @@ services:
       - frontend_cce_node_modules:/frontend/cce/node_modules
     environment:
       NODE_ENV: development
-      VITE_SUPABASE_URL: ${VITE_SUPABASE_URL:-http://localhost:54321}
+      VITE_SUPABASE_URL: ${VITE_SUPABASE_URL:-http://localhost:54200}
       VITE_SUPABASE_ANON_KEY: ${VITE_SUPABASE_ANON_KEY:-eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1sb2NhbCIsInJvbGUiOiJhbm9uIiwiaWF0IjoxNjEzNTMxOTg1LCJleHAiOjQ3NjkyMDU5ODV9.9oDfITnetRe3EYQzDh9CmgUFEJkLgHsGeKT8s1tHtvM}
     depends_on:
       - backend
@@ -216,8 +216,8 @@ services:
     environment:
       GOTRUE_API_HOST: 0.0.0.0
       GOTRUE_API_PORT: 9999
-      API_EXTERNAL_URL: http://localhost:54321
-      GOTRUE_API_EXTERNAL_URL: http://localhost:54321
+      API_EXTERNAL_URL: http://localhost:54200
+      GOTRUE_API_EXTERNAL_URL: http://localhost:54200
       GOTRUE_DB_DRIVER: postgres
       # GoTrue v2.x requiere DATABASE_URL (sin prefijo GOTRUE_)
       DATABASE_URL: postgres://supabase_admin:${POSTGRES_PASSWORD:-supabase123}@supabase-db:5432/postgres
@@ -319,13 +319,13 @@ services:
 
   # ---------------------------------------------------------------------------
   # Supabase Studio — Interfaz web de administración
-  # Accesible en http://localhost:54323
+  # Accesible en http://localhost:54210
   # ---------------------------------------------------------------------------
   supabase-studio:
     image: supabase/studio:2026.04.13-sha-e95f1cc
     container_name: knowto-supabase-studio
     ports:
-      - "54323:3000"
+      - "54210:3000"
     environment:
       STUDIO_PG_META_URL: http://supabase-meta:8080
       SUPABASE_URL: http://supabase-kong:8000
@@ -340,7 +340,7 @@ services:
 
   # ---------------------------------------------------------------------------
   # Supabase Kong — API Gateway (unifica Auth + REST + Realtime)
-  # Accesible desde el host en http://localhost:54321
+  # Accesible desde el host en http://localhost:54200
   # Accesible dentro de la red Docker en http://supabase-kong:8000
   # ---------------------------------------------------------------------------
   supabase-kong:
@@ -357,7 +357,7 @@ services:
     volumes:
       - ./src/supabase/kong.yml:/var/lib/kong/kong.yml:ro
     ports:
-      - "54321:8000"   # API Gateway (REST, Auth, Realtime WebSocket)
+      - "54200:8000"   # API Gateway (REST, Auth, Realtime WebSocket)
     networks:
       - knowto-network
     restart: unless-stopped

@@ -1,4 +1,4 @@
-import { Hono } from 'hono';
+import { OpenAPIHono, createRoute, z } from '@hono/zod-openapi';
 import { SupabaseService } from '../services/supabase.service';
 import type { Env } from '../../core/types/env';
 import type { ArtifactStatus, CertificationScore } from '../types/certification.types';
@@ -9,15 +9,57 @@ export const EMPTY_CERT_SCORE: CertificationScore = {
   cobertura: 0, bloom: 0, modalidad: 0, idioma: 0, vocabulario: 0, trazabilidad: 0, total: 0,
 };
 
-const certificationRoutes = new Hono<{ Bindings: Env; Variables: { userId: string } }>();
+// ── Zod schemas ───────────────────────────────────────────────────────────────
 
-// ── GET /dcfl/api/certification-status/:projectId ─────────────────────────
-//
-// Aggregates the active artifact version for each of the 8 F4 products.
-// Returns per-product status + a weighted project score + certificable flag.
+const CertScoreSchema = z.object({
+  cobertura: z.number(), bloom: z.number(), modalidad: z.number(),
+  idioma: z.number(), vocabulario: z.number(), trazabilidad: z.number(), total: z.number(),
+}).openapi('CertificationScore');
 
-certificationRoutes.get('/:projectId', async (c) => {
-  const projectId = c.req.param('projectId');
+const ProductEntrySchema = z.object({
+  status: z.string(),
+  certScore: CertScoreSchema,
+  version: z.number(),
+}).openapi('ProductEntry');
+
+const CertStatusOkSchema = z.object({
+  products: z.record(ProductEntrySchema),
+  projectCertScore: CertScoreSchema,
+  certificable: z.boolean(),
+  warning: z.string().optional(),
+}).openapi('CertificationStatusResponse');
+
+const ErrorSchema = z.object({ error: z.string() });
+
+// ── Route spec ────────────────────────────────────────────────────────────────
+
+const routeGetCertStatus = createRoute({
+  method: 'get',
+  path: '/{projectId}',
+  tags: ['certification'],
+  summary: 'Estado de certificación por producto',
+  description: 'Agrega el estado del artifact_version activo de cada uno de los 8 productos F4. Devuelve estado por producto, score ponderado del proyecto y flag certificable.',
+  security: [{ bearerAuth: [] }],
+  request: {
+    params: z.object({ projectId: z.string().uuid() }),
+  },
+  responses: {
+    200: {
+      description: 'Estado de certificación agregado correctamente',
+      content: { 'application/json': { schema: CertStatusOkSchema } },
+    },
+    403: { description: 'Forbidden', content: { 'application/json': { schema: ErrorSchema } } },
+    503: { description: 'Servicio no disponible', content: { 'application/json': { schema: ErrorSchema } } },
+    500: { description: 'Error interno', content: { 'application/json': { schema: ErrorSchema } } },
+  },
+});
+
+// ── Router ────────────────────────────────────────────────────────────────────
+
+const certificationRoutes = new OpenAPIHono<{ Bindings: Env; Variables: { userId: string } }>();
+
+certificationRoutes.openapi(routeGetCertStatus, async (c) => {
+  const projectId = c.req.valid('param').projectId;
   const userId = c.get('userId');
   const supabase = new SupabaseService(c.env);
 
@@ -42,13 +84,24 @@ certificationRoutes.get('/:projectId', async (c) => {
       .in('product_code', PRODUCT_CODES as unknown as string[]);
 
     if (error) {
-      // 42P01 = relation does not exist (migrations not yet applied to this volume)
-      if ((error as any).code === '42P01' || error.message?.includes('does not exist')) {
+      const errMsg = error.message ?? '';
+      const errCode = (error as any).code ?? '';
+      // 42P01 = table does not exist (migration 046 not yet applied)
+      if (errCode === '42P01') {
         return c.json({
           products: {},
           projectCertScore: { ...EMPTY_CERT_SCORE },
           certificable: false,
           warning: 'CCM_NOT_INITIALIZED',
+        });
+      }
+      // 42703 = column does not exist (migration 048 not yet applied — status column missing)
+      if (errCode === '42703' || errMsg.includes('does not exist')) {
+        return c.json({
+          products: {},
+          projectCertScore: { ...EMPTY_CERT_SCORE },
+          certificable: false,
+          warning: 'CCM_SCHEMA_OUTDATED',
         });
       }
       console.error('[certification-route] artifact_versions query error:', error);
@@ -89,13 +142,13 @@ certificationRoutes.get('/:projectId', async (c) => {
     const projectCertScore: CertificationScore = n === 0
       ? { ...EMPTY_CERT_SCORE }
       : {
-        cobertura:    Math.round(presentCodes.reduce((s, k) => s + products[k].certScore.cobertura, 0) / n),
-        bloom:        Math.round(presentCodes.reduce((s, k) => s + products[k].certScore.bloom, 0) / n),
-        modalidad:    Math.round(presentCodes.reduce((s, k) => s + products[k].certScore.modalidad, 0) / n),
-        idioma:       Math.round(presentCodes.reduce((s, k) => s + products[k].certScore.idioma, 0) / n),
-        vocabulario:  Math.round(presentCodes.reduce((s, k) => s + products[k].certScore.vocabulario, 0) / n),
-        trazabilidad: Math.round(presentCodes.reduce((s, k) => s + products[k].certScore.trazabilidad, 0) / n),
-        total:        Math.round(presentCodes.reduce((s, k) => s + products[k].certScore.total, 0) / n),
+        cobertura:    Math.round(presentCodes.reduce((s, k) => s + products[k]!.certScore.cobertura, 0) / n),
+        bloom:        Math.round(presentCodes.reduce((s, k) => s + products[k]!.certScore.bloom, 0) / n),
+        modalidad:    Math.round(presentCodes.reduce((s, k) => s + products[k]!.certScore.modalidad, 0) / n),
+        idioma:       Math.round(presentCodes.reduce((s, k) => s + products[k]!.certScore.idioma, 0) / n),
+        vocabulario:  Math.round(presentCodes.reduce((s, k) => s + products[k]!.certScore.vocabulario, 0) / n),
+        trazabilidad: Math.round(presentCodes.reduce((s, k) => s + products[k]!.certScore.trazabilidad, 0) / n),
+        total:        Math.round(presentCodes.reduce((s, k) => s + products[k]!.certScore.total, 0) / n),
       };
 
     // certificable = all 8 products present + none have status 'rejected'

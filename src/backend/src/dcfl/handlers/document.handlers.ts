@@ -102,10 +102,11 @@ export async function handleGetJob(c: Context) {
   return c.json({
     success: true,
     data: {
-      jobId: job.id,
-      status: job.status as "pending" | "running" | "completed" | "failed",
-      result: job.result as Record<string, any> | undefined,
-      error: job.error,
+      jobId:    job.id,
+      status:   job.status as 'pending' | 'running' | 'completed' | 'failed',
+      result:   job.result as Record<string, any> | undefined,
+      error:    job.error,
+      progress: job.progress ?? null,
     },
     timestamp: new Date().toISOString(),
   }, 200 as any);
@@ -128,6 +129,7 @@ export async function handleGenerateAsync(c: Context) {
     c.env.ENVIRONMENT !== 'production' ? '00000000-0000-0000-0000-000000000001' : null
   );
   if (!userId) return c.json({ success: false, error: 'Unauthorized' }, 401);
+  body.userId = userId;
   const jobsSvc = new PipelineJobsService(c.env);
 
   const jobId = await jobsSvc.createJob({
@@ -199,11 +201,61 @@ export async function buildEnrichedContext(
     console.warn('[pipeline] No se pudo recuperar Project Brief:', err);
   }
 
+  // ── Canonical Production Spec freeze — tiempos, plan_video, estandar_seguimiento ──
+  // Single read per job; all downstream phases (F4-F7) consume _frozen read-only.
+  try {
+    const [temarioSpec, f2_5Spec, f3Spec] = await Promise.all([
+      supabase.getTemarioBase(body.projectId),
+      supabase.getF2_5Recomendaciones(body.projectId),
+      supabase.getF3Especificaciones(body.projectId),
+    ]);
+    if (!ctx._frozen) ctx._frozen = {};
+    if (temarioSpec) {
+      (ctx._frozen as any).duracion_total_minutos = temarioSpec.duracion_total_minutos ?? null;
+      (ctx._frozen as any).tiempos_por_modulo     = temarioSpec.tiempos ?? null;
+      (ctx._frozen as any).total_unidades         = temarioSpec.total_unidades ?? null;
+    }
+    if (f2_5Spec) {
+      (ctx._frozen as any).plan_video = {
+        cantidad:          (f2_5Spec as any).total_videos              ?? null,
+        duracion_promedio: (f2_5Spec as any).duracion_promedio_minutos ?? null,
+      };
+    }
+    if (f3Spec) {
+      (ctx._frozen as any).estandar_seguimiento =
+        (f3Spec as any).formato || (f3Spec as any).reporteo || null;
+    }
+  } catch (err) {
+    console.warn('[pipeline] Canonical Production Spec freeze parcial:', err);
+  }
+
   ctx._fecha_hoy = new Date().toLocaleDateString('es-MX', { day: '2-digit', month: '2-digit', year: 'numeric' });
 
-  // Pre-LLM substitution variables — available as {{estandarNorma}} and {{folioSugerido}} in all templates
-  ctx.estandarNorma = (ctx._frozen as any)?.estandar_norma ?? 'No especificado';
+  // Pre-LLM substitution variables — available as {{estandarNorma}}, {{folioSugerido}}, etc. in all templates
+  ctx.estandarNorma       = (ctx._frozen as any)?.estandar_norma       ?? 'No especificado';
+  ctx.idiomaRequerido     = (ctx._frozen as any)?.idioma_requerido      ?? 'español';
+  ctx.estandarSeguimiento = (ctx._frozen as any)?.estandar_seguimiento  ?? 'SCORM 1.2';
   ctx.folioSugerido = `${(ctx._frozen as any)?.estandar_norma ?? 'FORM'}-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
+
+  // F5/F6 document variables — needed for {{f3Plataforma}}, {{clientName}}, dates in evidencias and ajustes templates
+  try {
+    const _f3 = (ctx as any).previousData?.f3_estructurado
+      ?? await supabase.getF3Especificaciones(body.projectId);
+    ctx.f3Plataforma = (_f3 as any)?.plataforma || 'Plataforma a especificar';
+    ctx.f3Scorm = (_f3 as any)?.formato || 'SCORM 1.2';
+  } catch {
+    ctx.f3Plataforma = 'Plataforma a especificar';
+    ctx.f3Scorm = 'SCORM 1.2';
+  }
+  ctx.clientName = (ctx as any).clientName
+    || (ctx as any).projectName
+    || ((ctx as any)._frozen as any)?.nombre_oficial_curso
+    || 'Candidato';
+  ctx.versionActual = '1.0';
+  const _plus7 = new Date(); _plus7.setDate(_plus7.getDate() + 7);
+  const _fmtES = (d: Date) => d.toLocaleDateString('es-MX', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  ctx.fechaInicialCurso   = _fmtES(_plus7);
+  ctx.fechaRevisionActual = _fmtES(_plus7);
 
   try {
     const projectSoul = await supabase.getProjectSoul(body.projectId);
@@ -436,6 +488,7 @@ async function runP4WithOrchestration(
       await jobsSvc.failJob(
         jobId,
         'No se generaron capítulos para P4. Verifique que el temario base esté confirmado.',
+        { projectId: body.projectId },
       );
       return;
     }
@@ -447,7 +500,7 @@ async function runP4WithOrchestration(
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'Error en orquestación de capítulos P4';
     console.error('[p4-orchestration]', err);
-    await jobsSvc.failJob(jobId, msg);
+    await jobsSvc.failJob(jobId, msg, { projectId: body.projectId });
   }
 }
 
@@ -512,7 +565,7 @@ export async function runPipelineAsync(
   if (body.promptId === 'F4_P4_GENERATE_DOCUMENT') {
     const caps = (body.context as any)?.capitulos_generados;
     if (!caps || !Array.isArray(caps) || caps.length === 0) {
-      await jobsSvc.failJob(jobId, 'P4 requiere capítulos generados. Lance F4_P4_CHAPTER por cada unidad del temario primero.');
+      await jobsSvc.failJob(jobId, 'P4 requiere capítulos generados. Lance F4_P4_CHAPTER por cada unidad del temario primero.', { projectId: body.projectId });
       return;
     }
   }
@@ -527,11 +580,36 @@ export async function runPipelineAsync(
         .in('validacion_estado', ['aprobado', 'aprobado_con_errores', 'aprobado_por_fallback']);
       if (productosAprobados && productosAprobados.length > 0) {
         const lista = (productosAprobados as { producto: string }[]).map(r => r.producto).join(', ');
-        await jobsSvc.failJob(jobId, `No se puede regenerar el Temario Base. Productos aprobados: ${lista}.`);
+        await jobsSvc.failJob(jobId, `No se puede regenerar el Temario Base. Productos aprobados: ${lista}.`, { projectId: body.projectId });
         return;
       }
     } catch (err) {
       console.warn('[TEMARIO_BASE] No se pudo verificar productos aprobados:', err);
+    }
+  }
+
+  // PT-159: CANONICAL_SPEC_FREEZE gate — block F4/F5/F6/F7 jobs until the instructor
+  // has confirmed the canonical production spec (temario + F2.5 + F3 specs).
+  const isProductionPhase =
+    body.phaseId === 'F4' ||
+    body.phaseId === 'F5' ||
+    body.phaseId === 'F6' ||
+    body.phaseId === 'F7';
+  if (isProductionPhase) {
+    try {
+      const isFrozen = await supabase.getCanonicalSpecFrozen(body.projectId);
+      if (!isFrozen) {
+        await jobsSvc.failJob(
+          jobId,
+          'La especificación canónica de producción no ha sido confirmada. Confirma el temario y las especificaciones (Paso 3) antes de lanzar producción.',
+          { projectId: body.projectId }
+        );
+        return;
+      }
+    } catch (err) {
+      // Non-fatal: if we can't check the flag, allow the job to proceed
+      // (avoids blocking production for a DB connectivity issue).
+      console.warn('[canonical-spec-gate] No se pudo verificar canonical_spec_frozen:', err);
     }
   }
 
@@ -551,7 +629,7 @@ export async function runPipelineAsync(
         .in('validacion_estado', ['aprobado', 'aprobado_con_errores', 'aprobado_por_fallback'])
         .maybeSingle();
       if (!row) {
-        await jobsSvc.failJob(jobId, `${prereq.label} debe generarse antes de producir este documento.`);
+        await jobsSvc.failJob(jobId, `${prereq.label} debe generarse antes de producir este documento.`, { projectId: body.projectId });
         return;
       }
     }
@@ -567,7 +645,7 @@ export async function runPipelineAsync(
       context: enrichedContext as Record<string, unknown>,
       userInputs: body.userInputs,
       onProgress: async (progress) => {
-        await jobsSvc.updateJobProgress(jobId, progress);
+        await jobsSvc.updateJobProgress(jobId, progress, { projectId: body.projectId });
       },
       onAgentOutput: async (agentName, output): Promise<string | void> => {
         console.log(`[AI-SENSING] Agente [${agentName}] respondió con ${output?.length || 0} caracteres.`);
@@ -604,12 +682,12 @@ export async function runPipelineAsync(
       documentId = saved.documentId;
     }
 
-    await jobsSvc.completeJob(jobId, { documentId, content: sanitizedContent });
+    await jobsSvc.completeJob(jobId, { documentId, content: sanitizedContent }, { projectId: body.projectId });
     console.log(`[pipeline] SUCCESS job=${jobId}`);
 
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'Pipeline error';
     console.error(`[pipeline] FAILED job=${jobId}:`, err);
-    await jobsSvc.failJob(jobId, msg);
+    await jobsSvc.failJob(jobId, msg, { projectId: body.projectId });
   }
 }

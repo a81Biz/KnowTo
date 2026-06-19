@@ -89,15 +89,36 @@ export abstract class BaseSupabaseService {
 
     const { data, error } = await this.client!.rpc(this.spSaveDocument, {
       p_project_id: params.projectId,
-      p_step_id: params.stepId,
-      p_phase_id: params.phaseId,
-      p_title: params.title,
-      p_content: params.content,
+      p_step_id:    params.stepId,
+      p_phase_id:   params.phaseId,
+      p_title:      params.title,
+      p_content:    params.content,
     });
 
     if (error) throw new Error(`${this.spSaveDocument} failed: ${error.message}`);
     if (!data.success) throw new Error(data.error);
     return { documentId: data.document_id };
+  }
+
+  async getProjectDocuments(projectId: string): Promise<Array<{ phaseId: string; content: string }>> {
+    if (!this.client) return [];
+    const { data, error } = await this.client!
+      .from('documents')
+      .select('phase_id, content')
+      .eq('project_id', projectId)
+      .order('created_at', { ascending: false });
+    if (error) {
+      console.error('[getProjectDocuments]', error.message);
+      return [];
+    }
+    const seen = new Set<string>();
+    const result: Array<{ phaseId: string; content: string }> = [];
+    for (const row of data ?? []) {
+      if (seen.has(row.phase_id)) continue;
+      seen.add(row.phase_id);
+      result.push({ phaseId: row.phase_id, content: row.content });
+    }
+    return result;
   }
 
   async getProjectContext(projectId: string): Promise<Record<string, unknown>> {
@@ -625,6 +646,15 @@ export abstract class BaseSupabaseService {
     };
   }
 
+  async updateF3CriteriosAceptacion(projectId: string, criterios: string[]): Promise<void> {
+    if (!this.client) return;
+    const { error } = await this.client
+      .from('fase3_especificaciones')
+      .update({ criterios_aceptacion: criterios })
+      .eq('project_id', projectId);
+    if (error) throw new Error(`updateF3CriteriosAceptacion failed: ${error.message}`);
+  }
+
   // ── Recomendaciones estructuradas F2.5 ──────────────────────────────────────
 
   async saveF2_5Recomendaciones(params: {
@@ -965,6 +995,7 @@ export abstract class BaseSupabaseService {
     validacionBloom?: { valido: boolean; violaciones: string[] };
     advertenciaDuracion?: string;
     validacionBloomInstrument?: object[];
+    advertenciasNombres?: string[];
   }): Promise<void> {
     if (!this.client) return;
 
@@ -978,6 +1009,9 @@ export abstract class BaseSupabaseService {
     }
     if (params.validacionBloomInstrument?.length) {
       temarioEnvelope.validacion_bloom_instrument = params.validacionBloomInstrument;
+    }
+    if (params.advertenciasNombres?.length) {
+      temarioEnvelope.advertencias_nombres_modulos = params.advertenciasNombres;
     }
 
     const { error } = await this.client
@@ -1126,6 +1160,7 @@ export abstract class BaseSupabaseService {
         model:                    model ?? null,
         generated_by:             generatedBy ?? null,
         cert_score:               certScore,
+        status:                   status,
         correction_log:           correctionLog ?? null,
         derived_from_artifact_id: derivedFromArtifactId ?? null,
         is_active:                true,
@@ -1147,5 +1182,29 @@ export abstract class BaseSupabaseService {
     }
 
     return inserted as unknown as ArtifactVersion;
+  }
+
+  // ── PT-159: Canonical Spec Freeze gate ───────────────────────────────────
+
+  async getCanonicalSpecFrozen(projectId: string): Promise<boolean> {
+    if (!this.client) return false;
+    const { data } = await this.client
+      .from('projects')
+      .select('canonical_spec_frozen')
+      .eq('id', projectId)
+      .maybeSingle();
+    return (data as any)?.canonical_spec_frozen === true;
+  }
+
+  async confirmCanonicalSpecFrozen(projectId: string): Promise<void> {
+    if (!this.client) return;
+    const { error } = await this.client
+      .from('projects')
+      .update({
+        canonical_spec_frozen: true,
+        canonical_spec_frozen_at: new Date().toISOString(),
+      })
+      .eq('id', projectId);
+    if (error) throw new Error(`confirmCanonicalSpecFrozen failed: ${error.message}`);
   }
 }

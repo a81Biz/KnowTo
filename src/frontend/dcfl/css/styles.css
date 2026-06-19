@@ -31,6 +31,10 @@
   @apply bg-gray-200 text-gray-500;
 }
 
+.wizard-step-indicator.visited {
+  @apply bg-gray-300 text-gray-600;
+}
+
 /* Document preview */
 .document-preview {
   @apply font-mono text-sm leading-relaxed;

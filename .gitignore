@@ -12,5 +12,6 @@ functional/
 docs/
 graphify-out/
 output/
+PTSA/
 # Runtime state — scratch dirs created by tools
 src/backend/src/brain/

@@ -416,7 +416,7 @@ export async function handleDocumentP6Assembler(context: ProductContext): Promis
       promptTemplateId: 'F4_P6_GENERATE_DOCUMENT',
       promptTemplateVersion: '1.0',
       model: frozen.model ?? 'llama-3.1-8b',
-      generatedBy: 'ensamblador_doc_p6',
+      generatedBy: context.event.body?.userId ?? undefined,
     });
 
     console.log(`[p6-assembler] CCM: ${errorCount === 0 ? 'P6 sesión certificable ✅' : `${errorCount} error(es)`}`);

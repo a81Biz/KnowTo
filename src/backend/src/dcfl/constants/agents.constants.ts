@@ -75,6 +75,42 @@ export const Agent = {
   AGENTE_CONTENIDO_B:    'agente_contenido_B',
   JUEZ_CAPITULO:         'juez_capitulo',
   ENSAMBLADOR_CAPITULO:  'ensamblador_capitulo',
+
+  // F5 — Verificación
+  VERIFICACION_A:       'agente_verificacion_A',
+  VERIFICACION_B:       'agente_verificacion_B',
+  JUEZ_VERIFICACION:    'juez_verificacion',
+  ENSAMBLADOR_F5:       'ensamblador_f5',
+
+  // F5_2 — Evidencias
+  EVIDENCIAS_A:         'agente_evidencias_A',
+  EVIDENCIAS_B:         'agente_evidencias_B',
+  JUEZ_EVIDENCIAS:      'juez_evidencias',
+  ENSAMBLADOR_F5_2:     'ensamblador_f5_2',
+
+  // F6 — Ajustes
+  AJUSTES_A:            'agente_ajustes_A',
+  AJUSTES_B:            'agente_ajustes_B',
+  JUEZ_AJUSTES:         'juez_ajustes',
+  ENSAMBLADOR_F6:       'ensamblador_f6',
+
+  // F6_2a — Inventario
+  INVENTARIO_A:         'agente_inventario_A',
+  INVENTARIO_B:         'agente_inventario_B',
+  JUEZ_INVENTARIO:      'juez_inventario',
+  ENSAMBLADOR_F6_2A:    'ensamblador_f6_2a',
+
+  // F6_2b — Declaración
+  DECLARACION_A:        'agente_declaracion_A',
+  DECLARACION_B:        'agente_declaracion_B',
+  JUEZ_DECLARACION:     'juez_declaracion',
+  ENSAMBLADOR_F6_2B:    'ensamblador_f6_2b',
+
+  // F7 — Resumen cualitativo
+  RESUMEN_A:            'agente_resumen_A',
+  RESUMEN_B:            'agente_resumen_B',
+  JUEZ_RESUMEN_PROCESO: 'juez_resumen_proceso',
+  ENSAMBLADOR_F7:       'ensamblador_f7',
 } as const;
 
 export type AgentName = typeof Agent[keyof typeof Agent];

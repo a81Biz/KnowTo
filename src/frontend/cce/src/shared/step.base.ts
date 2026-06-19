@@ -307,7 +307,7 @@ export class BaseStep {
           } else if (st.status === 'failed') {
             reject(new Error(st.error || 'Fallo el pipeline en el backend.'));
           } else {
-            setTimeout(poll, 2000);
+            setTimeout(poll, 10_000);
           }
         } catch (err) {
           reject(err);

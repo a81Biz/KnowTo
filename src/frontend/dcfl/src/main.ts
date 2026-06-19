@@ -144,7 +144,8 @@ async function resumeProject(projectId: string): Promise<void> {
     );
     const project = res.data?.['project'] as Record<string, unknown> | undefined;
     const steps = res.data?.['steps'] as Record<string, unknown>[] | undefined;
-    
+    const docsRaw = res.data?.['documents'] as Record<string, unknown>[] | undefined;
+
     if (project) {
       wizardStore.setProjectId(projectId);
       wizardStore.setClientData({
@@ -160,39 +161,44 @@ async function resumeProject(projectId: string): Promise<void> {
         wizardStore.setStepStatus(i, 'pending');
       }
 
-      let maxCompleted = -1;
+      // Build a map step_id → latest document (ordered by created_at asc, last wins)
+      const docByStepId = new Map<string, { id: string; content: string }>();
+      if (docsRaw) {
+        for (const doc of docsRaw) {
+          const sid = doc['step_id'] as string | undefined;
+          if (sid) {
+            docByStepId.set(sid, {
+              id:      doc['id'] as string,
+              content: doc['content'] as string,
+            });
+          }
+        }
+      }
 
       if (steps) {
         for (const apiStep of steps) {
           const stepNumber = Number(apiStep['step_number']);
           const status = String(apiStep['status']);
-          const outputText = apiStep['output_text'] as string | undefined;
           const stepId = apiStep['id'] as string;
 
           if (apiStep['input_data']) {
-            const parsedInput = typeof apiStep['input_data'] === 'string' 
-              ? JSON.parse(apiStep['input_data']) 
+            const parsedInput = typeof apiStep['input_data'] === 'string'
+              ? JSON.parse(apiStep['input_data'])
               : apiStep['input_data'];
             wizardStore.setStepInputData(stepNumber, parsedInput);
           }
-          if (status === 'completed') {
-            maxCompleted = Math.max(maxCompleted, stepNumber);
-            if (outputText) {
-              wizardStore.setStepDocument(stepNumber, outputText, stepId);
-            } else {
-              wizardStore.setStepStatus(stepNumber, 'completed');
-            }
+
+          // Document existence in BD is the primary completion signal
+          const doc = stepId ? docByStepId.get(stepId) : undefined;
+          if (doc?.content && doc?.id) {
+            wizardStore.setStepDocument(stepNumber, doc.content, doc.id);
+          } else if (status === 'completed') {
+            // Fallback: status completed without a documents row (e.g. F4 via POST /step/complete)
+            wizardStore.setStepStatus(stepNumber, 'completed');
           }
+
           if (stepId) wizardStore.setStepId(stepNumber, stepId);
         }
-        // Reparación de hidratación: Si un paso superior está completado, 
-        // los pasos inferiores (aunque fuesen saltados) se marcan visualmente como completados.
-        // Opcional: Esto ya no debería ser necesario si iteramos buscando el primer incompleto.
-        // for (let i = 0; i < maxCompleted; i++) {
-        //    if (wizardStore.getState().steps[i].status !== 'completed') {
-        //       wizardStore.setStepStatus(i, 'completed');
-        //    }
-        // }
       }
 
       // Calcular nextStep como el PRIMER paso que devuelva status !== 'completed'
@@ -226,7 +232,8 @@ function renderProgress(): void {
           <div class="flex flex-col items-center">
             <div class="wizard-step-indicator ${
               step.status === 'completed' ? 'completed' :
-              i === currentStep ? 'active' : 'pending'
+              i === currentStep ? 'active' :
+              i < currentStep ? 'visited' : 'pending'
             }" title="${step.label}">
               ${step.status === 'completed' ? '✓' : String(i + 1)}
             </div>
@@ -270,6 +277,8 @@ btnNext.addEventListener('click', () => {
   wizardStore.nextStep();
   void loadStep(wizardStore.getCurrentStep());
 });
+
+window.addEventListener('wizard:stepCompleted', () => renderProgress());
 
 // ============================================================================
 // INIT

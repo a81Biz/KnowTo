@@ -1,75 +1,88 @@
 ---
 id: F6_2b
 name: Resumen Ejecutivo y Declaración Final
-version: 1.0.0
-tags: [EC0366, resumen-ejecutivo, declaracion, cierre, certificacion]
+version: 2.0.0
+tags: [resumen-ejecutivo, declaracion, cierre, certificacion, battle-pattern]
+pipeline_steps:
+
+  # ── ESPECIALISTA A ────────────────────────────────────────────────────────
+  - agent: agente_declaracion_A
+    model: "qwen2.5:14b"
+    inputs_from: []
+    include_template: true
+    task: |
+      Eres un coordinador de certificación responsable del resumen ejecutivo del expediente conforme a {{estandarNorma}}.
+      Extrae los datos del curso del contexto del proyecto (nombre, industria, duración de estudio, modalidad, plataforma, módulos, videos, fechas).
+      Para el campo "duracion": usa EXCLUSIVAMENTE el valor de `resumen_datos.duracion` del contexto. Este campo representa las HORAS DE ESTUDIO del curso para los participantes. PROHIBIDO usar duraciones de producción de video (minutos por video de F2.5) — esos son datos de producción, no de estudio.
+      Genera un resumen ejecutivo conciso y una declaración formal.
+      SALIDA: SOLO JSON válido con la estructura resumen_declaracion descrita en la plantilla.
+
+  # ── ESPECIALISTA B ────────────────────────────────────────────────────────
+  - agent: agente_declaracion_B
+    model: "qwen2.5:14b"
+    inputs_from: []
+    include_template: true
+    task: |
+      Eres un especialista en documentación de cierre para procesos de certificación conforme a {{estandarNorma}}.
+      Genera el resumen ejecutivo con datos precisos del contexto del proyecto y una declaración formal completa.
+      Para el campo "duracion": usa EXCLUSIVAMENTE el valor de `resumen_datos.duracion` del contexto. Este campo representa las HORAS DE ESTUDIO del curso para los participantes. PROHIBIDO usar duraciones de producción de video (minutos por video de F2.5) — esos son datos de producción, no de estudio.
+      Incluye los logros del proceso y observaciones para el organismo certificador.
+      SALIDA: SOLO JSON válido con la estructura resumen_declaracion descrita en la plantilla.
+
+  # ── JUEZ ──────────────────────────────────────────────────────────────────
+  - agent: juez_declaracion
+    model: "qwen2.5:14b"
+    inputs_from: [agente_declaracion_A, agente_declaracion_B]
+    include_template: false
+    task: |
+      Compara los dos resúmenes ejecutivos (A y B).
+      Selecciona el más completo, con datos más precisos y declaración más formal.
+      DEVUELVE SOLO: {"seleccion":"A","razon":"justificación en una frase"}
+
+  # ── ENSAMBLADOR (TypeScript, sin LLM) ─────────────────────────────────────
+  - agent: ensamblador_f6_2b
+    model: null
+    inputs_from: [juez_declaracion]
+    include_template: false
+    task: ""
 ---
 
-Actúa como un coordinador de certificación responsable del cierre del expediente ante la entidad certificadora.
+## CONTEXTO DEL PROYECTO
+{context}
 
-## CONTEXTO ACUMULADO DEL PROYECTO
-{{context}}
+## DATOS DEL USUARIO EN ESTA FASE
+{userInputs}
 
-## DATOS DE ENTRADA DEL USUARIO EN ESTA FASE
-{{userInputs}}
+## ESTRUCTURA JSON REQUERIDA (SALIDA OBLIGATORIA)
 
-## INSTRUCCIÓN
-Genera ÚNICAMENTE el resumen ejecutivo del proceso y la declaración final. El inventario y firmas ya fueron generados en F6_2a.
+Responde SOLO con JSON válido. Sin texto adicional fuera del JSON.
 
-Extrae del contexto: nombre del curso (F1), industria/sector (F0), duración total (F3), modalidad (F2), plataforma LMS (F3), número de módulos (F2), número de actividades (F2), fechas de inicio y cierre del proceso.
+```json
+{
+  "resumen_declaracion": {
+    "datos_curso": {
+      "nombre": "Nombre oficial del curso extraído del contexto",
+      "industria": "Industria/Sector del proyecto",
+      "duracion": "usar resumen_datos.duracion — son las HORAS DE ESTUDIO del curso (NO minutos de producción de video)",
+      "modalidad": "Virtual/Presencial/Mixta",
+      "plataforma": "Nombre de la plataforma LMS",
+      "scorm": "SCORM 1.2/2004/No aplica",
+      "modulos": "N módulos",
+      "videos": "N videos producidos",
+      "fecha_inicio": "DD/MM/AAAA"
+    },
+    "logros": "Párrafo conciso sobre el logro principal de este curso y cómo resolverá la necesidad del cliente.",
+    "observaciones_organismo": "Indicar si hubo ajustes post-evaluación y que el curso pasó por revisión. Si no hubo ajustes significativos, indicarlo.",
+    "declaracion_adicional": "Texto formal de declaración del candidato (este campo es informativo para el ensamblador)"
+  }
+}
+```
 
-## FORMATO DE SALIDA OBLIGATORIO
-
-# RESUMEN EJECUTIVO Y DECLARACIÓN FINAL
-**Proyecto:** {{projectName}}
-**Candidato:** {{clientName}}
-**Folio de expediente:** {{folioSugerido}}
-**Fecha de cierre:** {{fechaActual}}
-
----
-
-## 1. RESUMEN EJECUTIVO DEL PROCESO
-
-| Dato | Valor |
-|:---|:---|
-| Nombre del curso desarrollado | {resumen_datos.titulo} |
-| Industria / Sector | {resumen_datos.industria} |
-| Duración total del curso | {resumen_datos.duracion} |
-| Modalidad | {resumen_datos.modalidad} |
-| Plataforma LMS utilizada | {resumen_datos.plataforma} |
-| Estándar de empaquetamiento | {resumen_datos.scorm} |
-| Número de módulos | {resumen_datos.modulos} |
-| Número de videos producidos | {resumen_datos.videos} |
-| Fecha de inicio del diseño instruccional | {resumen_datos.fecha_inicio_proceso} |
-| Fecha de cierre del expediente | {{fechaActual}} |
-
-### Logros del proceso
-[Basándote en el contexto, genera un párrafo conciso sobre el logro principal de este curso y cómo resolverá la necesidad del cliente.]
-
-### Observaciones y recomendaciones para el organismo certificador
-[Si hubo ajustes post-evaluación documentados en F6, mencionar brevemente que el curso pasó por un proceso de revisión y ajuste. Si no hubo ajustes significativos, indicarlo.]
-
----
-
-## 2. DECLARACIÓN FINAL
-
-El candidato {{clientName}} declara bajo protesta de decir verdad que:
-
-1. Todos los documentos incluidos en este expediente son auténticos.
-2. El curso descrito fue desarrollado íntegramente por el/la suscrito/a.
-3. El proceso se realizó conforme al estándar de certificación aplicable ({{estandarNorma}}).
-4. Las evidencias presentadas corresponden al proceso real de desarrollo y despliegue del curso.
-5. Los instrumentos de evaluación cumplen con los requisitos del estándar de certificación aplicable.
-
-**Nombre del candidato:** {{clientName}}
-**Firma:** _________________________
-**Fecha:** _________________________
-
----
-
-> *Este expediente fue generado con apoyo de la plataforma KnowTo como herramienta de diseño instruccional. El contenido, decisiones pedagógicas y evidencias son responsabilidad del candidato.*
-
-## INSTRUCCIONES DE CALIDAD
-- CRÍTICO: Debes reemplazar TODOS los placeholders {AÑO}, {4_DIGITOS_AL_AZAR}, {título...}, {del contexto...} con DATOS REALES extraídos del contexto acumulado.
-- Si un dato realmente no está en el contexto, escribe "No especificado". NUNCA imprimas las llaves o corchetes en tu respuesta final.
-- Responde SOLO en español. Genera únicamente este documento, sin preámbulos.
+REGLAS ABSOLUTAS:
+- Extrae todos los datos disponibles del contexto — no inventes ni estimes.
+- Si un dato no está en el contexto, usa "No especificado" (NUNCA imprimas llaves o corchetes).
+- El campo logros debe redactarse en un tono formal y corporativo.
+- Responde SOLO en {{idiomaRequerido}}.
+- OUTPUT SOLO JSON VÁLIDO — sin texto, sin markdown adicional.
+- PROHIBIDO usar datos de duración de producción audiovisual (minutos por video, duración_minima, duracion_maxima de F2.5) como valor del campo "duracion". Ese campo representa HORAS DE ESTUDIO del participante, no tiempo de producción.
+- Para "duracion": usar ÚNICAMENTE resumen_datos.duracion. Si no está disponible, usar "No especificado".

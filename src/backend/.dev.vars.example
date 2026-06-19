@@ -1,0 +1,11 @@
+ENVIRONMENT=development
+OLLAMA_URL=http://ollama:11434
+OLLAMA_MODEL=qwen2.5:14b
+
+# Búsqueda enriquecimiento OSINT (F0 Marco de Referencia + F4_P4 Capítulos)
+# Obtener en: https://app.tavily.com/
+TAVILY_API_KEY=tvly-XXXXXXXXXXXXXXXX
+
+SUPABASE_URL=http://supabase-kong:8000
+SUPABASE_SERVICE_ROLE_KEY=your-supabase-service-role-key
+SUPABASE_JWT_SECRET=your-supabase-jwt-secret-at-least-32-chars

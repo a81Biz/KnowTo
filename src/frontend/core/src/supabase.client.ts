@@ -9,6 +9,6 @@ if (!supabaseUrl || !supabaseAnonKey) {
 }
 
 export const supabase = createClient(
-  supabaseUrl ?? 'http://localhost:54321',
+  supabaseUrl ?? 'http://localhost:54200',
   supabaseAnonKey ?? 'dummy-key'
 );

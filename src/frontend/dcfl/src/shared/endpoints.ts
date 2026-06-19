@@ -59,6 +59,7 @@ export const ENDPOINTS = {
     fase2_5Recomendaciones: (projectId: string) => `/wizard/project/${projectId}/fase2_5/recomendaciones`,
     fase3Especificaciones: (projectId: string) => `/wizard/project/${projectId}/fase3/especificaciones`,
     fase4Productos:        (projectId: string) => `/wizard/project/${projectId}/fase4/productos`,
+    documents:             (projectId: string) => `/wizard/project/${projectId}/documents`,
     phaseQuestions: (projectId: string, phaseDestino: number) =>
       `/wizard/project/${projectId}/phase-questions/${phaseDestino}`,
     phaseAnswers:   (projectId: string) => `/wizard/project/${projectId}/phase-answers`,
@@ -66,6 +67,10 @@ export const ENDPOINTS = {
     f0Estructurado: (projectId: string) => `/wizard/project/${projectId}/f0-estructurado`,
     listProjects:  '/wizard/projects',
     job:           (jobId: string) => `/wizard/job/${jobId}`,
+  },
+  canonicalSpec: {
+    status:  (projectId: string) => `/api/canonical-spec/${projectId}`,
+    confirm: (projectId: string) => `/api/canonical-spec/${projectId}/confirm`,
   },
   health: '/health',
 } as const;

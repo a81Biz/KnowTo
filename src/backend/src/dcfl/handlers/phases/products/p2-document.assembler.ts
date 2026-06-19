@@ -412,7 +412,7 @@ export async function handleDocumentP2Assembler(context: ProductContext): Promis
       promptTemplateId: 'F4_P2_GENERATE_DOCUMENT',
       promptTemplateVersion: '1.0',
       model: frozen.model ?? 'llama-3.1-8b',
-      generatedBy: 'ensamblador_doc_p2',
+      generatedBy: context.event.body?.userId ?? undefined,
     });
 
     console.log(`[p2-assembler] CCM: ${errorCount === 0 ? 'P2 módulo certificable ✅' : `${errorCount} error(es)`}`);

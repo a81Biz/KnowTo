@@ -64,7 +64,7 @@ class Step3RecommendationsController extends BaseStep {
     const { projectId } = wizardStore.getState();
     if (!projectId) return;
 
-    // Primero verificar si ya existen resoluciones guardadas
+    // Cargar resoluciones previas (si existen)
     try {
       const resRes = await getData<{ resoluciones: Resolucion[]; listo_para_f3: boolean }>(
         buildEndpoint(ENDPOINTS.wizard.fase2Resolucion(projectId)),
@@ -72,10 +72,11 @@ class Step3RecommendationsController extends BaseStep {
       if (resRes.data?.resoluciones?.length) {
         this._valoresResueltos = resRes.data.resoluciones;
         this._confrontacionResuelta = true;
-        return; // Ya resuelto — no hace falta mostrar el panel otra vez
+        // No hacer early-return: cargar también discrepancias para poder reabrirlas
       }
     } catch { /* sin resoluciones previas */ }
 
+    // Siempre cargar discrepancias para que _reabrirConfrontacion tenga datos
     try {
       const discRes = await getData<{ discrepancias: Discrepancia[]; total: number }>(
         buildEndpoint(ENDPOINTS.wizard.fase2Discrepancias(projectId)),
@@ -184,6 +185,24 @@ class Step3RecommendationsController extends BaseStep {
     const list = wrapper.querySelector<HTMLElement>('#disc-list');
     const btnConfirmar = wrapper.querySelector<HTMLButtonElement>('#btn-confirmar-disc');
 
+    // Pre-seleccionar radios con resoluciones previas (cuando el usuario hace click en "Revisar")
+    if (this._valoresResueltos.length > 0) {
+      this._discrepancias.forEach((d, idx) => {
+        const prev = this._valoresResueltos.find(r => r.aspecto === d.aspecto);
+        if (prev) {
+          const radio = wrapper.querySelector<HTMLInputElement>(
+            `input[name="disc_${idx}"][value="${prev.decision}"]`
+          );
+          if (radio) radio.checked = true;
+        }
+      });
+      // Habilitar confirmar si todas las discrepancias ya tienen selección
+      const allAnswered = this._discrepancias.every((_, i) =>
+        !!wrapper.querySelector<HTMLInputElement>(`input[name="disc_${i}"]:checked`)
+      );
+      if (btnConfirmar) btnConfirmar.disabled = !allAnswered;
+    }
+
     list?.addEventListener('change', () => {
       const allAnswered = this._discrepancias.every((_, i) =>
         !!wrapper.querySelector<HTMLInputElement>(`input[name="disc_${i}"]:checked`),
@@ -239,9 +258,8 @@ class Step3RecommendationsController extends BaseStep {
   }
 
   private _reabrirConfrontacion(wrapper: HTMLElement): void {
-    // Resetear estado y re-renderizar el panel con el formulario
     this._confrontacionResuelta = false;
-    this._valoresResueltos = [];
+    // _valoresResueltos se conserva: _injectConfrontacionPanel los usará para pre-selección
     wrapper.remove();
     this._injectConfrontacionPanel();
   }

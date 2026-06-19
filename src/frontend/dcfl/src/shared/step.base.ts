@@ -6,24 +6,11 @@ import { TemplateLoader } from '@core/template.loader';
 import { postData } from '@core/http.client';
 import { ENDPOINTS, buildEndpoint } from './endpoints';
 import { showLoading, hideLoading, showError, showSuccess, renderMarkdown, printDocument } from '@core/ui';
-import { subscribeToJob, type JobResult, type JobSubscription } from './supabase.realtime';
+import { jobHub, type JobResult, type JobSubscription } from './supabase.realtime';
 import { logger } from './logger';
 import { wizardStore } from '../stores/wizard.store';
 import type { PhaseId, PromptId } from '../types/wizard.types';
 
-// Mapa de paso → ID del extractor que prepara su contexto.
-// Solo los pasos que necesitan contexto compacto (2 en adelante).
-const EXTRACTOR_FOR_STEP: Record<number, string> = {
-  2:  'EXTRACTOR_F2',
-  3:  'EXTRACTOR_F2_5',
-  4:  'EXTRACTOR_F3',
-  // Step 5 (F4 products) loads all context server-side in buildEnrichedContext — no client-side extractor needed.
-  6:  'EXTRACTOR_F5',
-  7:  'EXTRACTOR_F5_2',
-  8:  'EXTRACTOR_F6',
-  9:  'EXTRACTOR_F6_2a',
-  10: 'EXTRACTOR_F6_2b',
-};
 
 // ============================================================================
 // 1. TIPOS
@@ -167,6 +154,7 @@ export class BaseStep {
     if (!this._dom.previewPanel || !this._dom.documentPreview) return;
     this._dom.documentPreview.innerHTML = renderMarkdown(markdown);
     this._dom.previewPanel.classList.remove('hidden');
+    this._dom.form?.classList.add('hidden');
     this._ensurePrintButton(markdown);
   }
 
@@ -227,6 +215,7 @@ export class BaseStep {
     if (!this._config.promptId) {
       wizardStore.setStepInputData(this._config.stepNumber, formData);
       wizardStore.setStepStatus(this._config.stepNumber, 'completed');
+      window.dispatchEvent(new CustomEvent('wizard:stepCompleted', { detail: { stepNumber: this._config.stepNumber } }));
       return;
     }
 
@@ -339,6 +328,7 @@ export class BaseStep {
           res.data.documentId
         );
         this._renderPreview(res.data.content);
+        window.dispatchEvent(new CustomEvent('wizard:stepCompleted', { detail: { stepNumber: this._config.stepNumber } }));
       }
     } catch (err) {
       showError(err instanceof Error ? err.message : 'Error al generar el documento');
@@ -508,6 +498,7 @@ export class BaseStep {
       this._renderPreview(result.content);
       this._setLoading(false);
       hideLoading();
+      window.dispatchEvent(new CustomEvent('wizard:stepCompleted', { detail: { stepNumber: this._config.stepNumber } }));
     };
 
     const onError = (error: string) => {
@@ -533,8 +524,11 @@ export class BaseStep {
     // Sin esto, cada "Regenerar" acumula un polling timer adicional.
     this._jobSubscription?.cancel();
 
-    logger.info(`[step${this._config.stepNumber}] Esperando via Supabase Realtime (WebSocket)...`);
-    this._jobSubscription = subscribeToJob(jobId, onComplete, onError, onUpdate);
+    const projectId = wizardStore.getState().projectId;
+    if (projectId) jobHub.activate(projectId);
+
+    logger.info(`[step${this._config.stepNumber}] Esperando via Realtime Broadcast...`);
+    this._jobSubscription = jobHub.subscribeToJobCallback(jobId, onComplete, onError, onUpdate);
   }
 
 
@@ -562,6 +556,8 @@ export class BaseStep {
     });
 
     this._dom.btnRegenerate?.addEventListener('click', () => {
+      this._dom.previewPanel?.classList.add('hidden');
+      this._dom.form?.classList.remove('hidden');
       void this._generateDocumentAsync();
     });
   }

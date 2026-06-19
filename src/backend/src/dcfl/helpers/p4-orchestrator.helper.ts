@@ -113,5 +113,20 @@ export async function orchestrateP4Chapters(
   }
 
   console.log(`[p4-orchestrator] ${capitulos_generados.length}/${todasUnidades.length} capítulos listos`);
+
+  // PT-153: Coverage gate — fail the orchestration when any chapter is missing.
+  // A partial document (N-1 chapters) is semantically invalid; downstream assembler must not run.
+  if (capitulos_generados.length < todasUnidades.length) {
+    const generatedIndexes = new Set(capitulos_generados.map(c => c.index));
+    const missingUnits = todasUnidades
+      .map((u, i) => ({ index: i, nombre: u.nombre }))
+      .filter(u => !generatedIndexes.has(u.index))
+      .map(u => `[${u.index}] ${u.nombre}`);
+    throw new Error(
+      `[p4-orchestrator] Cobertura incompleta: ${capitulos_generados.length}/${todasUnidades.length} capítulos generados. ` +
+      `Faltantes: ${missingUnits.join(', ')}`
+    );
+  }
+
   return capitulos_generados;
 }

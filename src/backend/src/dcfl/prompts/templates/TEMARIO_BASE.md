@@ -55,6 +55,8 @@ pipeline_steps:
       Never reference certification standards, norms, or regulatory bodies in the syllabus content.
       The course topic is defined by {courseTopic} in the context.
 
+      NOMBRE_MODULO RULE (MANDATORY): Module names must describe a specific technical sub-domain or competency area derived from {_frozen.dominio_tecnico}. FORBIDDEN: repeating or paraphrasing the full course name ({_frozen.nombre_oficial_curso}). CORRECT: "Instalación y Configuración de Redes", "Diagnóstico de Fallas Eléctricas". INCORRECT: "Fundamentos del Curso de Redes", "Introducción al Curso".
+
       YOUR TASK: For each proposed module, define its learning units with:
       - nombre: specific, descriptive unit name (not "Unit 1")
       - objetivo_bloom: one observable learning objective using an action verb
@@ -100,6 +102,8 @@ pipeline_steps:
 
       AGNOSTIC RULE (MANDATORY): Never reference certification standards or norms.
       The course topic is defined by {courseTopic} in the context.
+
+      NOMBRE_MODULO RULE (MANDATORY): Module names must describe a specific technical sub-domain or competency area derived from {_frozen.dominio_tecnico}. FORBIDDEN: repeating or paraphrasing the full course name ({_frozen.nombre_oficial_curso}). CORRECT: "Instalación y Configuración de Redes", "Diagnóstico de Fallas Eléctricas". INCORRECT: "Fundamentos del Curso de Redes", "Introducción al Curso".
 
       YOUR TASK: Design an alternative structure that differs from the obvious first choice:
       - Try a different pedagogical sequence (e.g., problem-first instead of concept-first)
