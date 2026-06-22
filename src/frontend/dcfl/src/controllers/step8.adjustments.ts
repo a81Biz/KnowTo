@@ -6,6 +6,8 @@
 
 import { BaseStep } from '../shared/step.base';
 import { showError } from '@core/ui';
+import { getData } from '@core/http.client';
+import { buildEndpoint } from '../shared/endpoints';
 import { wizardStore } from '../stores/wizard.store';
 import type { DynamicFormField, DynamicFormSchema } from '../types/wizard.types';
 
@@ -46,9 +48,26 @@ class Step8AdjustmentsController extends BaseStep {
     this._dom.form = this._container.querySelector('#form-step8') ?? undefined;
   }
 
-  // Extrae los módulos del curso leyendo los documentos ya generados en el wizard store.
-  // Busca en F2 (idx 2), F3 (idx 4) y F2.5 (idx 3). Sin LLM.
-  private _extractModules(): Array<{ num: number; nombre: string }> {
+  // Consulta TEMARIO_BASE API para obtener los módulos reales del curso.
+  // Fallback: extrae módulos por regex de documentos del wizard store.
+  private async _fetchModulesFromTemario(): Promise<Array<{ num: number; nombre: string }>> {
+    const projectId = wizardStore.getState().projectId;
+    if (projectId) {
+      try {
+        const res = await getData<{ temario?: Array<{ modulo: string }> }>(
+          buildEndpoint(`/api/temario/${projectId}`)
+        );
+        const modulos = res?.temario ?? [];
+        if (modulos.length > 0) {
+          return modulos.map((m, i) => ({ num: i + 1, nombre: m.modulo ?? `Módulo ${i + 1}` }));
+        }
+      } catch { /* fall through to doc-scraping fallback */ }
+    }
+    return this._extractModulesFromDocs();
+  }
+
+  // Fallback: extrae módulos por regex de documentos del wizard store.
+  private _extractModulesFromDocs(): Array<{ num: number; nombre: string }> {
     const steps = wizardStore.getState().steps;
     for (const idx of [2, 4, 3, 5]) {
       const doc = steps[idx]?.documentContent ?? '';
@@ -61,7 +80,7 @@ class Step8AdjustmentsController extends BaseStep {
         const name = m[2].replace(/\*+/g, '').trim();
         if (!map.has(n) && name.length > 2) map.set(n, name);
       }
-      if (map.size > 1) {
+      if (map.size >= 1) {
         return Array.from(map.entries()).map(([num, nombre]) => ({ num, nombre })).sort((a, b) => a.num - b.num);
       }
     }
@@ -122,8 +141,8 @@ class Step8AdjustmentsController extends BaseStep {
     };
   }
 
-  private _loadDynamicForm(): void {
-    const modules = this._extractModules();
+  private async _loadDynamicForm(): Promise<void> {
+    const modules = await this._fetchModulesFromTemario();
     const schema = this._buildSchema(modules);
     this._renderDynamicForm(schema);
     if (this._adjDom.formGenerationPanel) this._adjDom.formGenerationPanel.classList.add('hidden');
@@ -190,6 +209,11 @@ class Step8AdjustmentsController extends BaseStep {
       }
     });
 
+    this._dom.btnViewForm?.addEventListener('click', () => {
+      this._dom.previewPanel?.classList.add('hidden');
+      if (this._adjDom.formGenerationPanel) this._adjDom.formGenerationPanel.classList.remove('hidden');
+    });
+
     this._dom.btnRegenerate?.addEventListener('click', () => {
       void this._generateDocumentAsync();
     });
@@ -197,7 +221,7 @@ class Step8AdjustmentsController extends BaseStep {
 
   private _bindSubDomEvents(): void {
     this._adjDom.btnGenerateForm?.addEventListener('click', () => {
-      this._loadDynamicForm();
+      void this._loadDynamicForm();
     });
   }
 

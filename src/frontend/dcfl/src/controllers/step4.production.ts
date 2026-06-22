@@ -51,6 +51,7 @@ class Step5ProductionController extends BaseStep {
   private _temarioSubscription: JobSubscription | null = null;
   private _projectSoul: string | null = null;
   private _temarioConfirmado = false;
+  private _temarioData: any = null;
   private _f3Valid = false;
   private _canonicalSpecFrozen = false;
   /** Raw datos_producto for P1 — populated in _loadProductsFromBD for strategy panel */
@@ -431,6 +432,7 @@ class Step5ProductionController extends BaseStep {
     try {
       const res = await getData<any>(buildEndpoint(`/api/temario/${projectId}`));
       this._temarioConfirmado = res?.confirmado_por_usuario === true;
+      if (this._temarioConfirmado) this._temarioData = res;
     } catch {
       this._temarioConfirmado = false;
     }
@@ -1169,7 +1171,8 @@ class Step5ProductionController extends BaseStep {
         for (let i = 0; i < moduloKeys.length; i++) {
           const key = moduloKeys[i];
           const moduloNum = parseInt(key.replace('guion_unidad_', ''), 10);
-          const nombreVideo = labelMap[key] || `Módulo ${moduloNum}`;
+          const nombreCanónico = (this._temarioData?.temario as any[])?.[moduloNum - 1]?.nombre;
+          const nombreVideo = nombreCanónico || labelMap[key] || `Módulo ${moduloNum}`;
           showLoading(`⏳ Generando Guiones P3... Módulo ${i + 1}/${moduloKeys.length}: ${nombreVideo}`);
 
           const res = await postData<{ jobId: string }>(
@@ -1971,6 +1974,7 @@ class Step5ProductionController extends BaseStep {
   }
 
   override _bindEvents(): void {
+    super._bindEvents();
     // Use the actual form element (form-step6), not this._dom.form which looks for
     // form-step5 (stepNumber=5) and would be null, causing e.preventDefault() to be skipped.
     const form = this._container.querySelector<HTMLFormElement>('#form-step6');

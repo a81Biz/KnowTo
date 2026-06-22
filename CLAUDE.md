@@ -205,7 +205,7 @@ El nombre del agente en el template YAML **debe coincidir exactamente** con la c
 
 - **pipeline-router.helper.ts re-guarda el resultado** — El `dispatchAgentEvent` para F4 (branch C) debe hacer `saveAgentOutput(jobId, agentName, result)` con el string devuelto por el assembler. Sin esto, `pipeline_agent_outputs.output` queda vacío para el agente ensamblador y el job puede parecer completado con contenido vacío.
 
-- **Acumulación por módulos en BD** — Los assemblers P5-P8 leen el registro anterior de `fase4_productos` (campo `datos_producto.partes`), agregan el módulo actual y reescriben el documento final completo. `saveF4Produto` hace DELETE del registro 'aprobado' existente antes del INSERT.
+- **Acumulación por módulos en BD** — Los assemblers P5-P8 leen el registro anterior de `fase4_productos` (campo `datos_producto.partes`), agregan el módulo actual y reescriben el documento final completo. `saveF4Produto` usa UPSERT (`onConflict: 'project_id,produto'`) — actualiza el registro existente independientemente de su `validacion_estado` (migration 041).
 
 - **validacion_estado VARCHAR(30)** — Migration 035 amplió la columna de 20 a 30 chars para soportar `'aprobado_por_fallback'` (21 chars) usado en fallbacks de p1 y document-generic assemblers.
 

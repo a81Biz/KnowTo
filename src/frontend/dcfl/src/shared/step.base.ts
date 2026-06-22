@@ -56,6 +56,7 @@ export class BaseStep {
     documentPreview?: HTMLElement;
     btnCopy?: HTMLButtonElement;
     btnRegenerate?: HTMLButtonElement;
+    btnViewForm?: HTMLButtonElement;
     btnPrint?: HTMLButtonElement;
   } = {};
 
@@ -78,6 +79,7 @@ export class BaseStep {
     this._dom.documentPreview = this._container.querySelector('#document-preview') ?? undefined;
     this._dom.btnCopy = this._container.querySelector('#btn-copy-doc') ?? undefined;
     this._dom.btnRegenerate = this._container.querySelector('#btn-regenerate') ?? undefined;
+    this._dom.btnViewForm = this._container.querySelector('#btn-view-form') ?? undefined;
     this._dom.btnPrint = this._container.querySelector('#btn-print') ?? undefined;
   }
 
@@ -555,9 +557,12 @@ export class BaseStep {
       }
     });
 
-    this._dom.btnRegenerate?.addEventListener('click', () => {
+    this._dom.btnViewForm?.addEventListener('click', () => {
       this._dom.previewPanel?.classList.add('hidden');
       this._dom.form?.classList.remove('hidden');
+    });
+
+    this._dom.btnRegenerate?.addEventListener('click', () => {
       void this._generateDocumentAsync();
     });
   }

@@ -31,6 +31,13 @@ pipeline_steps:
         - inventario_p4 = productos_previos.P4.inventario_materiales (flat string array — pass as-is; use [] if absent)
         - This is the authorized list of physical items for the course. Used to validate equipamiento.
       
+      EXTRACT nombre (CANONICAL MODULE NAME — HIGHEST PRIORITY):
+        1. Try: productos_previos.temario_base.temario.modulos[_modulo_actual - 1].nombre
+           (array is 0-indexed; _modulo_actual is 1-indexed, so modulo 1 → index 0)
+        2. If found: use that EXACT string verbatim. This is the CANONICAL SOURCE OF TRUTH.
+        3. If temario_base is absent or no matching index: fall back to _nombre_video verbatim.
+        CRITICAL: NEVER reformulate, paraphrase, abbreviate, or translate the module name.
+      
       SCOPE NOTE (IMPORTANT):
       P3 is classified as a SUPPLEMENTARY INSTRUCTIONAL TOOL (guión instruccional para soporte multimedia).
       It is NOT a primary certification deliverable — the applicable standard mandates didactic materials (manuals, instruments, guides, calendar) but may not require video production.
@@ -74,6 +81,7 @@ pipeline_steps:
       - MODALIDAD: El contenido debe reflejar la modalidad "{_frozen.modalidad_canonica ?? 'presencial'}". Ajusta vocabulario y ejemplos.
       - VOCABULARIO_OBSERVABLE: PROHIBIDO sustantivos de estado interno (conocimiento, comprension, dominio). Usa resultados verificables.
       - NO_PLACEHOLDERS: PROHIBIDO {{variable}}, [PENDIENTE], [INSERTAR], TBD en cualquier campo.
+      - MÓDULO_EXACTO: El campo "modulo" DEBE ser copiado TEXTUALMENTE del valor de {nombre}. PROHIBIDO reformular, parafrasear, abreviar o traducir el nombre del módulo. Cualquier diferencia, por mínima que sea, es un error.
 
       YOU ARE AN API ENDPOINT. YOU DO NOT CONVERSE. YOU ONLY OUTPUT RAW JSON.
       GLOBAL CONSTRAINT: NEVER output unresolved placeholders in ANY field: {{variable}}, [PENDIENTE], [INSERTAR], [TODO], TBD, or similar. Every field must contain a real, resolved value.
@@ -116,6 +124,7 @@ pipeline_steps:
       - MODALIDAD: El contenido debe reflejar la modalidad "{_frozen.modalidad_canonica ?? 'presencial'}". Ajusta vocabulario y ejemplos.
       - VOCABULARIO_OBSERVABLE: PROHIBIDO sustantivos de estado interno (conocimiento, comprension, dominio). Usa resultados verificables.
       - NO_PLACEHOLDERS: PROHIBIDO {{variable}}, [PENDIENTE], [INSERTAR], TBD en cualquier campo.
+      - MÓDULO_EXACTO: El campo "modulo" DEBE ser copiado TEXTUALMENTE del valor de {nombre}. PROHIBIDO reformular, parafrasear, abreviar o traducir el nombre del módulo. Cualquier diferencia, por mínima que sea, es un error.
 
       SAME AS AGENT A. APPLY SAME EQUIPAMIENTO TWO-CATEGORY RULE:
       PRODUCCIÓN = standard filming equipment (always valid). MATERIALES EN CÁMARA = only from {inventario_p4} or {ficha_tecnica_form}.

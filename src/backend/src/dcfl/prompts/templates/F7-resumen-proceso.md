@@ -71,3 +71,4 @@ REGLAS ABSOLUTAS:
 - Basarse en el contexto acumulado del proyecto para hacer la narrativa específica y real.
 - Responde SOLO en {{idiomaRequerido}}.
 - OUTPUT SOLO JSON VÁLIDO — sin texto, sin markdown adicional.
+- TRAZABILIDAD NORMATIVA (OBLIGATORIO): El campo "conclusion_valor" DEBE mencionar "EC0366" al menos una vez para identificar el estándar de competencia que rige el proceso documentado. Ejemplo: "...garantiza la calidad del producto conforme al Estándar de Competencia EC0366."

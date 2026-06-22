@@ -137,6 +137,32 @@ async function handleF6AjustesAssembler(event: PipelineEvent): Promise<string> {
   return doc;
 }
 
+const PHASE_DOCUMENT_MAP: Record<string, { nombre: string; fase: string; elemento: string; paginas: string }> = {
+  F0:    { nombre: 'Marco de Referencia del Cliente',               fase: 'Diagnóstico',            elemento: 'REQ-A', paginas: '2' },
+  F1:    { nombre: 'Informe de Necesidades de Capacitación',        fase: 'Análisis de Necesidades', elemento: 'REQ-B', paginas: '4' },
+  F2:    { nombre: 'Especificaciones de Análisis',                   fase: 'Alcance y Estructura',    elemento: 'REQ-C', paginas: '3' },
+  F2_5:  { nombre: 'Guiones y Especificaciones de Producción',      fase: 'Producción Audiovisual',  elemento: 'REQ-D', paginas: '5' },
+  F3:    { nombre: 'Recomendaciones Pedagógicas',                    fase: 'Estrategia Pedagógica',   elemento: 'REQ-E', paginas: '2' },
+  F3_2:  { nombre: 'Especificaciones Técnicas',                      fase: 'Especificaciones',        elemento: 'REQ-F', paginas: '3' },
+  F5:    { nombre: 'Informe de Verificación Técnica',               fase: 'Control de Calidad',      elemento: 'REQ-G', paginas: '3' },
+  F5_2:  { nombre: 'Evidencias de Calidad Instruccional',           fase: 'Validación',              elemento: 'REQ-H', paginas: '2' },
+  F6:    { nombre: 'Documento de Ajustes Post-Evaluación',          fase: 'Retroalimentación',       elemento: 'REQ-I', paginas: '2' },
+  F6_2a: { nombre: 'Lista de Verificación e Inventario',            fase: 'Cierre',                  elemento: 'REQ-J', paginas: '2' },
+  F6_2b: { nombre: 'Resumen Ejecutivo y Declaración Final',         fase: 'Cierre',                  elemento: 'REQ-K', paginas: '3' },
+  F7:    { nombre: 'Resumen Cualitativo del Proceso',               fase: 'Cierre',                  elemento: 'REQ-L', paginas: '2' },
+};
+
+const F4_PRODUCT_MAP: Record<string, { nombre: string; elemento: string; paginas: string }> = {
+  P1: { nombre: 'Instrumentos de Evaluación',              elemento: 'PROD-1', paginas: '6'  },
+  P2: { nombre: 'Presentación Electrónica',                elemento: 'PROD-2', paginas: '3'  },
+  P3: { nombre: 'Guiones Multimedia',                      elemento: 'PROD-3', paginas: '8'  },
+  P4: { nombre: 'Manual del Participante',                 elemento: 'PROD-4', paginas: '10' },
+  P5: { nombre: 'Guía del Instructor',                     elemento: 'PROD-5', paginas: '5'  },
+  P6: { nombre: 'Estrategia de Reactivación',              elemento: 'PROD-6', paginas: '3'  },
+  P7: { nombre: 'Glosario Técnico',                        elemento: 'PROD-7', paginas: '3'  },
+  P8: { nombre: 'Rúbrica de Evaluación',                   elemento: 'PROD-8', paginas: '4'  },
+};
+
 async function handleF6InventarioAssembler(event: PipelineEvent): Promise<string> {
   const { jobId, projectId, services } = event;
   const ctx = (event.body?.context ?? {}) as any;
@@ -144,6 +170,12 @@ async function handleF6InventarioAssembler(event: PipelineEvent): Promise<string
   const clientName = ctx.clientName ?? '';
   const folioSugerido = ctx.folioSugerido ?? `EXP-${new Date().getFullYear()}-0001`;
   const fechaActual = formatDate();
+
+  // Fetch BD data before LLM output so we can use it as fallback
+  const [productosF4, documentosFases] = await Promise.all([
+    services.supabase.getF4Productos(projectId).catch(() => [] as Array<{ producto: string; validacion_estado: string }>),
+    services.supabase.getProjectDocuments(projectId).catch(() => [] as Array<{ phaseId: string; content: string }>),
+  ]);
 
   const juezRaw = (await services.pipelineService.getAgentOutput(jobId, 'juez_inventario')) ?? '';
   const winner = pickWinner(juezRaw);
@@ -163,8 +195,48 @@ async function handleF6InventarioAssembler(event: PipelineEvent): Promise<string
   doc += `## 1. INVENTARIO COMPLETO DEL EXPEDIENTE\n\n`;
   doc += `| # | Documento | Fase | Elemento | Estado | Páginas aprox. | Firma requerida |\n|:---|:---|:---|:---|:---|:---|:---|\n`;
 
-  const documentos = Array.isArray(inventario.documentos) ? inventario.documentos : [];
-  if (documentos.length === 0) {
+  // BD is authoritative for which documents exist; LLM output is used only as hints for estado/paginas
+  const llmDocumentos = Array.isArray(inventario.documentos) ? inventario.documentos : [];
+  const llmHints = new Map<string, { estado?: string; paginas?: string }>();
+  for (const d of llmDocumentos) {
+    if (d.documento) {
+      llmHints.set(String(d.documento).toLowerCase().trim(), { estado: d.estado, paginas: d.paginas });
+    }
+  }
+
+  const bdDocumentos: Array<{ numero: number; documento: string; fase: string; elemento: string; estado: string; paginas: string; firma: string }> = [];
+  let counter = 1;
+
+  // Phase documents (sorted by phase key order)
+  const phaseOrder = ['F0','F1','F2','F2_5','F3','F3_2','F5','F5_2','F6','F6_2a','F6_2b','F7'];
+  const phaseSet = new Set(documentosFases.map((d: { phaseId: string }) => d.phaseId));
+  for (const phaseId of phaseOrder) {
+    if (!phaseSet.has(phaseId)) continue;
+    const meta = PHASE_DOCUMENT_MAP[phaseId];
+    if (!meta) continue;
+    const hint = llmHints.get(meta.nombre.toLowerCase().trim()) ?? {};
+    bdDocumentos.push({ numero: counter++, documento: meta.nombre, fase: meta.fase, elemento: meta.elemento, estado: hint.estado ?? 'Completado', paginas: hint.paginas ?? meta.paginas, firma: 'Candidato' });
+  }
+
+  // F4 products (approved or corrected)
+  const approvedStates = new Set(['aprobado', 'aprobado_con_errores', 'aprobado_por_fallback', 'corrected']);
+  const seenProductos = new Set<string>();
+  for (const prod of productosF4 as Array<{ producto: string; validacion_estado: string }>) {
+    if (seenProductos.has(prod.producto)) continue;
+    seenProductos.add(prod.producto);
+    if (!approvedStates.has(prod.validacion_estado)) continue;
+    const meta = F4_PRODUCT_MAP[prod.producto];
+    if (!meta) continue;
+    const hint = llmHints.get(meta.nombre.toLowerCase().trim()) ?? {};
+    bdDocumentos.push({ numero: counter++, documento: meta.nombre, fase: 'Producción Instruccional', elemento: meta.elemento, estado: hint.estado ?? 'Completado', paginas: hint.paginas ?? meta.paginas, firma: 'Candidato' });
+  }
+
+  if (bdDocumentos.length > 0) {
+    for (const d of bdDocumentos) {
+      doc += `| ${d.numero} | ${d.documento} | ${d.fase} | ${d.elemento} | ${d.estado} | ${d.paginas} | ${d.firma} |\n`;
+    }
+  } else {
+    // Last-resort fallback: only when BD is also empty
     const defaults = [
       { numero: 1, documento: 'Marco de Referencia del Cliente', fase: 'Diagnóstico', elemento: 'REQ-A', estado: 'Completado', paginas: '2', firma: 'Candidato' },
       { numero: 2, documento: 'Informe de Necesidades de Capacitación', fase: 'Análisis de Necesidades', elemento: 'REQ-A', estado: 'Completado', paginas: '4', firma: 'Candidato' },
@@ -175,14 +247,6 @@ async function handleF6InventarioAssembler(event: PipelineEvent): Promise<string
     for (const d of defaults) {
       doc += `| ${d.numero} | ${d.documento} | ${d.fase} | ${d.elemento} | ${d.estado} | ${d.paginas} | ${d.firma} |\n`;
     }
-  } else {
-    let completados = 0;
-    for (const d of documentos) {
-      doc += `| ${d.numero ?? ''} | ${d.documento ?? ''} | ${d.fase ?? ''} | ${d.elemento ?? ''} | ${d.estado ?? ''} | ${d.paginas ?? ''} | ${d.firma ?? ''} |\n`;
-      if (d.estado === 'Completado') completados++;
-    }
-    doc += `\n**Documentos completados:** ${completados} de ${documentos.length}\n`;
-    doc += `**Documentos pendientes:** ${documentos.length - completados} de ${documentos.length}\n`;
   }
   doc += `\n---\n\n`;
 
@@ -236,7 +300,7 @@ async function handleF6DeclaracionAssembler(event: PipelineEvent): Promise<strin
   const projectName = ctx.projectName ?? ctx._frozen?.nombreOficialCurso ?? 'Proyecto';
   const clientName = ctx.clientName ?? '';
   const folioSugerido = ctx.folioSugerido ?? `EXP-${new Date().getFullYear()}-0001`;
-  const estandarNorma = ctx._frozen?.estandar_norma ?? 'el estándar de certificación aplicable';
+  const estandarNorma = ctx._frozen?.estandar_norma ?? 'EC0366';
   const fechaActual = formatDate();
 
   const juezRaw = (await services.pipelineService.getAgentOutput(jobId, 'juez_declaracion')) ?? '';
@@ -285,7 +349,7 @@ async function handleF6DeclaracionAssembler(event: PipelineEvent): Promise<strin
   doc += `2. El curso descrito fue desarrollado íntegramente por el/la suscrito/a.\n`;
   doc += `3. El proceso se realizó conforme al estándar de certificación aplicable (${estandarNorma}).\n`;
   doc += `4. Las evidencias presentadas corresponden al proceso real de desarrollo y despliegue del curso.\n`;
-  doc += `5. Los instrumentos de evaluación cumplen con los requisitos del estándar de certificación aplicable.\n\n`;
+  doc += `5. Los instrumentos de evaluación cumplen con los requisitos del ${estandarNorma}.\n\n`;
   doc += `**Nombre del candidato:** ${clientName}\n`;
   doc += `**Firma:** _________________________\n`;
   doc += `**Fecha:** _________________________\n\n`;

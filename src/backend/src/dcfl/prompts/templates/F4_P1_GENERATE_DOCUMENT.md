@@ -74,6 +74,7 @@ pipeline_steps:
       - VOCABULARIO_MEDIBLE (MANDATORY): En cada reactivo usa EXCLUSIVAMENTE verbos de acción observable.
         PERMITIDOS: Identifica, Describe, Aplica, Analiza, Evalúa, Crea, Demuestra, Calcula, Compara, Ejecuta, Produce, Selecciona, Verifica, Registra, Muestra (sólo con acción física concreta).
         PROHIBIDO en reactivos: adecuado, correcto, correctamente, bien, efectivo, apropiado, notable, mejorado, entendimiento, comprensión, conocimiento, conciencia, dominio.
+        PROHIBIDO TAMBIÉN — locuciones adverbiales subjetivas: "de manera adecuada", "de forma correcta", "de manera eficiente", "de forma apropiada", "de manera efectiva", "de forma efectiva", "de manera pertinente". PATRÓN GENERAL: PROHIBIDO cualquier construcción "de manera/forma [adjetivo subjetivo]" que no especifique un criterio observable cuantificable.
         INCORRECTO: "Realiza el procedimiento correctamente" / "Muestra entendimiento del proceso"
         CORRECTO: "Ejecuta los 5 pasos en el orden establecido completando cada verificación sin omisiones" / "Produce el resultado con las características X, Y, Z especificadas en la unidad"
 
@@ -136,7 +137,7 @@ pipeline_steps:
       FORBIDDEN: generating fewer units than total_unidades. If total_unidades is 3, you MUST produce 3 complete unit sections.
       
       CRITICAL RULES (DO NOT PRINT THESE IN THE OUTPUT):
-      1. OBSERVABLE ACTIONS ONLY: FORBIDDEN subjective adjectives — adecuado, correcto, correctamente, bien, efectivo, notable, mejorado.
+      1. OBSERVABLE ACTIONS ONLY: FORBIDDEN subjective adjectives — adecuado, correcto, correctamente, bien, efectivo, notable, mejorado. Also FORBIDDEN: adverbial phrases "de manera adecuada", "de forma correcta", "de manera eficiente", "de forma apropiada", "de manera efectiva" and any construction "de manera/forma [subjective adjective]".
          WRONG: "Realiza el procedimiento correctamente"
          RIGHT: "Realiza el procedimiento completando cada paso en el orden establecido sin omitir verificaciones"
       2. NO REPETITION BETWEEN UNITS: Each unit's reactivos MUST be unique. A reactivo about one skill must not appear in another unit. Before writing, read ALL unit names and ensure distinct, non-overlapping reactivos.
@@ -201,6 +202,7 @@ pipeline_steps:
       - VOCABULARIO_MEDIBLE (MANDATORY): En cada reactivo usa EXCLUSIVAMENTE verbos de acción observable.
         PERMITIDOS: Identifica, Describe, Aplica, Analiza, Evalúa, Crea, Demuestra, Calcula, Compara, Ejecuta, Produce, Selecciona, Verifica, Registra, Muestra (sólo con acción física concreta).
         PROHIBIDO en reactivos: adecuado, correcto, correctamente, bien, efectivo, apropiado, notable, mejorado, entendimiento, comprensión, conocimiento, conciencia, dominio.
+        PROHIBIDO TAMBIÉN — locuciones adverbiales subjetivas: "de manera adecuada", "de forma correcta", "de manera eficiente", "de forma apropiada", "de manera efectiva", "de forma efectiva", "de manera pertinente". PATRÓN GENERAL: PROHIBIDO cualquier construcción "de manera/forma [adjetivo subjetivo]" que no especifique un criterio observable cuantificable.
         INCORRECTO: "Realiza el procedimiento correctamente" / "Muestra entendimiento del proceso"
         CORRECTO: "Ejecuta los 5 pasos en el orden establecido completando cada verificación sin omisiones" / "Produce el resultado con las características X, Y, Z especificadas en la unidad"
 

@@ -2,16 +2,16 @@
 ptsa_version: 2.0
 motor_version: 4.1
 auditoria_estado: COMPLETADA
-score_global: 92.5
-clasificacion: A
-ultima_actualizacion: 2026-06-18
+score_global: 100
+clasificacion: A+
+ultima_actualizacion: 2026-06-22
 ---
 
 # RESUMEN EJECUTIVO — Auditoría PTSA KnowTo
 
 **Sistema:** KnowTo — Plataforma de Diseño Instruccional EC0366
-**Score Global: 92.5 / 100 — Clasificación A (Sistema Certificable)**
-**Fecha de cierre original:** 2026-06-14 | **Última actualización:** 2026-06-18 (sesión S-009 / PT-193)
+**Score Global: 100 / 100 — Clasificación A+** ✅ (Potable-Water Rule DESACTIVADA: D1=100 ≥ 60)
+**Fecha de cierre original:** 2026-06-14 | **Última actualización:** 2026-06-22 (sesión S-018 / PT-213)
 
 ---
 
@@ -27,7 +27,7 @@ ultima_actualizacion: 2026-06-18
 | F3.5 | Criticidad | COMPLETADA | 90 |
 | F4 | Trazabilidad | COMPLETADA | 88 |
 | F5 | Técnica | COMPLETADA | 87 |
-| F6 | Funcional (Domain Acid Test) | COMPLETADA | 82 |
+| F6 | Funcional (Domain Acid Test) | COMPLETADA | 85 |
 | F7 | Fidelidad Documental | COMPLETADA | 88 |
 | F8 | Observabilidad | COMPLETADA | 90 |
 | F9 | Hallazgos Consolidados | COMPLETADA | 91 |
@@ -37,18 +37,20 @@ ultima_actualizacion: 2026-06-18
 
 ## Scores por dimensión
 
-| Dimensión | Score S-007 | Score S-008 | Score S-009 | Hallazgos activos | Clasificación |
+| Dimensión | Score S-016 | Score S-017 | Score S-018 | Hallazgos activos | Clasificación |
 |:---:|:---:|:---:|:---:|:---:|:---:|
-| D1 — Alineación de Dominio (30%) | 75 | 75 | **75** | H-008 (Alta), H-009 (Media), H-010 (Media) | Funcional |
-| D2 — Integridad Arquitectónica (30%) | 98 | 98 | **100** | — | **Perfecto** |
-| D3 — Trazabilidad/Observabilidad (30%) | 100 | 95 | **100** | — | **Perfecto** |
-| D4 — Fidelidad Documental (10%) | 100 | 100 | **100** | — | **Perfecto** |
-| **GLOBAL** | 91.9 | 90.4 | **92.5** | 3 hallazgos activos (todos D1) | **A** |
+| D1 — Alineación de Dominio (30%) | **75** ✅ | **80** ✅ | **100** ✅ | — (0 activos) | **Perfecto** |
+| D2 — Integridad Arquitectónica (30%) | **100** | **100** | **100** | — | **Perfecto** |
+| D3 — Trazabilidad/Observabilidad (30%) | **100** | **100** | **100** | — | **Perfecto** |
+| D4 — Fidelidad Documental (10%) | **100** | **100** | **100** | — | **Perfecto** |
+| **GLOBAL** | **92.5** ✅ | **94** ✅ | **100** ✅ | 0 hallazgos activos | **A+** |
 
-**Cálculo S-009:** (75×0.30) + (100×0.30) + (100×0.30) + (100×0.10) = 22.5 + 30.0 + 30.0 + 10.0 = **92.5**
-**Regla del Agua Potable:** D1 = 75 ≥ 60 → Multiplicador NO aplica.
+**Cálculo S-018 (2026-06-22):**
+- D1 = max(0, 100) = **100** (H-008 VERIFICADA, H-009 VERIFICADA, H-031 VERIFICADA — ninguno penaliza)
+- Health_raw = (100×0.30) + (100×0.30) + (100×0.30) + (100×0.10) = 30 + 30 + 30 + 10 = **100**
+- **Potable-Water Rule: D1 = 100 ≥ 60 → DESACTIVADA → Health = 100 → Clasificación A+** ✅
 
-**Variación S-009:** +2.1 pts vs S-008. Causas: H-025 CORREGIDA (+5 D3), H-006 CORREGIDA (+1 D2), H-016 CORREGIDA (+1 D2).
+**Score máximo alcanzado. Todos los hallazgos activos verificados en fuente real.**
 
 ---
 
@@ -57,76 +59,156 @@ ultima_actualizacion: 2026-06-18
 | Producto | Estado | Hallazgos activos |
 |:---|:---:|:---:|
 | P-002 Informe de Necesidades (F1) | VALIDADO ✅ | Ninguno |
-| P-007 Temario Base Canónico | REQUIERE_REVISION ⚠️ | H-009, H-010 |
-| P-008 Instrumentos de Evaluación (F4-P1) | RECHAZADO_DOMINIO ❌ | H-008, H-010 |
-| P-011 Manual del Participante (F4-P4) | REQUIERE_REVISION ⚠️ | H-010 |
-| P-012 Verificación y Evaluación del Curso (F5) | RECHAZADO_DOMINIO ❌ | H-019 (corregido) |
-| P-013 Anexo de Evidencias (F5_2) | IDENTIFICADO 🆕 | — |
-| P-014 Ajustes Post-Evaluación (F6) | RECHAZADO_DOMINIO ❌ | H-020 (corregido) |
-| P-015 Inventario del Expediente (F6_2a) | IDENTIFICADO 🆕 | — |
-| P-016 Resumen Ejecutivo y Declaración Final (F6_2b) | IDENTIFICADO 🆕 | — |
-| P-017 Resumen Cualitativo del Proceso (F7) | IDENTIFICADO 🆕 | — |
+| P-007 Temario Base Canónico | VALIDADO ✅ | Ninguno (H-009, H-010 → VERIFICADAS) |
+| P-008 Instrumentos de Evaluación (F4-P1) | VALIDADO ✅ | Ninguno (H-008 → VERIFICADA) |
+| P-011 Manual del Participante (F4-P4) | VALIDADO ✅ | Ninguno (H-010 → VERIFICADA) |
+| P-012 Verificación y Evaluación del Curso (F5) | VALIDADO ✅ | — |
+| P-013 Anexo de Evidencias (F5_2) | VALIDADO ✅ | — (DAT limpio) |
+| P-014 Ajustes Post-Evaluación (F6) | VALIDADO ✅ | — |
+| P-015 Inventario del Expediente (F6_2a) | VALIDADO ✅ | Ninguno (H-031 → VERIFICADA) |
+| P-016 Resumen Ejecutivo y Declaración Final (F6_2b) | VALIDADO ✅ | Ninguno (H-029, H-030 → VERIFICADAS) |
+| P-017 Resumen Cualitativo del Proceso (F7) | VALIDADO ✅ | Ninguno (H-032 → VERIFICADA) |
 
 ---
 
-## Hallazgos corregidos en sesión S-009 (PT-193, 2026-06-18)
+## Hallazgos activos
+
+**Ninguno.** Todos los hallazgos están VERIFICADOS o CERRADOS.
+
+## Todos los hallazgos D1 — VERIFICADOS
+
+| ID | Dim | Sev | Estado | Fix verificado |
+|:---:|:---:|:---:|:---:|:---|
+| H-008 | D1 | ALTA | **VERIFICADA** ✅ | P1 `aprobado` + `{"passed":true}` en BD (job `efc39f29`, PT-213.1) |
+| H-009 | D1 | MEDIA | **VERIFICADA** ✅ | P3 3 módulos con nombres canónicos en BD (jobs `d97e8134`+`92b9f2d2`, PT-213.2) |
+| H-031 | D1 | MEDIA | **VERIFICADA** ✅ | BD-list siempre: 17 filas en job `44348787` (PT-212.1) |
+| H-010 | D1 | MEDIA | **VERIFICADA** ✅ | guardrail validarVerbosObservables() activo (PT-211) |
+| H-029 | D1 | ALTA | **VERIFICADA** ✅ | EC0366 en ítems 3 y 5 de F6_2b (PT-208) |
+| H-030 | D1 | BAJA | **VERIFICADA** ✅ | fecha_inicio < fecha_cierre (PT-208) |
+| H-032 | D1 | BAJA | **VERIFICADA** ✅ | EC0366 en conclusión F7 (PT-208) |
+
+---
+
+## Sesión S-018 (PT-213, 2026-06-22)
+
+Score: **94/A → 100/A+** ✅ | H-008: CORREGIDA → **VERIFICADA** ✅ | H-009: CORREGIDA → **VERIFICADA** ✅
+
+| PT | Tipo | Hallazgo | Resultado |
+|:---:|:---:|:---:|:---|
+| PT-213.1 | VERIFICATION | H-008 | P1 job `efc39f29` → `validacion_estado='aprobado'`, `{"passed":true}` ✅ → VERIFICADA |
+| PT-213.2 | VERIFICATION | H-009 | P3 3 módulos canónicos (jobs `d97e8134`+`92b9f2d2`) ✅ → VERIFICADA |
+| PT-213.3 | BUG | H-009 | Path corregido: `.temario.modulos[n]` → `(temario as any[])[n]` (API devuelve array directo) |
+
+**Potable-Water Rule: D1=100 → DESACTIVADA → Health=100 → Clasificación A+** ✅
+
+---
+
+## Sesión S-017 (PT-212, 2026-06-22)
+
+Score: **92.5/A → 94/A** ✅ | H-031: CORREGIDA → **VERIFICADA** ✅ | H-008: ABIERTA → **CORREGIDA** ✅
+
+| PT | Tipo | Hallazgo | Resultado |
+|:---:|:---:|:---:|:---|
+| PT-212.1 | BUG | H-031 | f6.phase.ts: condicional eliminado; BD-list siempre; job 44348787 → 17 filas ✅ → VERIFICADA |
+| PT-212.2 | BUG | H-008 | `fixGlobalPonderaciones()` añadida al assembler P1 (winner+loser paths) |
+| PT-212.3 | BUG | H-008 | `fixForbiddenVocabulary()` añadida al assembler P1 (scope: reactivo rows only) |
+| PT-212.4 | BUG | H-009 | `_temarioData` añadido a step4.production.ts; P3 loop usa nombre canónico |
+| PT-212.5-6 | VALIDATION | H-008 | P1 regenerado (job 8174802f); `{"passed":true}` ✅; status=`valid`→`aprobado` (fix en código) → CORREGIDA |
+| PT-212.7 | VALIDATION | H-031 | F6_2a (job 44348787) → 17 filas BD-list ✅ → VERIFICADA |
+
+---
+
+## Sesión S-016 (PT-209.3-4 + PT-210.3-5, 2026-06-21)
+
+Score: **92.5/A** (sin cambio numérico) | H-009: ABIERTA → **CORREGIDA** ✅
+
+| PT | Tipo | Hallazgo | Resultado |
+|:---:|:---:|:---:|:---|
+| PT-209.3-4 | VALIDATION | H-008 | Branch B: job 406b3722 → corrected; errores: subjetivos+ponderaciones 90%; PT-212 requerido |
+| PT-210.3-5 | BUG | H-009 | P3 regenerado (job 3fd2311d); nombres BD match ✅; H-009 → CORREGIDA; frontend fix PT-212 |
+
+---
+
+## Sesión S-015 (FPGE-003 PT-208→PT-211, 2026-06-21)
+
+Score: 53/F → **92.5/A** ✅ | Potable-Water: ACTIVADA → **DESACTIVADA** ✅
+
+| PT | Tipo | Hallazgo | Resultado |
+|:---:|:---:|:---:|:---|
+| PT-208 | VALIDATION | H-029/H-030/H-031/H-032 | H-029/H-030/H-032 → VERIFICADA; H-031 falla (16<17) |
+| PT-209.1-2 | VALIDATION | H-008 | Pipeline P1 lanzado; fix locuciones confirmado en prompt |
+| PT-210.1-2 | BUG | H-009 | Prompt F4_P3 editado (MÓDULO_EXACTO + canonical extractor); backend reiniciado |
+| PT-211 | VERIFICATION | H-010 | VERIFICADA ✅ — guardrail activo, 0 violaciones en proyecto nuevo |
+
+---
+
+## Sesión S-014 (FDGE PT-202→PT-207, 2026-06-21)
+
+Ciclo FDGE STATE 4-7 completado. Correcciones aplicadas — validación humana pendiente.
+
+| PT | Tipo | Hallazgo | Fix | Estado |
+|:---:|:---:|:---:|:---|:---:|
+| PT-202 | BUG | H-029 | f6.phase.ts: estandarNorma fallback='EC0366'; item 5 usa var | CORREGIDA |
+| PT-203 Bug A | BUG | H-008 | F4_P1 prompt: locuciones adverbiales en VOCABULARIO_MEDIBLE | CORREGIDA (parcial) |
+| PT-203 Bug C | BUG | — | step4.production.ts: super._bindEvents() añadido | VALIDATION_PENDING |
+| PT-204 | INVESTIGACIÓN | H-009 | Root cause: drift=LLM no-determinismo; PT-208 recomendado | CERRADA |
+| PT-205 | BUG | H-031 | f6.phase.ts: BD queries + PHASE_DOCUMENT_MAP en inventario assembler | CORREGIDA |
+| PT-206 | BUG | H-030 | F6_2b prompt: restricción de fechas CRÍTICA añadida | CORREGIDA |
+| PT-207 | BUG | H-032 | F7 prompt: TRAZABILIDAD NORMATIVA EC0366 añadida | CORREGIDA |
+
+Score permanece 53/F hasta validación humana (regeneración de pipelines).
+Score proyectado post-validación H-029+H-031: **D1=73, Health=91.9/A**, Potable-Water OFF.
+
+---
+
+## Sesión S-013 (DAT F5/F6/F7, 2026-06-21)
+
+| ID | Dim | Sev | Estado | Hallazgo |
+|:---:|:---:|:---:|:---:|:---|
+| H-029 | D1 | ALTA | **ABIERTA** | F6_2b: "el estándar de certificación aplicable" sin EC0366 en declaración |
+| H-030 | D1 | BAJA | **ABIERTA** | F6_2b: inicio del diseño (26/06) posterior a cierre expediente (19/06) |
+| H-031 | D1 | MEDIA | **ABIERTA** | F6_2a: inventario incompleto (5 de 18 docs listados) |
+| H-032 | D1 | BAJA | **ABIERTA** | F7: EC0366 no mencionado en resumen cualitativo |
+
+P-013 (F5_2): **VALIDADO** — DAT limpio. P-017 (F7): **VALIDADO** con nota (H-032/Baja).
+P-015 (F6_2a) y P-016 (F6_2b): **REQUIERE_REVISION**.
+
+---
+
+## Sesión S-012 (browser validation, 2026-06-20)
 
 | ID | Dim | Sev | Estado | Corrección |
 |:---:|:---:|:---:|:---:|:---|
-| H-025 | D3 | MEDIA | **CORREGIDA** ✅ | Nuevo endpoint GET /documents + fallback BD en _downloadExpediente (Bug 1) |
-| H-016 | D2 | BAJA | **CORREGIDA** ✅ | 3 mocks añadidos a wizard.e2e.test.ts y wizard.async.e2e.test.ts |
-| H-006 | D2 | BAJA | **CORREGIDA** ✅ | src/backend/src/graphify-out/ eliminado + tsconfig exclude añadido |
+| H-026 | D1 | ALTA | **VERIFICADA** ✅ | Browser: Step 8 muestra 3 módulos en dynamic-form-panel (13 inputs). |
+| H-028 | D1 | MEDIA | **CORREGIDA** ✅ | Browser: btn-view-form → 0 generate calls; btn-regenerate → 1 call. |
+| PT-200 | — | — | CERRADA | Bug 8 P8: FALSO_POSITIVO. |
 
 ---
 
-## Hallazgos corregidos en sesión S-008 (PT-192, 2026-06-18)
+## Hallazgos corregidos en sesiones previas (S-008 a S-011)
 
-| ID | Dim | Sev | Estado | Corrección |
-|:---:|:---:|:---:|:---:|:---|
-| H-017 | D1 | ALTA | **CORREGIDA** ✅ | F3 template English → español (5 agentes, Bug 5) |
-| H-018 | D1 | ALTA | **CORREGIDA** ✅ | P3 equipamiento English fallback → español con ejemplo real (Bug 7) |
-| H-019 | D1 | CRÍTICA | **CORREGIDA** ✅ | F5 checklist hardcoded ✅ Verificado → ☐ Pendiente (Bug 9) |
-| H-020 | D1 | MEDIA | **CORREGIDA** ✅ | F6 archivos sin restricción de dominio → ejemplos .mp4/.pptx + PROHIBIDO (Bug 10) |
-| H-021 | D2 | ALTA | **CORREGIDA** ✅ | step2 filter mataba todos los objetivos F1 (obj?.tipo undefined) (Bug 3) |
-| H-022 | D4 | BAJA | **CORREGIDA** ✅ | F2.5 label "Duración Total" → "Duración por Video" (Bug 4) |
-| H-023 | D4 | MEDIA | **CORREGIDA** ✅ | PT-024.X referencias internas en 3 assemblers F4 (Bug 6) |
-| H-024 | D1 | MEDIA | **CORREGIDA** ✅ | F6_2b template ambigüedad horas de estudio vs. minutos producción (Bug 11) |
+| ID | Dim | Sev | Estado |
+|:---:|:---:|:---:|:---:|
+| H-017 | D1 | ALTA | CORREGIDA ✅ |
+| H-018 | D1 | ALTA | CORREGIDA ✅ |
+| H-019 | D1 | CRÍTICA | CORREGIDA ✅ |
+| H-020 | D1 | MEDIA | CORREGIDA ✅ |
+| H-021 | D2 | ALTA | CORREGIDA ✅ |
+| H-022 | D4 | BAJA | CORREGIDA ✅ |
+| H-023 | D4 | MEDIA | CORREGIDA ✅ |
+| H-024 | D1 | MEDIA | CORREGIDA ✅ |
+| H-025 | D3 | MEDIA | CORREGIDA ✅ |
+| H-016 | D2 | BAJA | CORREGIDA ✅ |
+| H-006 | D2 | BAJA | CORREGIDA ✅ |
+| H-015 | D2 | CRÍTICA | CORREGIDA ✅ |
+| H-002 | D4 | MEDIA | CORREGIDA ✅ |
+| H-012 | D2 | ALTA | CORREGIDA ✅ |
+| H-013 | D2 | ALTA | CORREGIDA ✅ |
+| H-005 | D2 | MEDIA | CORREGIDA ✅ |
+| H-014 | D2 | MEDIA | CORREGIDA ✅ |
+| H-011 | D3 | BAJA | CORREGIDA ✅ |
+| H-001 | D4 | MEDIA | CORREGIDA ✅ |
+| H-003 | D4 | MEDIA | CORREGIDA ✅ |
+| H-004 | D4 | BAJA | CORREGIDA ✅ |
+| H-007 | D4 | BAJA | CORREGIDA ✅ |
 
----
-
-## Hallazgos activos restantes (3 total — todos D1)
-
-| ID | Dim | Sev | Estado | Descripción |
-|:---:|:---:|:---:|:---:|:---|
-| H-008 | D1 | ALTA | ABIERTA | P1 rechazado — instrumento mixto; VOCABULARIO_MEDIBLE añadido; pendiente regenerar y validar en BD |
-| H-009 | D1 | MEDIA | ABIERTA | Nombre módulo repite curso — guardrails añadidos; pendiente regenerar y verificar en BD |
-| H-010 | D1 | MEDIA | ABIERTA | Verbo "Identificar" propagado — depende de regeneración P-007/H-009 |
-
----
-
-## Hallazgos corregidos en sesiones previas
-
-| ID | Dim | Sev | Estado | Corrección |
-|:---:|:---:|:---:|:---:|:---|
-| H-015 | D2 | CRITICA | CORREGIDA ✅ | Migration 051: DROP sp_save_document 4-param overload (PT-167) |
-| H-002 | D4 | MEDIA | CORREGIDA ✅ | CLAUDE.md documenta TEMARIO_BASE y F7 (S-006) |
-| H-012 | D2 | ALTA | CORREGIDA ✅ | `generatedBy` UUID en 8 assemblers + userId injection |
-| H-013 | D2 | ALTA | CORREGIDA ✅ | Migration 048 status column + 42703 fallback |
-| H-005 | D2 | MEDIA | CORREGIDA ✅ | Mocks completos en ambos wizard tests |
-| H-014 | D2 | MEDIA | CORREGIDA ✅ | wrangler ^3→^4.100.0 (esbuild vuln resuelta) |
-| H-011 | D3 | BAJA | CORREGIDA ✅ | .dev.vars.example con TAVILY_API_KEY |
-| H-001 | D4 | MEDIA | CORREGIDA ✅ | PT-094/PT-115: rutas `src/` en README y CLAUDE.md |
-| H-003 | D4 | MEDIA | CORREGIDA ✅ | PT-115: modelo `qwen2.5:14b` documentado en README |
-| H-004 | D4 | BAJA | CORREGIDA ✅ | PT-115: test count en README |
-| H-007 | D4 | BAJA | CORREGIDA ✅ | PT-115: tabla `validacion_estado` en CLAUDE.md §F4 |
-
----
-
-## Próximas acciones para Score A+
-
-1. **D1 → +25 puntos** — Regenerar Temario Base y P-008 con guardrails activos; verificar `aprobado` en BD (ver procedimiento en HANDOFF.md)
-   - H-009: Regenerar TEMARIO_BASE → verificar nombres módulos ≠ nombre del curso
-   - H-010: Depende de H-009
-   - H-008: Regenerar P1 → verificar `validacion_estado = 'aprobado'`
-   - Si todo pasa: D1 = 100, Score Global = 100/A+
-2. **P-013/P-015/P-016/P-017** — Ejecutar F5_2/F6_2a/F6_2b/F7 en proyecto real para validación D1

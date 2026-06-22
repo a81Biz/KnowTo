@@ -86,3 +86,4 @@ REGLAS ABSOLUTAS:
 - OUTPUT SOLO JSON VÁLIDO — sin texto, sin markdown adicional.
 - PROHIBIDO usar datos de duración de producción audiovisual (minutos por video, duración_minima, duracion_maxima de F2.5) como valor del campo "duracion". Ese campo representa HORAS DE ESTUDIO del participante, no tiempo de producción.
 - Para "duracion": usar ÚNICAMENTE resumen_datos.duracion. Si no está disponible, usar "No especificado".
+- RESTRICCIÓN DE FECHAS (CRÍTICA): La "fecha_inicio" del diseño instruccional DEBE ser ANTERIOR a la fecha de cierre del expediente (hoy). Si no tienes información específica del inicio, calcula: fecha_inicio = fecha actual − 90 días (mínimo). NUNCA generes una fecha_inicio posterior o igual a la fecha de hoy. Ejemplo correcto: si hoy es 21/06/2026, fecha_inicio válida sería 23/03/2026 o anterior.
