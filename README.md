@@ -801,7 +801,7 @@ docker compose restart backend
 ```bash
 curl -X POST http://api.localhost/dcfl/test/run-all \
   -H "Content-Type: application/json" \
-  -d '{ "projectId": "ce9e3068-31e7-4896-a793-090b59155f50" }'
+  -d '{ "projectId": "b49a7579-6337-428f-be34-61192c347c12" }'
 ```
 
 Retorna `202` inmediatamente. La generación corre en background (2-6 horas con Ollama local).

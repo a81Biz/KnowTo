@@ -265,6 +265,103 @@ async function ensureFormSchema(
   };
 }
 
+// ── Prerequisite helpers ───────────────────────────────────────────────────
+
+/**
+ * Ensures temario_base.confirmado_por_usuario = true before F4 product runs.
+ * Three branches:
+ *   1. Already confirmed → no-op.
+ *   2. Record exists, not confirmed → confirm directly (no regeneration).
+ *   3. No record → run TEMARIO_BASE pipeline, then confirm if completed.
+ * A failed pipeline is non-fatal: run continues in degraded mode (consistent
+ * with the pre-fix behavior for projects that had no temario).
+ */
+async function ensureTemarioConfirmado(
+  supabase: SupabaseService,
+  jobsSvc: PipelineJobsService,
+  projectId: string,
+  baseContext: Record<string, any>,
+  env: Env,
+  runId?: string,
+): Promise<void> {
+  const temario = await supabase.getTemarioBase(projectId);
+
+  if (temario?.confirmado_por_usuario === true) {
+    console.log('[TEST-RUN] prereq:temario — ya confirmado');
+    if (runId) await logTestStep(supabase, runId, projectId, 'prereq:temario', 'skipped', undefined, { reason: 'already-confirmed' });
+    return;
+  }
+
+  if (temario) {
+    // Record exists but not yet confirmed — confirm without regenerating
+    console.log('[TEST-RUN] prereq:temario — registro existente no confirmado, confirmando...');
+    if (runId) await logTestStep(supabase, runId, projectId, 'prereq:temario', 'running');
+    await supabase.confirmarTemario(projectId);
+    console.log('[TEST-RUN] prereq:temario — confirmado (registro existente)');
+    if (runId) await logTestStep(supabase, runId, projectId, 'prereq:temario', 'confirmed-existing');
+    return;
+  }
+
+  // No record — run pipeline then confirm
+  console.log('[TEST-RUN] prereq:temario — sin registro; generando TEMARIO_BASE...');
+  if (runId) await logTestStep(supabase, runId, projectId, 'prereq:temario', 'running');
+
+  const body = {
+    projectId,
+    stepId:    '',
+    phaseId:   'TEMARIO_BASE',   // must NOT be 'F4' — avoids CANONICAL_SPEC_FREEZE gate
+    promptId:  'TEMARIO_BASE',
+    context:   baseContext,
+    userInputs: {},
+  };
+
+  const jobId = await jobsSvc.createJob({
+    siteId:    'dcfl',
+    projectId,
+    phaseId:   body.phaseId,
+    promptId:  body.promptId,
+    context:   body.context,
+    userInputs: body.userInputs,
+    userId:    DEV_USER_ID,
+  });
+
+  runPipelineAsync(jobId, body, env)
+    .catch(err => console.error('[TEST-RUN] prereq:temario pipeline error:', err));
+
+  const outcome = await jobsSvc.waitForJob(jobId, JOB_TIMEOUT_MS);
+  console.log(`[TEST-RUN] prereq:temario — pipeline ${outcome} (job ${jobId})`);
+
+  if (outcome === 'completed') {
+    await supabase.confirmarTemario(projectId);
+    console.log('[TEST-RUN] prereq:temario — generado y confirmado');
+    if (runId) await logTestStep(supabase, runId, projectId, 'prereq:temario', 'completed', jobId);
+  } else {
+    console.warn(`[TEST-RUN] prereq:temario — pipeline ${outcome}; continuando con calidad degradada`);
+    if (runId) await logTestStep(supabase, runId, projectId, 'prereq:temario', outcome, jobId, { reason: 'pipeline-failed-degraded' });
+  }
+}
+
+/**
+ * Ensures projects.canonical_spec_frozen = true before F4 product runs.
+ * Idempotent: if already frozen, returns immediately.
+ * Throws on DB error — without this flag all F4 jobs will fail anyway.
+ */
+async function ensureCanonicalSpecFrozen(
+  supabase: SupabaseService,
+  projectId: string,
+  runId?: string,
+): Promise<void> {
+  const isFrozen = await supabase.getCanonicalSpecFrozen(projectId);
+  if (isFrozen) {
+    console.log('[TEST-RUN] prereq:canonical-spec — ya frozen');
+    if (runId) await logTestStep(supabase, runId, projectId, 'prereq:canonical-spec', 'skipped', undefined, { reason: 'already-frozen' });
+    return;
+  }
+  await supabase.confirmCanonicalSpecFrozen(projectId);
+  console.log('[TEST-RUN] prereq:canonical-spec — confirmado');
+  if (runId) await logTestStep(supabase, runId, projectId, 'prereq:canonical-spec', 'confirmed');
+}
+
 // ── Background runner ──────────────────────────────────────────────────────
 
 async function runAllProductsSequentially(projectId: string, runId: string, env: Env): Promise<void> {
@@ -296,6 +393,12 @@ async function runAllProductsSequentially(projectId: string, runId: string, env:
     console.error('[TEST-RUN] Error cargando contexto base:', err);
     return;
   }
+
+  // ── Prerequisites (simulate manual wizard confirmations) ──────────────────
+  // Order is mandatory: temario first (provides _frozen.total_unidades),
+  // then canonical_spec (gates every F4 job).
+  await ensureTemarioConfirmado(supabase, jobsSvc, projectId, baseContext, env, runId);
+  await ensureCanonicalSpecFrozen(supabase, projectId, runId);
 
   const log: Array<{ step: string; jobId: string; status: string }> = [];
 
@@ -506,8 +609,8 @@ export async function handleTestRunAll(c: Context) {
     projectId,
     projectName: projectCheck.name,
     clientName:  projectCheck.client_name,
-    message: 'Test run iniciado. Ciclo completo: form schema → documento para cada producto.',
-    order: 'P4 → P1 → P3 → P2 → P5 → P7 → P6 → P8',
+    message: 'Test run iniciado. Prerequisitos (temario + canonical spec) y ciclo completo de productos: form schema → documento.',
+    order: 'TEMARIO_BASE (prereq, si necesario) → canonical_spec (prereq, si necesario) → P4 → P1 → P3 → P2 → P5 → P7 → P6 → P8',
     realtime: {
       table:  'test_run_logs',
       filter: `run_id=eq.${runId}`,
