@@ -298,7 +298,7 @@ async function ensureTemarioConfirmado(
     if (runId) await logTestStep(supabase, runId, projectId, 'prereq:temario', 'running');
     await supabase.confirmarTemario(projectId);
     console.log('[TEST-RUN] prereq:temario — confirmado (registro existente)');
-    if (runId) await logTestStep(supabase, runId, projectId, 'prereq:temario', 'confirmed-existing');
+    if (runId) await logTestStep(supabase, runId, projectId, 'prereq:temario', 'completed');
     return;
   }
 
@@ -359,7 +359,7 @@ async function ensureCanonicalSpecFrozen(
   }
   await supabase.confirmCanonicalSpecFrozen(projectId);
   console.log('[TEST-RUN] prereq:canonical-spec — confirmado');
-  if (runId) await logTestStep(supabase, runId, projectId, 'prereq:canonical-spec', 'confirmed');
+  if (runId) await logTestStep(supabase, runId, projectId, 'prereq:canonical-spec', 'completed');
 }
 
 // ── Background runner ──────────────────────────────────────────────────────

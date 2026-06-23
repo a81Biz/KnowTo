@@ -3,6 +3,50 @@
 
 ---
 
+## 2026-06-22 — PT-215 — Fix H-033 VERIFICADA ✅ — Score 98.5/A → 100/A+
+
+- Trigger: R-020 FPGE-004 aprobado → PT-215 TRIVIAL STATE 1-EXPRESS.
+- **Fix:** `test.handlers.ts` línea 301 `'confirmed-existing'` → `'completed'`; línea 362 `'confirmed'` → `'completed'`.
+- **Tests:** 355 passed / 6 failed (pre-existing) — 0 nuevas regresiones.
+- **Verificación BD run 1** (98efc80b): `prereq:temario='skipped'`, `prereq:canonical-spec='skipped'` — INSERTs aceptados ✅
+- **Verificación BD run 2** (d765f7c9, canonical_spec_frozen reset a false): `prereq:canonical-spec='completed'` — path fijo ejercitado, INSERT aceptado ✅. `canonical_spec_frozen` restaurado a `true` ✅
+- **H-033 → VERIFICADA** ✅ — D2: 95→100 | Health: 98.5→**100/A+**
+- **Score PT-215:** D1=100 | D2=100 | D3=100 | D4=100 | Health=**100/A+** | Potable-Water DESACTIVADA ✅
+- **Hallazgos activos: 0** (todos verificados)
+- **Archivos modificados:** `test.handlers.ts` (2 líneas), `docs/implementation/evidence/PT-215/`, `HISTORY.log`, `HANDOFF.md`, `PENDING_TASKS.md`
+
+---
+
+## 2026-06-22 — PT-215-OLD — Fix H-033 CORREGIDA (VALIDATION_PENDING) [SUPERADO]
+
+- Trigger: R-020 FPGE-004 aprobado → PT-215 TRIVIAL STATE 1-EXPRESS.
+- **Fix:** `test.handlers.ts` línea 301 `'confirmed-existing'` → `'completed'`; línea 362 `'confirmed'` → `'completed'`.
+- **Tests:** 355 passed / 6 failed (pre-existing) — 0 nuevas regresiones.
+- **H-033 → CORREGIDA** (VALIDATION_PENDING): penalización −5 permanece hasta verificación empírica en BD.
+- **Score actual:** 98.5/A (sin cambio hasta VERIFICADA). Score proyectado post-VERIFICADA: 100/A+.
+- **Evidencia:** `docs/implementation/evidence/PT-215/E-215-01-fix-constraint.md`
+- **Validación requerida:** `POST /dcfl/test/run-all` → `test_run_logs.status IN ('completed','skipped')` para prereq steps.
+
+---
+
+## 2026-06-22 — S-019 — Delta Sync commit 77bcb3f — Score 100/A+ → 98.5/A
+
+- Trigger: `[START PTSA]` — Delta Sync sobre commit `77bcb3f` (2026-06-22 22:17).
+- **Scope auditado:** `test.handlers.ts` (+107 líneas prerequisite checks) + `README.md` (2 líneas).
+- **Verificaciones pasadas ✅:**
+  - `getCanonicalSpecFrozen()` / `confirmCanonicalSpecFrozen()` → existen en supabase.service.ts (líneas 1189/1199).
+  - Migración 050 aplicada — `canonical_spec_frozen BOOLEAN DEFAULT false` confirmado en BD viva.
+  - Lógica 3-branch (ya-confirmado / existe-no-confirmado / sin-registro) → correcta.
+  - Prerequisito fallido → non-fatal (degraded mode) → correcto.
+  - Orden temario→canonical_spec → correcto.
+- **H-033 ABIERTA (D2/MEDIA −5):** `test_run_logs` CHECK constraint violado — `'confirmed-existing'` (línea 301) y `'confirmed'` (línea 362) no están en `ARRAY['running','completed','failed','skipped','timeout']`. INSERTs fallan silenciosamente. Solo afecta test runner; productos P1-P8 no afectados. Fix: cambiar ambos a `'completed'`.
+- **Evidencia:** E-029.
+- **Score S-019:** D1=100 | D2=100→95 (H-033 -5) | D3=100 | D4=100 | Health: 100/A+ → **98.5/A**
+- Potable-Water Rule: D1=100 ≥ 60 → DESACTIVADA ✅
+- Archivos PTSA actualizados: ESTADO_ACTUAL.md, RESUMEN.md, score-history.json, H-033.md, E-029.md
+
+---
+
 ## 2026-06-22 — S-018 — PT-213 — Score 94/A → 100/A+
 
 - Trigger: PT-213 Mandate ACK STATE 3 → FDGE States 4–7. Verificar en fuente real: P1 `aprobado` + P3 nombres canónicos.

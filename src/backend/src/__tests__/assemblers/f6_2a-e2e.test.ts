@@ -6,6 +6,8 @@ function buildServices(outputs: Record<string, string> = {}) {
   return {
     supabase: {
       saveDocument: vi.fn().mockResolvedValue({ documentId: 'doc-f6_2a-test' }),
+      getF4Productos: vi.fn().mockResolvedValue([]),
+      getProjectDocuments: vi.fn().mockResolvedValue([]),
     },
     pipelineService: {
       getAgentOutput: vi.fn().mockImplementation((_job: string, name: string) =>

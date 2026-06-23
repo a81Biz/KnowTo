@@ -11,7 +11,7 @@ ultima_actualizacion: 2026-06-22
 
 **Sistema:** KnowTo — Plataforma de Diseño Instruccional EC0366
 **Score Global: 100 / 100 — Clasificación A+** ✅ (Potable-Water Rule DESACTIVADA: D1=100 ≥ 60)
-**Fecha de cierre original:** 2026-06-14 | **Última actualización:** 2026-06-22 (sesión S-018 / PT-213)
+**Fecha de cierre original:** 2026-06-14 | **Última actualización:** 2026-06-22 (PT-215 / H-033 VERIFICADA)
 
 ---
 
@@ -37,20 +37,20 @@ ultima_actualizacion: 2026-06-22
 
 ## Scores por dimensión
 
-| Dimensión | Score S-016 | Score S-017 | Score S-018 | Hallazgos activos | Clasificación |
+| Dimensión | Score S-018 | Score S-019 | Score PT-215 | Hallazgos activos | Clasificación |
 |:---:|:---:|:---:|:---:|:---:|:---:|
-| D1 — Alineación de Dominio (30%) | **75** ✅ | **80** ✅ | **100** ✅ | — (0 activos) | **Perfecto** |
-| D2 — Integridad Arquitectónica (30%) | **100** | **100** | **100** | — | **Perfecto** |
+| D1 — Alineación de Dominio (30%) | **100** ✅ | **100** ✅ | **100** ✅ | — (0 activos) | **Perfecto** |
+| D2 — Integridad Arquitectónica (30%) | **100** | **95** | **100** ✅ | — (H-033 VERIFICADA) | **Perfecto** |
 | D3 — Trazabilidad/Observabilidad (30%) | **100** | **100** | **100** | — | **Perfecto** |
 | D4 — Fidelidad Documental (10%) | **100** | **100** | **100** | — | **Perfecto** |
-| **GLOBAL** | **92.5** ✅ | **94** ✅ | **100** ✅ | 0 hallazgos activos | **A+** |
+| **GLOBAL** | **100** ✅ | **98.5** | **100** ✅ | 0 hallazgos activos | **A+** |
 
-**Cálculo S-018 (2026-06-22):**
-- D1 = max(0, 100) = **100** (H-008 VERIFICADA, H-009 VERIFICADA, H-031 VERIFICADA — ninguno penaliza)
+**Cálculo PT-215 (2026-06-22):**
+- D1 = 100 | D2 = 100 (H-033 VERIFICADA — penalización −5 eliminada) | D3 = 100 | D4 = 100
 - Health_raw = (100×0.30) + (100×0.30) + (100×0.30) + (100×0.10) = 30 + 30 + 30 + 10 = **100**
 - **Potable-Water Rule: D1 = 100 ≥ 60 → DESACTIVADA → Health = 100 → Clasificación A+** ✅
 
-**Score máximo alcanzado. Todos los hallazgos activos verificados en fuente real.**
+**PT-215 (2026-06-22): H-033 VERIFICADA ✅. Score 98.5/A → 100/A+. Score máximo restaurado. 0 hallazgos activos.**
 
 ---
 
@@ -86,6 +86,29 @@ ultima_actualizacion: 2026-06-22
 | H-029 | D1 | ALTA | **VERIFICADA** ✅ | EC0366 en ítems 3 y 5 de F6_2b (PT-208) |
 | H-030 | D1 | BAJA | **VERIFICADA** ✅ | fecha_inicio < fecha_cierre (PT-208) |
 | H-032 | D1 | BAJA | **VERIFICADA** ✅ | EC0366 en conclusión F7 (PT-208) |
+
+---
+
+## PT-215 (2026-06-22) — Fix H-033 + VERIFICADA
+
+Score: **98.5/A → 100/A+** ✅ | H-033: CORREGIDA → **VERIFICADA** ✅
+
+| Ítem | Tipo | Resultado |
+|:---:|:---:|:---|
+| Línea 301: `'confirmed-existing'` → `'completed'` | BUG FIX | ✅ |
+| Línea 362: `'confirmed'` → `'completed'` | BUG FIX | ✅ |
+| Tests: 355 passed / 0 nuevas regresiones | VALIDATION | ✅ |
+| BD run 1 (98efc80b): `prereq:canonical-spec = 'skipped'` | EVIDENCE | ✅ |
+| BD run 2 (d765f7c9): `prereq:canonical-spec = 'completed'` | EVIDENCE | ✅ path fijo ejercitado |
+
+**Potable-Water Rule: D1=100 → DESACTIVADA → Health=100 → Clasificación A+** ✅
+**0 hallazgos activos. Score máximo restaurado.**
+
+---
+
+## Sesión S-019 (Delta Sync, 2026-06-22) — commit 77bcb3f
+
+Score: **100/A+ → 98.5/A** | H-033: nueva ABIERTA (D2/MEDIA) — resuelta en PT-215
 
 ---
 
